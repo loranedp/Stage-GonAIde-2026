@@ -30,7 +30,7 @@ def calculate_polygon_area(yolo_coords, image_width, image_height):
     area = abs(area) / 2.0
     return area
 
-# ---- Calcul de la surface -----
+# ---- Calcul de la surface : images transversales -----
 def calculate_areas(mask_path, image_path, echelle):
     # Importer l'image
     image = cv2.imread(image_path)
@@ -62,7 +62,7 @@ def calculate_areas(mask_path, image_path, echelle):
 
     return surface_cm2_gonade, surface_cm2_cavite
 
-
+# ---- Calcul du volume : images transversales -----
 def calculate_volumes(df, id, path):
     #---- Initialisation des variables ----
     resultats = {"id poisson": [], "position echo": [], "surface_cavite": [], "surface_gonade": [], "volume_cavite": [], 
@@ -157,5 +157,92 @@ def calculate_volumes(df, id, path):
 
         resultats["volume_cavite"].append(0)
         resultats["volume_gonade"].append(0)
+
+    return resultats
+
+
+# ---- Calcul de la surface : images longitudinales -----
+def calculate_eggs_areas(mask_path, image_path, echelle):
+    # Importer l'image
+    image = cv2.imread(image_path)
+    image_height = image.shape[0]
+    image_width = image.shape[1]
+    
+    # Importer le masque YOLO
+    with open(mask_path, "r") as f:
+        lines = [line for line in f.readlines() if line.strip()]
+
+    # --- Calculer l'aire de chaque instance et faire la moyenne des 2 plus grandes surfaces ---
+    area_eggs = []
+    for line in lines:
+        values = [float(x) for x in line.split()]
+        yolo_coords = values[1:]
+        area = calculate_polygon_area(yolo_coords, image_width, image_height)
+        area_eggs.append(area)
+
+    # --- Prendre les 20% plus grandes surfaces ---
+    area_eggs.sort(reverse=True)
+    area_eggs = area_eggs[:max(1, int(0.2 * len(area_eggs)))]
+
+    # ---- Faire la moyenne des surfaces sélectionnées ----
+    mean_area_eggs = np.mean(area_eggs) if area_eggs else 0
+
+    # ---- Transformation des pixels en mm ----
+    surface_cm2_eggs = (echelle / image_height) ** 2 * mean_area_eggs
+
+    return surface_cm2_eggs
+
+
+# ---- Calcul du volume : images longitudinales -----
+def calculate_volumes(df, id, path):
+    #---- Initialisation des variables ----
+    resultats = {"id poisson": [], "surface_moyenne_oeufs": [], "volume_moyen_oeufs": [], "echelle": []}
+    
+    volumes_oeufs_list = []
+    count = 0
+
+    # ---- On parcours chaque échographie du poisson ----
+    for index, row in df.iterrows():
+        file_path = row["new_name_file"]
+
+        # --- Importation des images et des masques ---
+        mask_path = f"../{path}{file_path}.txt"
+        image_path = f"../data/COCO/oeufs/{file_path}.jpg"
+
+        if os.path.exists(mask_path) : # Vérifie si le fichier existe
+            count += 1
+            echelle = row["echelle"] # Récupère l'échelle de l'image
+
+            # --- Calcul de la surface moyenne des oeufs ---
+            surface_oeufs = calculate_eggs_areas(mask_path, image_path, echelle)
+
+            # ---- Calcul du rayon du cercle à partir des surfaces ----
+            rayon_oeufs = np.sqrt(surface_oeufs/np.pi)
+
+            # ---- Calcul du volume des spheres ----
+            volume_oeufs = 4/3 * np.pi * rayon_oeufs**3
+
+            volumes_oeufs_list.append(volume_oeufs)
+
+            print(f"Echo n° : {count}, surface oeufs : {surface_oeufs:.2f} cm2, rayon : {rayon_oeufs:.2f} cm")
+
+            resultats["id poisson"].append(str(id))
+            resultats["surface_moyenne_oeufs"].append(surface_oeufs)
+            resultats["volume_moyen_oeufs"].append(volume_oeufs)
+            resultats["echelle"].append(echelle)
+
+    # --- Calcul du volume total des oeufs ---
+    if np.sum(volumes_oeufs_list) != 0:
+       # Faire la moyenne des volumes calculés pour chaque échographie
+        volume_total_oeufs = np.mean(volumes_oeufs_list)
+
+        print(f"Poisson n°: {id}, Nombre d'échos : {count}/{len(df)}, Volume total oeufs: {volume_total_oeufs:.2f} cm3")
+        print("-----------------------")
+
+    else:
+        print("les oeufs ne sont pas visibles.")
+        print(f"Poisson n°: {id}, Nombre d'échos : {count}/{len(df)}")
+        print("-----------------------")
+        volume_total_oeufs = "NA"
 
     return resultats
