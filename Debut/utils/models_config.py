@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 import cv2
 import json
-from sklearn.model_selection import StratifiedGroupKFold
+from sklearn.model_selection import GroupKFold, StratifiedGroupKFold
 
 
 sys.path.append(str(Path.cwd().parent)) # Ajoute le dossier parent au chemin de recherche de Python
@@ -135,14 +135,24 @@ def split_dataset(all_samples, all_images_dir, df, IMAGE_SIZE, num_classes, clas
     # Récupérer la liste de toutes les catégories
     categories_all = [sample['category'] for sample in all_samples]
 
-    # -------- 1. Séparation stratifiée par groupe : train/val (85%) vs test (15%) --------
-    kf = StratifiedGroupKFold(n_splits=6) # On utilise 6 splits pour simuler un ratio 83/17 (proche de 85/15)
-
     X = np.array(all_samples, dtype=object) # Les images
     y = np.array(categories_all) # Les classes
     groups = np.array([sample["image_info"]["file_name"].split("_")[2] for sample in all_samples]) # L'ID du poisson pour chaque image
 
-    for cv_idx, test_idx in kf.split(X, y, groups):
+    # Les exports qui ne contiennent pas les métadonnées d'échographie (ex: oeufs)
+    # ne peuvent pas être traités par StratifiedGroupKFold avec des NaN. On conserve
+    # l'absence de stratification tout en garantissant qu'un même poisson reste dans
+    # un seul sous-ensemble.
+    metadata_available = all(value is not None and not (isinstance(value, float) and np.isnan(value))
+                             for value in categories_all)
+    if metadata_available and len(np.unique(y)) > 1:
+        kf = StratifiedGroupKFold(n_splits=6, shuffle=True, random_state=42)
+        split_iterator = kf.split(X, y, groups)
+    else:
+        kf = GroupKFold(n_splits=6)
+        split_iterator = kf.split(X, groups=groups)
+
+    for cv_idx, test_idx in split_iterator:
         cv_samples, test_samples = X[cv_idx], X[test_idx]
         cv_categories, test_categories = y[cv_idx], y[test_idx]
         groups_train, groups_test = groups[cv_idx], groups[test_idx]

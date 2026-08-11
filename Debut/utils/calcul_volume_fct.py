@@ -81,6 +81,8 @@ def calculate_volumes(df, id, path):
     for index, row in df.iterrows():
         file_path = row["new_name_file"]
 
+        df = df[df["type_image"] != "œufs"] # Filtrer les écho sans type "oeufs"
+
         # --- Importation des images et des masques ---
         mask_path = f"../{path}{file_path}.txt"
         image_path = f"../data/COCO/images/{file_path}.jpg"
@@ -129,13 +131,14 @@ def calculate_volumes(df, id, path):
             resultats["augmentation_surface_gonade"].append(augmentation_surface_gonade)
             resultats["augmentation_surface_cavite"].append(augmentation_surface_cavite)
 
+
     # --- Calcul du volume total des gonades et de la cavité ---
     if np.sum(volumes_gonade_list) != 0:
         # ---- Calcul du cône final ----
-        volume_gonade = np.pi * rayon_gonade**2 * abs(row["position"] - row["long_gonade"]) / 3 # Formule d'un cône
+        volume_gonade = np.pi * last_rayon_gonade**2 * abs(last_row["position"] - last_row["long_gonade"]) / 3 # Formule d'un cône
         volumes_gonade_list.append(volume_gonade)
 
-        volume_cavite = np.pi * rayon_cavite**2 * abs(row["position"] - row["long_gonade"]) / 3 # Formule d'un cône
+        volume_cavite = np.pi * last_rayon_cavite**2 * abs(last_row["position"] - last_row["long_gonade"]) / 3 # Formule d'un cône
         volumes_cavite_list.append(volume_cavite)
 
         # --- calcul volume final ----
@@ -194,12 +197,14 @@ def calculate_eggs_areas(mask_path, image_path, echelle):
 
 
 # ---- Calcul du volume : images longitudinales -----
-def calculate_volumes(df, id, path):
+def calculate_eggs_volumes(df, id, path):
     #---- Initialisation des variables ----
-    resultats = {"id poisson": [], "surface_moyenne_oeufs": [], "volume_moyen_oeufs": [], "echelle": []}
+    resultats = {"id poisson": [], "position echo": [], "surface_moyenne_oeufs": [], "volume_moyen_oeufs": [], "echelle": []}
     
     volumes_oeufs_list = []
     count = 0
+
+    df = df[df["type_image"] == "œufs"] # Filtrer les écho de type "oeufs"
 
     # ---- On parcours chaque échographie du poisson ----
     for index, row in df.iterrows():
@@ -224,25 +229,20 @@ def calculate_volumes(df, id, path):
 
             volumes_oeufs_list.append(volume_oeufs)
 
-            print(f"Echo n° : {count}, surface oeufs : {surface_oeufs:.2f} cm2, rayon : {rayon_oeufs:.2f} cm")
+            print(f"Echo n° : {count}, surface oeufs : {surface_oeufs:.3f} cm2, rayon : {rayon_oeufs:.3f} cm, volume : {volume_oeufs:.4f} cm3")
 
             resultats["id poisson"].append(str(id))
             resultats["surface_moyenne_oeufs"].append(surface_oeufs)
             resultats["volume_moyen_oeufs"].append(volume_oeufs)
             resultats["echelle"].append(echelle)
+            resultats["position echo"].append(row["type_image"])
 
     # --- Calcul du volume total des oeufs ---
     if np.sum(volumes_oeufs_list) != 0:
        # Faire la moyenne des volumes calculés pour chaque échographie
         volume_total_oeufs = np.mean(volumes_oeufs_list)
 
-        print(f"Poisson n°: {id}, Nombre d'échos : {count}/{len(df)}, Volume total oeufs: {volume_total_oeufs:.2f} cm3")
+        print(f"Poisson n°: {id}, Nombre d'échos : {count}/{len(df)}, Volume total oeufs: {volume_total_oeufs:.4f} cm3")
         print("-----------------------")
-
-    else:
-        print("les oeufs ne sont pas visibles.")
-        print(f"Poisson n°: {id}, Nombre d'échos : {count}/{len(df)}")
-        print("-----------------------")
-        volume_total_oeufs = "NA"
 
     return resultats
