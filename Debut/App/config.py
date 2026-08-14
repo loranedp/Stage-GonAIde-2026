@@ -12,11 +12,11 @@ if str(ROOT_DIR) not in sys.path:
 
 # --- Modèle : ensemble des 5 folds (U-NET) ---
 FOLD_MODEL_PATHS = [
-    ROOT_DIR / "App" / "unet_finetuned_fold_1.pth",
-    ROOT_DIR / "App" / "unet_finetuned_fold_2.pth",
-    ROOT_DIR / "App" / "unet_finetuned_fold_3.pth",
-    ROOT_DIR / "App" / "unet_finetuned_fold_4.pth",
-    ROOT_DIR / "App" / "unet_finetuned_fold_5.pth",
+    ROOT_DIR / "App" / "checkpoints" / "unet_finetuned_fold_1.pth",
+    ROOT_DIR / "App" / "checkpoints" / "unet_finetuned_fold_2.pth",
+    ROOT_DIR / "App" / "checkpoints" / "unet_finetuned_fold_3.pth",
+    ROOT_DIR / "App" / "checkpoints" / "unet_finetuned_fold_4.pth",
+    ROOT_DIR / "App" / "checkpoints" / "unet_finetuned_fold_5.pth",
     ]
 IMAGE_SIZE = (512, 512)  # (W, H) taille d'entrée du modèle, après crop
 CROP_PARAMS = [85, 33, 510, 380]  # x, y, w, h appliqué avant resize (RoboflowUNetDataset)

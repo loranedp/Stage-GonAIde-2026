@@ -1,10 +1,11 @@
 """Interface Streamlit : segmentation de gonades de poisson et calcul de volume."""
 
+import logging
+
 import numpy as np
 import pandas as pd
 import streamlit as st
 from PIL import Image
-from streamlit_drawable_canvas import st_canvas
 
 import calcul_volume_gonade
 import config
@@ -12,7 +13,11 @@ import data_utils
 import metadata_utils
 import model_utils
 import train
+from canvas_adapter import st_stable_canvas
 from filename_utils import parse_filename
+from mask_editor_utils import apply_pending_stroke, extract_stroke_mask
+
+logger = logging.getLogger(__name__)
 
 st.set_page_config(page_title="Segmentation gonades", layout="wide")
 
@@ -131,39 +136,9 @@ def _canvas_dims() -> tuple:
     return canvas_width, canvas_height
 
 
-def extract_stroke_mask(image_data: np.ndarray, mode: str) -> np.ndarray:
-    """Isole les pixels tracés au pinceau sur le canvas d'édition, selon la couleur
-    correspondant au mode actif (vert pour Ajouter, rouge pour Effacer)."""
-    r = image_data[..., 0].astype(int)
-    g = image_data[..., 1].astype(int)
-    b = image_data[..., 2].astype(int)
-    if mode == "Ajouter":
-        return (g > 180) & (r < 120) & (b < 120)
-    return (r > 180) & (g < 120) & (b < 120)
-
-
-def apply_stroke_to_masks(masks: dict, class_name: str, stroke_small: np.ndarray, mode: str) -> None:
-    """Applique (en place) un tracé du canvas (résolution canvas) au masque pleine résolution
-    de class_name : redimensionne vers la taille du crop puis replace au bon offset
-    (config.CROP_PARAMS), à l'inverse exact de ce que fait model_utils.predict."""
-    x, y, w, h = config.CROP_PARAMS
-    stroke_img = Image.fromarray((stroke_small * 255).astype(np.uint8)).resize(
-        (w, h), Image.Resampling.NEAREST
-    )
-    stroke_crop = np.array(stroke_img) > 0
-
-    mask = masks[class_name]
-    full_stroke = np.zeros_like(mask)
-    full_stroke[y : y + h, x : x + w] = stroke_crop
-
-    if mode == "Ajouter":
-        masks[class_name] = mask | full_stroke
-    else:
-        masks[class_name] = mask & ~full_stroke
-
-
 def render_mask_editor(filename: str, pred: dict) -> None:
-    edited_masks = st.session_state.editing[filename]["masks"]
+    edit_state = st.session_state.editing[filename]
+    edited_masks = edit_state["masks"]
 
     st.markdown("**Re-labellisation des masques**")
     edit_col1, edit_col2, edit_col3 = st.columns([2, 2, 2])
@@ -180,6 +155,26 @@ def render_mask_editor(filename: str, pred: dict) -> None:
             "Largeur du pinceau", min_value=2, max_value=40, value=12, key=f"edit_width_{filename}"
         )
 
+    # Le composant est recréé au changement de classe ou de mode. Le tracé de
+    # l'outil précédent, déjà renvoyé lors du mouse-up, est donc d'abord intégré.
+    current_tool = (active_class, mode)
+    previous_tool = edit_state.get("tool")
+    if previous_tool is None:
+        edit_state["tool"] = current_tool
+    elif previous_tool != current_tool:
+        try:
+            apply_pending_stroke(edit_state, config.CROP_PARAMS)
+        except (ValueError, KeyError) as exc:
+            logger.exception(
+                "Impossible d'appliquer le tracé avant changement d'outil",
+                extra={"image_name": filename},
+            )
+            st.error(f"{filename} : tracé invalide ({exc}).")
+        edit_state["tool"] = current_tool
+        st.session_state.canvas_version[filename] = (
+            st.session_state.canvas_version.get(filename, 0) + 1
+        )
+
     canvas_width, canvas_height = _canvas_dims()
     preview = overlay_masks(pred["image"], edited_masks, alphas=EDIT_CLASS_ALPHAS)
     background = crop_for_display(preview).resize((canvas_width, canvas_height))
@@ -189,7 +184,7 @@ def render_mask_editor(filename: str, pred: dict) -> None:
 
     canvas_col, origin_col = st.columns([3, 1])
     with canvas_col:
-        canvas_result = st_canvas(
+        canvas_result = st_stable_canvas(
             fill_color="rgba(0, 0, 0, 0)",
             stroke_width=stroke_width,
             stroke_color=stroke_color,
@@ -203,15 +198,33 @@ def render_mask_editor(filename: str, pred: dict) -> None:
     with origin_col:
         st.image(crop_for_display(pred["image"]), width=EDIT_ORIGIN_PREVIEW_WIDTH)
 
+    # À chaque mouse-up, update_streamlit déclenche un rerun et fournit tous les
+    # traits du canvas. On conserve le tracé courant afin qu'un clic direct sur
+    # « Valider » ou un changement d'outil ne puisse pas le perdre.
+    if canvas_result.image_data is not None:
+        try:
+            stroke_small = extract_stroke_mask(canvas_result.image_data, mode)
+            edit_state["pending"] = (
+                {"stroke": stroke_small.copy(), "class_name": active_class, "mode": mode}
+                if stroke_small.any()
+                else None
+            )
+        except ValueError as exc:
+            logger.exception("Données de canvas invalides", extra={"image_name": filename})
+            st.error(f"{filename} : le tracé reçu est invalide ({exc}).")
+
     action_col1, action_col2, action_col3 = st.columns([1, 1, 2])
     with action_col1:
         if st.button("Appliquer le tracé", key=f"apply_stroke_{filename}"):
-            if canvas_result.image_data is not None:
-                stroke_small = extract_stroke_mask(canvas_result.image_data, mode)
-                if stroke_small.any():
-                    apply_stroke_to_masks(edited_masks, active_class, stroke_small, mode)
+            try:
+                if apply_pending_stroke(edit_state, config.CROP_PARAMS):
                     st.session_state.canvas_version[filename] = version + 1
                     st.rerun()
+                else:
+                    st.warning("Aucun tracé à appliquer.")
+            except (ValueError, KeyError) as exc:
+                logger.exception("Échec d'application du tracé", extra={"image_name": filename})
+                st.error(f"{filename} : impossible d'appliquer le tracé ({exc}).")
     with action_col2:
         if st.button("Annuler", key=f"cancel_edit_{filename}"):
             del st.session_state.editing[filename]
@@ -219,19 +232,30 @@ def render_mask_editor(filename: str, pred: dict) -> None:
             st.rerun()
     with action_col3:
         if st.button("Valider les modifications", key=f"save_edit_{filename}", type="primary"):
-            pred["masks"] = edited_masks
-            data_utils.add_image_to_corrected_set(filename, pred["image"], pred["masks"])
-            previous_status = st.session_state.statuses.get(filename, config.DEFAULT_STATUS)
-            if previous_status == "bonne":
-                data_utils.remove_image_from_training_set(filename)
-            elif previous_status == "mauvaise":
-                data_utils.remove_image_from_labellisation_set(filename)
-            st.session_state.statuses[filename] = config.DEFAULT_STATUS
-            st.session_state.corrected.add(filename)
-            del st.session_state.editing[filename]
-            st.session_state.canvas_version.pop(filename, None)
-            st.toast(f"{filename} modifiée !", icon="✅")
-            st.rerun()
+            try:
+                apply_pending_stroke(edit_state, config.CROP_PARAMS)
+                data_utils.add_image_to_corrected_set(filename, pred["image"], edited_masks)
+                previous_status = st.session_state.statuses.get(filename, config.DEFAULT_STATUS)
+                if previous_status == "bonne":
+                    data_utils.remove_image_from_training_set(filename)
+                elif previous_status == "mauvaise":
+                    data_utils.remove_image_from_labellisation_set(filename)
+            except (OSError, ValueError, KeyError, data_utils.DataStoreError) as exc:
+                logger.exception(
+                    "Échec de sauvegarde de la correction", extra={"image_name": filename}
+                )
+                st.error(
+                    f"{filename} : la correction n'a pas pu être enregistrée ({exc}). "
+                    "L'éditeur reste ouvert et votre travail est conservé."
+                )
+            else:
+                pred["masks"] = {name: mask.copy() for name, mask in edited_masks.items()}
+                st.session_state.statuses[filename] = config.DEFAULT_STATUS
+                st.session_state.corrected.add(filename)
+                del st.session_state.editing[filename]
+                st.session_state.canvas_version.pop(filename, None)
+                st.toast(f"{filename} modifiée !", icon="✅")
+                st.rerun()
 
 
 init_state()
@@ -274,7 +298,17 @@ with tab_prediction:
                         st.error(str(exc))
                         continue
 
-                    corrected_data = data_utils.load_corrected_image_and_masks(filename)
+                    try:
+                        corrected_data = data_utils.load_corrected_image_and_masks(filename)
+                    except (OSError, ValueError, KeyError, data_utils.DataStoreError) as exc:
+                        logger.exception(
+                            "Échec de chargement d'une correction", extra={"image_name": filename}
+                        )
+                        st.error(
+                            f"{filename} : correction enregistrée illisible ({exc}). "
+                            "La prédiction n'a pas été lancée afin de ne pas masquer le problème."
+                        )
+                        continue
                     if corrected_data is not None:
                         image = corrected_data["image"]
                         masks = corrected_data["masks"]
@@ -282,6 +316,7 @@ with tab_prediction:
                         st.session_state.corrected.add(filename)
                     else:
                         image = Image.open(uploaded_file).convert("RGB")
+                        st.session_state.corrected.discard(filename)
                         try:
                             result = model_utils.predict(models, image, parsed.id_image)
                         except ValueError as exc:
@@ -428,29 +463,79 @@ with tab_prediction:
                             previous_status = st.session_state.statuses.get(
                                 filename, config.DEFAULT_STATUS
                             )
-                            st.session_state.statuses[filename] = status
-                            if status == "bonne":
-                                data_utils.add_image_to_training_set(
-                                    filename, pred["image"], pred["masks"]
-                                )
-                            elif previous_status == "bonne":
-                                data_utils.remove_image_from_training_set(filename)
+                            try:
+                                if status == "bonne":
+                                    data_utils.add_image_to_training_set(
+                                        filename, pred["image"], pred["masks"]
+                                    )
+                                elif previous_status == "bonne":
+                                    data_utils.remove_image_from_training_set(filename)
 
-                            if status == "mauvaise":
-                                data_utils.add_image_to_labellisation_set(
-                                    filename, pred["image"], pred["masks"]
+                                if status == "mauvaise":
+                                    data_utils.add_image_to_labellisation_set(
+                                        filename, pred["image"], pred["masks"]
+                                    )
+                                elif previous_status == "mauvaise":
+                                    data_utils.remove_image_from_labellisation_set(filename)
+                            except (OSError, ValueError, KeyError, data_utils.DataStoreError) as exc:
+                                logger.exception(
+                                    "Échec du changement de statut",
+                                    extra={"image_name": filename, "status": status},
                                 )
-                            elif previous_status == "mauvaise":
-                                data_utils.remove_image_from_labellisation_set(filename)
-
-                            st.rerun()
+                                st.error(f"{filename} : statut non enregistré ({exc}).")
+                            else:
+                                st.session_state.statuses[filename] = status
+                                st.rerun()
 
                     if filename not in st.session_state.editing:
-                        if st.button("Re-labellisation", key=f"edit_toggle_{filename}"):
-                            st.session_state.editing[filename] = {
-                                "masks": {c: m.copy() for c, m in pred["masks"].items()}
-                            }
-                            st.rerun()
+                        relabel_col, delete_col = st.columns(2)
+                        with relabel_col:
+                            if st.button("Re-labellisation", key=f"edit_toggle_{filename}"):
+                                st.session_state.editing[filename] = {
+                                    "masks": {c: m.copy() for c, m in pred["masks"].items()},
+                                    "pending": None,
+                                    "tool": None,
+                                }
+                                st.rerun()
+                        with delete_col:
+                            if filename in st.session_state.corrected:
+                                if st.button(
+                                    "Supprimer labellisation", key=f"delete_correction_{filename}"
+                                ):
+                                    try:
+                                        # Ne retirer la seule correction valide qu'une fois
+                                        # son remplacement par une prédiction confirmé.
+                                        models = model_utils.load_models()
+                                        result = model_utils.predict(
+                                            models, pred["image"], pred["id_image"]
+                                        )
+                                        data_utils.remove_image_from_corrected_set(filename)
+                                    except (
+                                        OSError,
+                                        ValueError,
+                                        KeyError,
+                                        data_utils.DataStoreError,
+                                    ) as exc:
+                                        logger.exception(
+                                            "Échec de suppression de la correction",
+                                            extra={"image_name": filename},
+                                        )
+                                        st.error(
+                                            f"{filename} : labellisation non supprimée ({exc}). "
+                                            "La correction existante a été conservée."
+                                        )
+                                    else:
+                                        pred["masks"] = result["masks"]
+                                        pred["confidences"] = result["confidences"]
+                                        st.session_state.corrected.discard(filename)
+                                        st.session_state.statuses[filename] = (
+                                            data_utils.get_disk_status(filename)
+                                            or config.DEFAULT_STATUS
+                                        )
+                                        st.toast(
+                                            f"Labellisation de {filename} supprimée !", icon="🗑️"
+                                        )
+                                        st.rerun()
 
                 if filename in st.session_state.editing:
                     render_mask_editor(filename, pred)
