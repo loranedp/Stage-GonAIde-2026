@@ -1,0 +1,7 @@
+.venv
+mon_venv
+.vscode
+__pycache__
+Debut/UNet/saves
+Debut/App/checkpoints
+Debut/App/__pycache__
