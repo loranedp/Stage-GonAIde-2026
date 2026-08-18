@@ -5,6 +5,8 @@ import statsmodels.api as sm
 import seaborn as sns
 import cv2
 from PIL import Image
+from matplotlib.colors import BoundaryNorm, ListedColormap
+from matplotlib.patches import Patch
 
 
 def distribution(donnees, titre="Distribution", xlabel="Valeurs", couleur='cornflowerblue'):
@@ -229,6 +231,141 @@ def overlay_mask(image_tensor, mask_tensor, alpha=0.4, target_size=None):
                 overlay[..., rgb_channel]
             )
     return overlay
+
+
+def plot_segmentation_comparison(
+    image, mask_true, mask_pred, is_eggs=False, alpha=0.45
+):
+    """Affiche l'image, la vérité terrain et la prédiction côte à côte.
+
+    En mode standard, les masques sont attendus au format ``(C, H, W)`` avec
+    les canaux dans l'ordre suivant : cavité, gonade, intestin. En mode œufs,
+    le masque prédit peut être une carte 2D d'identifiants d'instances ou un
+    masque binaire au format ``(1, H, W)``.
+
+    Args:
+        image: Tenseur image au format ``(C, H, W)``.
+        mask_true: Tenseur du masque réel au format ``(C, H, W)``.
+        mask_pred: Masque prédit multi-canal, binaire ou d'instances.
+        is_eggs: Active l'affichage spécifique aux instances d'œufs.
+        alpha: Transparence des masques superposés, entre 0 et 1.
+
+    Returns:
+        Un tuple ``(fig, axes)`` contenant la figure et ses trois axes.
+    """
+    if not 0 <= alpha <= 1:
+        raise ValueError("alpha doit être compris entre 0 et 1.")
+
+    image_display = np.clip(tensor_to_numpy_image(image), 0, 1)
+    height, width = image_display.shape[:2]
+
+    def resize_label_map(label_map):
+        if label_map.shape != (height, width):
+            label_map = cv2.resize(
+                label_map.astype(np.float32),
+                (width, height),
+                interpolation=cv2.INTER_NEAREST,
+            )
+        return label_map
+
+    def semantic_mask_to_label_map(mask_tensor):
+        mask = mask_tensor.detach().cpu().numpy()
+        if mask.ndim != 3:
+            raise ValueError("Les masques doivent avoir la forme (C, H, W).")
+        if not 1 <= mask.shape[0] <= 3:
+            raise ValueError("Les masques doivent contenir entre 1 et 3 classes.")
+
+        label_map = np.zeros((height, width), dtype=np.uint8)
+        for class_idx, class_mask in enumerate(mask):
+            class_mask = resize_label_map(class_mask)
+            label_map[class_mask > 0.5] = class_idx + 1
+        return label_map
+
+    if is_eggs:
+        true_mask = mask_true.detach().cpu().numpy()
+        if true_mask.ndim == 3 and true_mask.shape[0] == 1:
+            true_mask = true_mask[0]
+        elif true_mask.ndim != 2:
+            raise ValueError("Le masque réel des œufs doit avoir la forme (1, H, W) ou (H, W).")
+        true_labels = (resize_label_map(true_mask) > 0.5).astype(np.uint8)
+
+        pred_mask = mask_pred.detach().cpu().numpy()
+        if pred_mask.ndim == 3 and pred_mask.shape[0] == 1:
+            pred_labels = (
+                resize_label_map(pred_mask[0]) > 0.5
+            ).astype(np.int32)
+        elif pred_mask.ndim == 2:
+            pred_labels = np.rint(resize_label_map(pred_mask)).astype(np.int32)
+            if np.any(pred_labels < 0):
+                raise ValueError("Les identifiants d'instances doivent être positifs ou nuls.")
+        else:
+            raise ValueError(
+                "Le masque prédit des œufs doit avoir la forme (1, H, W) ou (H, W)."
+            )
+
+        instance_count = int(pred_labels.max())
+        true_cmap = ListedColormap(["#000000", plt.cm.tab10(0)])
+        true_norm = BoundaryNorm(np.arange(-0.5, 2.5), true_cmap.N)
+        displayed_instances = max(1, instance_count)
+        pred_colors = ["#000000"] + [
+            plt.cm.tab20(idx % 20) for idx in range(displayed_instances)
+        ]
+        pred_cmap = ListedColormap(pred_colors)
+        pred_norm = BoundaryNorm(
+            np.arange(-0.5, displayed_instances + 1.5), pred_cmap.N
+        )
+        legend_handles = [
+            Patch(color=pred_colors[idx], label=f"Instance {idx}")
+            for idx in range(1, instance_count + 1)
+        ]
+    else:
+        class_names = ["Cavité", "Gonade", "Intestin"]
+        class_colors = [
+            "#1A0CB0",  # Cavité : bleu foncé
+            "#66CCFF",  # Gonade : bleu clair
+            "#8E44AD",  # Intestin : violet
+        ]
+        if mask_true.shape[0] != mask_pred.shape[0]:
+            raise ValueError("mask_true et mask_pred doivent avoir le même nombre de classes.")
+
+        true_labels = semantic_mask_to_label_map(mask_true)
+        pred_labels = semantic_mask_to_label_map(mask_pred)
+        semantic_cmap = ListedColormap(["#000000", *class_colors])
+        semantic_norm = BoundaryNorm(
+            np.arange(-0.5, len(class_colors) + 1.5), semantic_cmap.N
+        )
+        true_cmap = pred_cmap = semantic_cmap
+        true_norm = pred_norm = semantic_norm
+        legend_handles = [
+            Patch(color=class_colors[idx], label=class_names[idx])
+            for idx in range(mask_true.shape[0])
+        ]
+
+    fig, axes = plt.subplots(1, 3, figsize=(20, 8))
+    titles = ["Image originale", "Vérité terrain", "Prédiction"]
+    overlays = [None, true_labels, pred_labels]
+    colormaps = [None, true_cmap, pred_cmap]
+    norms = [None, true_norm, pred_norm]
+
+    for ax, title, labels, cmap, norm in zip(
+        axes, titles, overlays, colormaps, norms
+    ):
+        ax.imshow(image_display)
+        if labels is not None:
+            masked_labels = np.ma.masked_where(labels == 0, labels)
+            ax.imshow(masked_labels, cmap=cmap, norm=norm, alpha=alpha)
+        ax.set_title(title)
+        ax.axis("off")
+
+    if legend_handles:
+        fig.legend(
+            handles=legend_handles,
+            loc="lower center",
+            ncol=min(5, len(legend_handles)),
+        )
+    plt.tight_layout(rect=[0, 0.08, 1, 1])
+    plt.show()
+    return fig, axes
 
 # ----- Fonction pour extraire et formater en YOLO les contours d'un masque COCO ----
 def mask_to_yolo_polygons(mask_bool, class_id, target_size=(640, 480)):

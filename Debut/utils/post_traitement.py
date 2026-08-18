@@ -2,8 +2,9 @@ import torch
 import numpy as np
 import cv2
 from scipy.ndimage import binary_fill_holes
+from skimage.feature import peak_local_max
+from skimage.segmentation import watershed
 
-# ---------------- Post-traitement : conserve un seul masque par classe ----------------
 def keep_largest_components(preds_tensor):
     preds_np = preds_tensor.byte().cpu().numpy() # Transfert du batch sur le CPU pour traitement
     B, C, H, W = preds_np.shape
@@ -26,16 +27,18 @@ def keep_largest_components(preds_tensor):
             preds_np[i, 1] = np.isin(labels, np.where(large_components)[0] + 1).astype(np.uint8) # +1 car on ignore le label 0 (fond)
 
         # -- 3. Intestin : garde toutes les composantes supérieures à 300 pixels ---
-        mask = preds_np[i, 2]
-        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
+        if C > 2: # Si la classe intestin est présente
+            mask = preds_np[i, 2]
+            num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
 
-        if num_labels > 2: # Si plus de deux composantes (fond + au moins 2 objets), on garde toutes celles supérieure à 300 pixels
-            large_components = stats[1:, cv2.CC_STAT_AREA] > 300
-            preds_np[i, 2] = np.isin(labels, np.where(large_components)[0] + 1).astype(np.uint8) # +1 car on ignore le label 0 (fond)
+            if num_labels > 2: # Si plus de deux composantes (fond + au moins 2 objets), on garde toutes celles supérieure à 300 pixels
+                large_components = stats[1:, cv2.CC_STAT_AREA] > 300
+                preds_np[i, 2] = np.isin(labels, np.where(large_components)[0] + 1).astype(np.uint8) # +1 car on ignore le label 0 (fond)
 
     return torch.from_numpy(preds_np).to(preds_tensor.device).bool()
 
-# Fonction pour corriger les formes incohérentes des masques prédits (remplissage des trous et enveloppe convexe pour la cavité)
+# Fonction pour corriger les formes incohérentes des masques prédits (remplissage des trous, suppression des excroissances et des encoches sur le contour,
+# et application d'une enveloppe convexe pour la cavité)
 def fill_holes(preds_tensor):
     preds_np = preds_tensor.byte().cpu().numpy() # Transfert du batch sur le CPU pour traitement
     B, C, H, W = preds_np.shape
@@ -51,11 +54,89 @@ def fill_holes(preds_tensor):
             cv2.fillConvexPoly(new_mask, hull, 1)
             preds_np[i, 0] = new_mask
 
-        # --- 2. Gonades et intestin : remplit les trous ---
-        for c in [1, 2]:
+        # --- 2. Gonades et intestin : remplit les trous et enleve les excroissances ---
+        for c in range(1, C):
             mask = preds_np[i, c]
-            new_mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((10, 10), np.uint8))
+
+            # Noyau arrondi pour ne pas créer de contours carrés
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (10, 10))
+            # Supression des petites excroissances
+            new_mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel) # Ouverture morphologique
+            # Remplissage des petites encoches sur le contour
+            new_mask = cv2.morphologyEx(new_mask, cv2.MORPH_CLOSE, kernel) # Fermeture morphologique
+
+            # Remplissage des trous internes
             new_mask = binary_fill_holes(new_mask).astype(np.uint8)
+
             preds_np[i, c] = new_mask
 
     return torch.from_numpy(preds_np).to(preds_tensor.device).bool()
+
+
+def split_eggs(preds_tensor, min_distance=10, min_area=100):
+    """Sépare un masque sémantique d'œufs en instances par watershed.
+
+    ``preds_tensor`` est un tenseur booléen/binaire ``(B, 1, H, W)``. La
+    valeur retournée est une carte d'identifiants ``(B, H, W)`` : 0 pour le
+    fond et 1..N pour les instances, renumérotées sans trou pour chaque image.
+    """
+    if preds_tensor.ndim != 4 or preds_tensor.shape[1] != 1:
+        raise ValueError("Le masque des œufs doit avoir la forme (B, 1, H, W).")
+    if min_distance < 1 or min_area < 1:
+        raise ValueError("min_distance et min_area doivent être strictement positifs.")
+
+    preds_np = preds_tensor.detach().byte().cpu().numpy()
+    batch_labels = []
+    for batch_mask in preds_np:
+        binary = batch_mask[0].astype(np.uint8)
+
+        # Écarter le bruit avant de chercher les centres des œufs.
+        num_components, component_labels, stats, _ = cv2.connectedComponentsWithStats(
+            binary, connectivity=8
+        )
+        clean = np.zeros_like(binary)
+        for component_id in range(1, num_components):
+            if stats[component_id, cv2.CC_STAT_AREA] >= min_area:
+                clean[component_labels == component_id] = 1
+
+        if not clean.any():
+            batch_labels.append(np.zeros_like(clean, dtype=np.int32))
+            continue
+
+        distance = cv2.distanceTransform(clean, cv2.DIST_L2, 5)
+        peak_coords = peak_local_max(
+            distance,
+            min_distance=min_distance,
+            labels=clean,
+            exclude_border=False,
+        )
+        markers = np.zeros_like(clean, dtype=np.int32)
+        for marker_id, (row, col) in enumerate(peak_coords, start=1):
+            markers[row, col] = marker_id
+
+        # peak_local_max doit normalement fournir un maximum par composante,
+        # mais ce repli garantit qu'aucune composante valide ne disparaît.
+        clean_count, clean_components = cv2.connectedComponents(clean, connectivity=8)
+        next_marker = int(markers.max()) + 1
+        for component_id in range(1, clean_count):
+            component = clean_components == component_id
+            if not np.any(markers[component]):
+                flat_index = np.argmax(np.where(component, distance, -1.0))
+                row, col = np.unravel_index(flat_index, distance.shape)
+                markers[row, col] = next_marker
+                next_marker += 1
+
+        labels = watershed(-distance, markers, mask=clean).astype(np.int32)
+        relabelled = np.zeros_like(labels, dtype=np.int32)
+        next_label = 1
+        for label_id in np.unique(labels):
+            if label_id == 0:
+                continue
+            instance = labels == label_id
+            if int(instance.sum()) < min_area:
+                continue
+            relabelled[instance] = next_label
+            next_label += 1
+        batch_labels.append(relabelled)
+
+    return torch.from_numpy(np.stack(batch_labels)).to(preds_tensor.device)

@@ -129,6 +129,15 @@ def collate_fn_sequence(batch):
         'id_poisson': [item['id_poisson']],
     }
 
+def collate_fn_egg_hv(batch):
+    return {
+        'image': torch.stack([item['image'] for item in batch]),
+        'mask': torch.stack([item['mask'] for item in batch]),
+        'image_path': [item['image_path'] for item in batch],
+        'original_size': [item['original_size'] for item in batch],
+        'crop_params': [item['crop_params'] for item in batch],
+    }
+
 
 def split_dataset(all_samples, all_images_dir, df, IMAGE_SIZE, num_classes, class_ids, dim="2",
                    ignore_category_id=None, ignore_target_class_idx=None, ignore_value=-100.0):
@@ -291,29 +300,40 @@ class BCE_DiceLoss_ignore(torch.nn.Module):
         
         return self.bce_weight * bce_loss + self.dice_weight * dice_loss
 
-# --------- Calcul des métriques par image et par classe ---------
-def get_metrics(true_masks, pred_masks):
-            # Calcul TP, FP et FN par image et par classe
-            tp = (pred_masks & true_masks).float().sum((2, 3))
-            fp = (pred_masks & ~true_masks).float().sum((2, 3))
-            fn = (~pred_masks & true_masks).float().sum((2, 3))
 
-            # Calcul des surfaces et leurs différences
-            true_surface = true_masks.float().sum((2, 3))
-            pred_surface = pred_masks.float().sum((2, 3))
-            
-            diff_surface = (true_surface - pred_surface).abs()
-            ratio_surface = diff_surface / (true_surface + 1e-6)
+# Calcul des métriques par image et par classe avec prise en compte de l'échelle et du dataset
+def metrics_by_class(true, preds, echelle, dataset_name) :
+    intersection = (preds & true).float().sum((2, 3))
+    union = (preds | true).float().sum((2, 3))   
 
-            # Calculs métriques par images
-            intersection = tp
-            union = (pred_masks | true_masks).float().sum((2, 3))   
-            
-            iou_per_img = intersection / (union + 1e-6)  
-            precision_per_img = tp / (tp + fp + 1e-6)
-            recall_per_img = tp / (tp + fn + 1e-6)
-            f1_per_img = 2 * tp / (2 * tp + fp + fn + 1e-6)
+    # --- Calcul de l'IoU ---
+    iou_per_img = intersection / (union + 1e-6)  
+    iou_per_img[union==0] = 1.0 # Si prédiction et vérité sont toutes deux vides, IoU = 1.0
 
-            iou_per_img[union==0] = 1.0
+    # --- Calcul du Dice Score ---
+    dice_per_img = (2 * intersection) / (preds.float().sum((2, 3)) + true.float().sum((2, 3)) + 1e-6)
 
-            return tp, fp, fn,iou_per_img, precision_per_img, recall_per_img, f1_per_img, diff_surface, ratio_surface
+    # --- Calcul de la précision et du rappel ---
+    false_positive = (preds.float().sum((2, 3)) - intersection)
+    false_negative = (true.float().sum((2, 3)) - intersection)
+    precision_per_img = intersection / (intersection + false_positive + 1e-6)
+    recall_per_img = intersection / (intersection + false_negative + 1e-6)
+
+    #--- Calcul des surfaces en cm2 ---
+    pred_surf_pixels = preds.float().sum((2, 3))
+    true_surf_pixels = true.float().sum((2, 3))
+
+    diff_surf_pixels = (true_surf_pixels - pred_surf_pixels).abs()
+    if dataset_name != "oeufs":
+        echelle = echelle.to(
+            device=diff_surf_pixels.device,
+            dtype=diff_surf_pixels.dtype
+        ).reshape(-1, 1)
+
+        # ``echelle`` est la hauteur physique totale de l'image en cm.
+        # Un pixel représente donc (echelle / hauteur_px) ** 2 cm².
+        diff_surface = diff_surf_pixels * (echelle / true.shape[2]) ** 2
+    else:
+        diff_surface = diff_surf_pixels  # En pixels pour le dataset "oeufs"
+
+    return intersection, union,iou_per_img, dice_per_img, precision_per_img, recall_per_img, diff_surface

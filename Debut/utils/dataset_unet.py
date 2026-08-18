@@ -3,18 +3,16 @@
 import sys
 import numpy as np
 import torch
-from torch.nn import functional as F
-import torch.nn as nn
 from PIL import Image
 import pycocotools.mask as mask_util
-import segmentation_models_pytorch as smp
 from pathlib import Path
 import pandas as pd
 
 sys.path.append(str(Path.cwd().parent)) # Ajoute le dossier parent au chemin de recherche de Python
 
-from utils.data_augmentation_fct import data_augmentation, data_augmentation_sequence
+from utils.data_augmentation_fct import data_augmentation
 from utils.conditional_metadata_embedding import CME
+from UNet.models.EggSegmentationHVUNet import generate_hv_targets
 
 
 def decode_segmentation(segmentation, height: int, width: int) -> np.ndarray:
@@ -175,3 +173,37 @@ class RoboflowUNetDataset(torch.utils.data.Dataset):
             'crop_params': self.crop_params,
             'image_path': sample['image_path']
         }
+
+
+class EggHVDataset(torch.utils.data.Dataset):
+    """Dataset COCO d'instances d'œufs pour la sortie masque/H/V."""
+    def __init__(self, samples, image_size, crop_params=(85, 33, 510, 380)):
+        self.samples = samples
+        self.image_size = image_size
+        self.crop_params = crop_params
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        from PIL import Image
+        from utils.dataset_unet import decode_segmentation
+        sample = self.samples[idx]
+        image = Image.open(sample['image_path']).convert('RGB')
+        width, height = image.size
+        instances = []
+        for ann in sample['annotations']:
+            if ann.get('category_id') != 1:
+                continue
+            instances.append(decode_segmentation(ann['segmentation'], height, width))
+        mask, horizontal, vertical = generate_hv_targets(instances, height, width)
+        x, y, w, h = self.crop_params
+        image = image.crop((x, y, x + w, y + h))
+        targets = np.stack([mask[y:y+h, x:x+w], horizontal[y:y+h, x:x+w], vertical[y:y+h, x:x+w]])
+        image = image.resize(self.image_size, Image.Resampling.BILINEAR)
+        image_tensor = torch.from_numpy(np.asarray(image, dtype=np.float32) / 255.0).permute(2, 0, 1).contiguous()
+        targets_tensor = torch.from_numpy(np.stack([np.asarray(Image.fromarray(channel).resize(self.image_size, Image.Resampling.BILINEAR), dtype=np.float32) for channel in targets]))
+        targets_tensor[0].clamp_(0, 1)
+        targets_tensor[1:].clamp_(-1, 1)
+        return {'image': image_tensor, 'mask': targets_tensor, 'image_path': sample['image_path'], 'original_size': (width, height), 'crop_params': self.crop_params}
+

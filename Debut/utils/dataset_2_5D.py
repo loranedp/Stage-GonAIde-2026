@@ -19,7 +19,8 @@ import pandas as pd
 
 sys.path.append(str(Path.cwd().parent)) # Ajoute le dossier parent au chemin de recherche de Python
 
-from utils.dataset_unet import RoboflowUNetDataset, data_augmentation_sequence
+from utils.dataset_unet import RoboflowUNetDataset
+from utils.data_augmentation_fct import data_augmentation_sequence
 
 class SliceSequenceUNetDataset(torch.utils.data.Dataset):
     """

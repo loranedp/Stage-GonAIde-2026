@@ -183,9 +183,9 @@ def calculate_eggs_areas(mask_path, image_path, echelle):
         area = calculate_polygon_area(yolo_coords, image_width, image_height)
         area_eggs.append(area)
 
-    # --- Prendre les 20% plus grandes surfaces ---
+    # --- Prendre les 50% plus grandes surfaces ---
     area_eggs.sort(reverse=True)
-    area_eggs = area_eggs[:max(1, int(0.2 * len(area_eggs)))]
+    area_eggs = area_eggs[:max(1, int(0.5 * len(area_eggs)))]
 
     # ---- Faire la moyenne des surfaces sélectionnées ----
     mean_area_eggs = np.mean(area_eggs) if area_eggs else 0
@@ -194,6 +194,73 @@ def calculate_eggs_areas(mask_path, image_path, echelle):
     surface_cm2_eggs = (echelle / image_height) ** 2 * mean_area_eggs
 
     return surface_cm2_eggs
+
+
+def calculate_eggs_area_from_instances(instance_labels, echelle, image_height):
+    """Calcule la surface moyenne des 50 % plus grandes instances d'œufs.
+
+    ``instance_labels`` est une carte 2D d'identifiants (0 = fond). La règle de
+    sélection est identique à :func:`calculate_eggs_areas`, mais travaille
+    directement sur une prédiction en mémoire.
+    """
+    labels = np.asarray(instance_labels)
+    if labels.ndim != 2:
+        raise ValueError("La carte d'instances d'œufs doit être bidimensionnelle.")
+    if image_height <= 0 or echelle <= 0:
+        raise ValueError("L'échelle et la hauteur de l'image doivent être positives.")
+
+    areas = [
+        int(np.count_nonzero(labels == label_id))
+        for label_id in np.unique(labels)
+        if label_id > 0
+    ]
+    if not areas:
+        return 0.0
+    areas.sort(reverse=True)
+    selected = areas[: max(1, int(0.5 * len(areas)))]
+    mean_area_pixels = float(np.mean(selected))
+    return (float(echelle) / float(image_height)) ** 2 * mean_area_pixels
+
+
+def count_egg_instances(instance_labels):
+    """Compte les identifiants d'œufs distincts (strictement positifs)."""
+    labels = np.asarray(instance_labels)
+    if labels.ndim != 2:
+        raise ValueError("La carte d'instances d'œufs doit être bidimensionnelle.")
+    return int(np.count_nonzero(np.unique(labels) > 0))
+
+
+def calculate_egg_volume_from_instances(instance_labels, echelle, image_height):
+    """Volume sphérique associé à la surface moyenne des œufs d'une image."""
+    surface = calculate_eggs_area_from_instances(instance_labels, echelle, image_height)
+    egg_count = count_egg_instances(instance_labels)
+    selected_egg_count = max(1, int(0.5 * egg_count)) if egg_count else 0
+    radius = np.sqrt(surface / np.pi)
+    volume = 4 / 3 * np.pi * radius**3
+    return {
+        "surface_moyenne_oeufs_cm2": float(surface),
+        "volume_moyen_oeufs_cm3": float(volume),
+        "nombre_oeufs_distincts": egg_count,
+        "nombre_oeufs_utilises_pour_moyenne": selected_egg_count,
+    }
+
+
+def calculate_mean_egg_volume(images):
+    """Agrège le volume moyen d'œuf sur plusieurs échographies.
+
+    Chaque élément contient ``id_image``, ``instances``, ``echelle`` et
+    ``image_height``. Les images sans instance donnent un volume nul dans le
+    détail mais ne permettent pas à elles seules de produire une fécondité.
+    """
+    rows = []
+    for item in images:
+        values = calculate_egg_volume_from_instances(
+            item["instances"], item["echelle"], item["image_height"]
+        )
+        rows.append({"id_image": item["id_image"], **values})
+    volumes = [row["volume_moyen_oeufs_cm3"] for row in rows]
+    mean_volume = float(np.mean(volumes)) if volumes else None
+    return {"images": rows, "volume_moyen_oeufs_cm3": mean_volume}
 
 
 # ---- Calcul du volume : images longitudinales -----
