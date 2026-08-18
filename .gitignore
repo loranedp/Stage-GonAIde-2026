@@ -13,6 +13,6 @@ Debut/App/__pycache__
 
 Debut/YOLO26/*.pt
 Debut/YOLO26/*.yaml
-Debut/YOLO26/*.txt
+Debut/YOLO26/folds
 Debut/YOLO26/mobileclip2_b.ts
 Debut/YOLO26/runs

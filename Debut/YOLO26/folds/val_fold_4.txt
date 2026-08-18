@@ -1,0 +1,14 @@
+/home/ldepiero/Stage-GonAIde-2026/Debut/data/YOLO/images/0004599_12.17.26_356434_2019.jpg
+/home/ldepiero/Stage-GonAIde-2026/Debut/data/YOLO/images/0004653_11.23.56_356868_2019.jpg
+/home/ldepiero/Stage-GonAIde-2026/Debut/data/YOLO/images/0004657_11.29.44_356877_2019.jpg
+/home/ldepiero/Stage-GonAIde-2026/Debut/data/YOLO/images/0004665_11.58.41_356918_2019.jpg
+/home/ldepiero/Stage-GonAIde-2026/Debut/data/YOLO/images/0004666_11.58.51_356918_2019.jpg
+/home/ldepiero/Stage-GonAIde-2026/Debut/data/YOLO/images/0004725_11.08.26_357291_2019.jpg
+/home/ldepiero/Stage-GonAIde-2026/Debut/data/YOLO/images/0004731_11.17.07_357302_2019.jpg
+/home/ldepiero/Stage-GonAIde-2026/Debut/data/YOLO/images/0004730_11.16.59_357302_2019.jpg
+/home/ldepiero/Stage-GonAIde-2026/Debut/data/YOLO/images/0004736_11.21.16_357305_2019.jpg
+/home/ldepiero/Stage-GonAIde-2026/Debut/data/YOLO/images/0006929_09.46.01_426687_2024.jpg
+/home/ldepiero/Stage-GonAIde-2026/Debut/data/YOLO/images/0006939_10.23.25_426729_2024.jpg
+/home/ldepiero/Stage-GonAIde-2026/Debut/data/YOLO/images/0007108_09.45.49_427184_2024.jpg
+/home/ldepiero/Stage-GonAIde-2026/Debut/data/YOLO/images/0007149_11.01.32_427276_2024.jpg
+/home/ldepiero/Stage-GonAIde-2026/Debut/data/YOLO/images/0007159_11.21.46_427305_2024.jpg
