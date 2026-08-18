@@ -7,15 +7,17 @@ import pandas as pd
 import streamlit as st
 from PIL import Image
 
-import calcul_volume_gonade
 import config
 import data_utils
 import metadata_utils
+from metrics_utils import compute_iou_per_class
 import model_utils
+import result_workflow
 import train
+from utils import calcul_volume_fct
 from canvas_adapter import st_stable_canvas
-from filename_utils import parse_filename
 from mask_editor_utils import apply_pending_stroke, extract_stroke_mask
+from rendering_utils import draw_instance_contours
 
 logger = logging.getLogger(__name__)
 
@@ -31,16 +33,19 @@ CLASS_COLORS = {
     "Cavite": (10, 10, 200),
     "Gonade": (0, 150, 240),
     "Intestin": (170, 130, 250),
+    "Oeuf": (245, 170, 35),
 }
 CLASS_ALPHAS = {
     "Cavite": 0.25,
     "Gonade": 0.55,
     "Intestin": 0.35,
+    "Oeuf": 0.50,
 }
 EDIT_CLASS_ALPHAS = {
     "Cavite": 0.15,
     "Gonade": 0.45,
     "Intestin": 0.25,
+    "Oeuf": 0.40,
 }
 IMAGE_DISPLAY_WIDTH = 500
 EDIT_IMAGE_DISPLAY_WIDTH = 900
@@ -60,10 +65,36 @@ def init_state() -> None:
     st.session_state.setdefault("corrected", set())
     st.session_state.setdefault("selected_fish", None)
     st.session_state.setdefault("uploader_version", 0)
+    st.session_state.setdefault("uploaded_batches", {"cavite": [], "oeufs": []})
     st.session_state.setdefault("volume_result", None)
 
 
-CAPTION_FONT_SIZE_PX = 20
+def snapshot_uploaded_files(uploaded_files) -> list[result_workflow.UploadedImage]:
+    """Conserve les uploads même lorsque leur widget n'est plus affiché."""
+    return [
+        result_workflow.UploadedImage(uploaded_file.name, uploaded_file.getvalue())
+        for uploaded_file in uploaded_files
+    ]
+
+
+def apply_prediction_batch(batch: result_workflow.PredictionBatch) -> None:
+    """Intègre un résultat de prédiction dans la session Streamlit."""
+    st.session_state.predictions.update(batch.predictions)
+    for prediction_key, status in batch.statuses.items():
+        st.session_state.statuses.setdefault(prediction_key, status)
+        if prediction_key in batch.corrected_keys:
+            st.session_state.corrected.add(prediction_key)
+        else:
+            st.session_state.corrected.discard(prediction_key)
+    st.session_state.volume_result = None
+
+
+def render_prediction_issues(batch: result_workflow.PredictionBatch) -> None:
+    for issue in batch.issues:
+        st.error(issue.message)
+
+
+CAPTION_FONT_SIZE_PX = 22
 STATUS_FONT_SIZE_PX = 22
 CAPTION_COLOR_CORRECTED = "green"
 
@@ -77,12 +108,16 @@ def render_captioned_image(image: Image.Image, caption: str, width: int, color: 
 
 
 def render_legend() -> None:
+    render_class_legend(config.CLASS_NAMES)
+
+
+def render_class_legend(class_names: list[str]) -> None:
     swatches = "".join(
         f'<span style="display:inline-flex;align-items:center;margin-right:16px;">'
         f'<span style="display:inline-block;width:12px;height:12px;border-radius:2px;'
         f'background-color:rgb{CLASS_COLORS[class_name]};margin-right:6px;"></span>'
         f'{class_name}</span>'
-        for class_name in config.CLASS_NAMES
+        for class_name in class_names
     )
     st.markdown(f'<div style="margin-bottom:8px;">{swatches}</div>', unsafe_allow_html=True)
 
@@ -97,7 +132,7 @@ def overlay_masks(image: Image.Image, masks: dict, alphas: dict | None = None) -
     base = np.array(image.convert("RGB"), dtype=np.float32)
     overlay = base.copy()
     # Gonade dessinée en dernier (par-dessus) pour rester bien visible en cas de chevauchement.
-    draw_order = ["Cavite", "Intestin", "Gonade"]
+    draw_order = ["Cavite", "Intestin", "Gonade", "Oeuf"]
     for class_name in draw_order:
         color = CLASS_COLORS.get(class_name)
         if color is None:
@@ -114,19 +149,6 @@ def overlay_masks(image: Image.Image, masks: dict, alphas: dict | None = None) -
     return Image.fromarray(overlay.astype(np.uint8))
 
 
-def compute_iou_per_class(pred_masks: dict, gt_masks: dict) -> dict:
-    """IoU par classe entre masques prédits et masques de vérité terrain. Union nulle
-    (les deux masques vides pour cette classe) -> IoU = 1.0 (accord parfait)."""
-    ious = {}
-    for class_name in config.CLASS_NAMES:
-        pred_mask = pred_masks.get(class_name)
-        gt_mask = gt_masks.get(class_name)
-        intersection = np.logical_and(pred_mask, gt_mask).sum()
-        union = np.logical_or(pred_mask, gt_mask).sum()
-        ious[class_name] = float(intersection / union) if union > 0 else 1.0
-    return ious
-
-
 def _canvas_dims() -> tuple:
     """Taille (largeur, hauteur) du canvas d'édition, alignée sur l'aspect ratio du crop
     (config.CROP_PARAMS) à la largeur d'affichage habituelle (IMAGE_DISPLAY_WIDTH)."""
@@ -136,23 +158,26 @@ def _canvas_dims() -> tuple:
     return canvas_width, canvas_height
 
 
-def render_mask_editor(filename: str, pred: dict) -> None:
-    edit_state = st.session_state.editing[filename]
+def render_mask_editor(prediction_key: str, pred: dict) -> None:
+    filename = pred["filename"]
+    image_type = pred["image_type"]
+    class_names = config.EGG_CLASS_NAMES if image_type == "oeufs" else config.CLASS_NAMES
+    edit_state = st.session_state.editing[prediction_key]
     edited_masks = edit_state["masks"]
 
     st.markdown("**Re-labellisation des masques**")
     edit_col1, edit_col2, edit_col3 = st.columns([2, 2, 2])
     with edit_col1:
         active_class = st.radio(
-            "Classe", config.CLASS_NAMES, key=f"edit_class_{filename}", horizontal=True
+            "Classe", class_names, key=f"edit_class_{prediction_key}", horizontal=True
         )
     with edit_col2:
         mode = st.radio(
-            "Mode", ["Ajouter", "Effacer"], key=f"edit_mode_{filename}", horizontal=True
+            "Mode", ["Ajouter", "Effacer"], key=f"edit_mode_{prediction_key}", horizontal=True
         )
     with edit_col3:
         stroke_width = st.slider(
-            "Largeur du pinceau", min_value=2, max_value=40, value=12, key=f"edit_width_{filename}"
+            "Largeur du pinceau", min_value=2, max_value=40, value=12, key=f"edit_width_{prediction_key}"
         )
 
     # Le composant est recréé au changement de classe ou de mode. Le tracé de
@@ -171,8 +196,8 @@ def render_mask_editor(filename: str, pred: dict) -> None:
             )
             st.error(f"{filename} : tracé invalide ({exc}).")
         edit_state["tool"] = current_tool
-        st.session_state.canvas_version[filename] = (
-            st.session_state.canvas_version.get(filename, 0) + 1
+        st.session_state.canvas_version[prediction_key] = (
+            st.session_state.canvas_version.get(prediction_key, 0) + 1
         )
 
     canvas_width, canvas_height = _canvas_dims()
@@ -180,7 +205,7 @@ def render_mask_editor(filename: str, pred: dict) -> None:
     background = crop_for_display(preview).resize((canvas_width, canvas_height))
 
     stroke_color = STROKE_COLOR_ADD if mode == "Ajouter" else STROKE_COLOR_ERASE
-    version = st.session_state.canvas_version.get(filename, 0)
+    version = st.session_state.canvas_version.get(prediction_key, 0)
 
     canvas_col, origin_col = st.columns([3, 1])
     with canvas_col:
@@ -193,7 +218,7 @@ def render_mask_editor(filename: str, pred: dict) -> None:
             height=canvas_height,
             width=canvas_width,
             drawing_mode="freedraw",
-            key=f"canvas_{filename}_{version}",
+            key=f"canvas_{prediction_key}_{version}",
         )
     with origin_col:
         st.image(crop_for_display(pred["image"]), width=EDIT_ORIGIN_PREVIEW_WIDTH)
@@ -215,10 +240,10 @@ def render_mask_editor(filename: str, pred: dict) -> None:
 
     action_col1, action_col2, action_col3 = st.columns([1, 1, 2])
     with action_col1:
-        if st.button("Appliquer le tracé", key=f"apply_stroke_{filename}"):
+        if st.button("Appliquer le tracé", key=f"apply_stroke_{prediction_key}"):
             try:
                 if apply_pending_stroke(edit_state, config.CROP_PARAMS):
-                    st.session_state.canvas_version[filename] = version + 1
+                    st.session_state.canvas_version[prediction_key] = version + 1
                     st.rerun()
                 else:
                     st.warning("Aucun tracé à appliquer.")
@@ -226,20 +251,26 @@ def render_mask_editor(filename: str, pred: dict) -> None:
                 logger.exception("Échec d'application du tracé", extra={"image_name": filename})
                 st.error(f"{filename} : impossible d'appliquer le tracé ({exc}).")
     with action_col2:
-        if st.button("Annuler", key=f"cancel_edit_{filename}"):
-            del st.session_state.editing[filename]
-            st.session_state.canvas_version.pop(filename, None)
+        if st.button("Annuler", key=f"cancel_edit_{prediction_key}"):
+            del st.session_state.editing[prediction_key]
+            st.session_state.canvas_version.pop(prediction_key, None)
             st.rerun()
     with action_col3:
-        if st.button("Valider les modifications", key=f"save_edit_{filename}", type="primary"):
+        if st.button(
+            "Valider les modifications", key=f"save_edit_{prediction_key}", type="primary"
+        ):
             try:
                 apply_pending_stroke(edit_state, config.CROP_PARAMS)
-                data_utils.add_image_to_corrected_set(filename, pred["image"], edited_masks)
-                previous_status = st.session_state.statuses.get(filename, config.DEFAULT_STATUS)
+                data_utils.add_image_to_corrected_set(
+                    filename, pred["image"], edited_masks, image_type=image_type
+                )
+                previous_status = st.session_state.statuses.get(
+                    prediction_key, config.DEFAULT_STATUS
+                )
                 if previous_status == "bonne":
-                    data_utils.remove_image_from_training_set(filename)
+                    data_utils.remove_image_from_training_set(filename, image_type=image_type)
                 elif previous_status == "mauvaise":
-                    data_utils.remove_image_from_labellisation_set(filename)
+                    data_utils.remove_image_from_labellisation_set(filename, image_type=image_type)
             except (OSError, ValueError, KeyError, data_utils.DataStoreError) as exc:
                 logger.exception(
                     "Échec de sauvegarde de la correction", extra={"image_name": filename}
@@ -250,10 +281,13 @@ def render_mask_editor(filename: str, pred: dict) -> None:
                 )
             else:
                 pred["masks"] = {name: mask.copy() for name, mask in edited_masks.items()}
-                st.session_state.statuses[filename] = config.DEFAULT_STATUS
-                st.session_state.corrected.add(filename)
-                del st.session_state.editing[filename]
-                st.session_state.canvas_version.pop(filename, None)
+                if image_type == "oeufs":
+                    pred["instances"] = model_utils.split_egg_mask(pred["masks"]["Oeuf"])
+                st.session_state.statuses[prediction_key] = config.DEFAULT_STATUS
+                st.session_state.corrected.add(prediction_key)
+                del st.session_state.editing[prediction_key]
+                st.session_state.canvas_version.pop(prediction_key, None)
+                st.session_state.volume_result = None
                 st.toast(f"{filename} modifiée !", icon="✅")
                 st.rerun()
 
@@ -263,17 +297,25 @@ tab_prediction, tab_entrainement = st.tabs(["Prédiction", "Entraînement"])
 
 with tab_prediction:
     st.header("Données")
+    upload_type = st.radio(
+        "Type des images à ajouter",
+        ["cavite", "oeufs"],
+        format_func=lambda value: "Cavité" if value == "cavite" else "Œufs",
+        horizontal=True,
+        key="upload_image_type",
+    )
     upload_col, clear_col = st.columns([5, 1], vertical_alignment="center")
     with upload_col:
         uploaded_files = st.file_uploader(
             "Uploader une ou plusieurs images",
             type=["jpg", "jpeg", "png"],
             accept_multiple_files=True,
-            key=f"file_uploader_{st.session_state.uploader_version}",
+            key=f"file_uploader_{upload_type}_{st.session_state.uploader_version}",
         )
     with clear_col:
         if st.button("Effacer", key="clear_uploaded_files"):
             st.session_state.uploader_version += 1
+            st.session_state.uploaded_batches = {"cavite": [], "oeufs": []}
             st.session_state.predictions = {}
             st.session_state.statuses = {}
             st.session_state.editing = {}
@@ -283,64 +325,92 @@ with tab_prediction:
             st.session_state.volume_result = None
             st.rerun()
 
-    if st.button("Prédiction"):
-        if not uploaded_files:
+    if uploaded_files:
+        st.session_state.uploaded_batches[upload_type] = snapshot_uploaded_files(
+            uploaded_files
+        )
+    cavity_upload_count = len(st.session_state.uploaded_batches["cavite"])
+    egg_upload_count = len(st.session_state.uploaded_batches["oeufs"])
+    if cavity_upload_count or egg_upload_count:
+        st.caption(
+            f"Fichiers conservés — Cavité : {cavity_upload_count} · "
+            f"Œufs : {egg_upload_count}"
+        )
+
+    if st.button("Sauvegarde des résultats", key="automatic_results_save"):
+        uploads_by_type = st.session_state.uploaded_batches
+        if not any(uploads_by_type.values()):
+            st.warning("Veuillez uploader au moins une image avant la sauvegarde.")
+        else:
+            with st.spinner("Prédiction, calcul et sauvegarde en cours..."):
+                batch = result_workflow.predict_uploads(uploads_by_type)
+                apply_prediction_batch(batch)
+
+                successful_fish_ids = {
+                    pred["id_poisson"] for pred in batch.predictions.values()
+                }
+                candidate_fish_ids = sorted(
+                    successful_fish_ids - batch.failed_fish_ids
+                )
+                calculated_results = []
+                for fish_id in candidate_fish_ids:
+                    try:
+                        result = result_workflow.calculate_fish_result(
+                            fish_id,
+                            batch.predictions,
+                            st.session_state.statuses,
+                        )
+                    except (OSError, ValueError, KeyError, RuntimeError) as exc:
+                        logger.exception(
+                            "Échec du calcul automatique",
+                            extra={"fish_id": fish_id},
+                        )
+                        continue
+                    if result_workflow.has_exportable_result(result):
+                        calculated_results.append(result)
+
+                try:
+                    saved_count = result_workflow.save_fish_results(
+                        calculated_results, config.RESULTATS_CSV_PATH
+                    )
+                except (OSError, ValueError, KeyError, pd.errors.ParserError) as exc:
+                    logger.exception("Échec de sauvegarde automatique des résultats")
+                    saved_count = 0
+                    save_error = str(exc)
+                else:
+                    save_error = None
+
+            all_known_fish_ids = successful_fish_ids | batch.failed_fish_ids
+            skipped_count = len(all_known_fish_ids) - saved_count
+            if save_error is not None:
+                st.error(f"Les résultats n'ont pas pu être sauvegardés ({save_error}).")
+            elif saved_count:
+                st.success(
+                    f"Résultats sauvegardés pour {saved_count} poisson(s) dans "
+                    f"{config.RESULTATS_CSV_PATH}."
+                )
+            else:
+                st.error("Aucun poisson n'a pu être sauvegardé.")
+            if save_error is None and (skipped_count or batch.issues):
+                st.warning(
+                    f"Sauvegarde partielle : {skipped_count} poisson(s) et "
+                    f"{len([issue for issue in batch.issues if issue.fish_id is None])} "
+                    "fichier(s) non rattaché(s) ont été ignorés."
+                )
+
+    st.header("Résultats par poisson")
+    if st.button("Prédiction", key="manual_prediction"):
+        current_uploads = st.session_state.uploaded_batches[upload_type]
+        if not current_uploads:
             st.warning("Veuillez uploader au moins une image avant de lancer la prédiction.")
         else:
-            models = model_utils.load_models()
             with st.spinner("Prédiction en cours..."):
-                processed = 0
-                for uploaded_file in uploaded_files:
-                    filename = uploaded_file.name
-                    try:
-                        parsed = parse_filename(filename)
-                    except ValueError as exc:
-                        st.error(str(exc))
-                        continue
+                batch = result_workflow.predict_uploads({upload_type: current_uploads})
+                apply_prediction_batch(batch)
+            render_prediction_issues(batch)
+            if batch.predictions:
+                st.success(f"{len(batch.predictions)} image(s) traitée(s).")
 
-                    try:
-                        corrected_data = data_utils.load_corrected_image_and_masks(filename)
-                    except (OSError, ValueError, KeyError, data_utils.DataStoreError) as exc:
-                        logger.exception(
-                            "Échec de chargement d'une correction", extra={"image_name": filename}
-                        )
-                        st.error(
-                            f"{filename} : correction enregistrée illisible ({exc}). "
-                            "La prédiction n'a pas été lancée afin de ne pas masquer le problème."
-                        )
-                        continue
-                    if corrected_data is not None:
-                        image = corrected_data["image"]
-                        masks = corrected_data["masks"]
-                        confidences = {}
-                        st.session_state.corrected.add(filename)
-                    else:
-                        image = Image.open(uploaded_file).convert("RGB")
-                        st.session_state.corrected.discard(filename)
-                        try:
-                            result = model_utils.predict(models, image, parsed.id_image)
-                        except ValueError as exc:
-                            st.error(f"{filename} : {exc}")
-                            continue
-                        masks = result["masks"]
-                        confidences = result["confidences"]
-
-                    st.session_state.predictions[filename] = {
-                        "image": image,
-                        "masks": masks,
-                        "confidences": confidences,
-                        "id_image": parsed.id_image,
-                        "heure": parsed.heure,
-                        "id_poisson": parsed.id_poisson,
-                    }
-                    st.session_state.statuses.setdefault(
-                        filename, data_utils.get_disk_status(filename) or config.DEFAULT_STATUS
-                    )
-                    processed += 1
-            if processed:
-                st.success(f"{processed} image(s) traitée(s).")
-
-    st.header("Résultats")
     predictions = st.session_state.predictions
     selected_fish = None
 
@@ -401,11 +471,22 @@ with tab_prediction:
 
         if selected_fish:
             fish_items = sorted(
-                ((fn, p) for fn, p in predictions.items() if p["id_poisson"] == selected_fish),
-                key=lambda item: item[1]["heure"],
+                ((key, p) for key, p in predictions.items() if p["id_poisson"] == selected_fish),
+                key=lambda item: (item[1]["image_type"] == "oeufs", item[1]["heure"]),
             )
-            render_legend()
-            for filename, pred in fish_items:
+            visible_classes = list(config.CLASS_NAMES)
+            if any(pred["image_type"] == "oeufs" for _, pred in fish_items):
+                visible_classes.extend(config.EGG_CLASS_NAMES)
+            render_class_legend(visible_classes)
+            for prediction_key, pred in fish_items:
+                filename = pred["filename"]
+                image_type = pred["image_type"]
+                instances = None
+                if image_type == "oeufs":
+                    instances = pred.get("instances")
+                    if instances is None:
+                        instances = model_utils.split_egg_mask(pred["masks"]["Oeuf"])
+                        pred["instances"] = instances
                 col_left, col_right = st.columns([4, 1], vertical_alignment="center")
                 with col_left:
                     meta = metadata_utils.lookup(pred["id_image"])
@@ -414,7 +495,8 @@ with tab_prediction:
                         if meta is not None and pd.notna(meta["type_image"])
                         else "N/A"
                     )
-                    st.subheader(f"Image : {filename} — Op : {op_value}")
+                    descriptor = "Œufs" if image_type == "oeufs" else f"Op : {op_value}"
+                    st.subheader(f"Image : {filename} — {descriptor}")
                     img_col1, img_col2 = st.columns(2)
                     with img_col1:
                         render_captioned_image(
@@ -424,7 +506,9 @@ with tab_prediction:
                         )
                     with img_col2:
                         overlay_img = overlay_masks(pred["image"], pred["masks"])
-                        is_corrected = filename in st.session_state.corrected
+                        if instances is not None:
+                            overlay_img = draw_instance_contours(overlay_img, instances)
+                        is_corrected = prediction_key in st.session_state.corrected
                         caption = (
                             "Masques corrigés manuellement"
                             if is_corrected
@@ -436,6 +520,11 @@ with tab_prediction:
                             IMAGE_DISPLAY_WIDTH,
                             color=CAPTION_COLOR_CORRECTED if is_corrected else None,
                         )
+                    if instances is not None:
+                        distinct_egg_count = calcul_volume_fct.count_egg_instances(instances)
+                        st.caption(
+                            f"Nombre d'œufs distincts retrouvés : {distinct_egg_count}"
+                        )
                     #conf_cols = st.columns(len(config.CLASS_NAMES))
                     #for conf_col, class_name in zip(conf_cols, config.CLASS_NAMES):
                     #    confidence = pred["confidences"].get(class_name)
@@ -443,40 +532,63 @@ with tab_prediction:
                     #        f"Confiance ({class_name})",
                     #        f"{confidence:.1%}" if confidence is not None else "N/A",
                     #    )
-                    gt_masks = data_utils.load_coco_ground_truth_masks(filename)
+                    class_names = (
+                        config.EGG_CLASS_NAMES
+                        if image_type == "oeufs"
+                        else config.CLASS_NAMES
+                    )
+                    gt_masks = data_utils.load_coco_ground_truth_masks(
+                        filename, image_type=image_type
+                    )
                     if gt_masks is not None:
-                        ious = compute_iou_per_class(pred["masks"], gt_masks)
+                        ious = compute_iou_per_class(
+                            pred["masks"], gt_masks, class_names
+                        )
                         st.caption(
                             "Image présente dans data/COCO — IoU par classe (vs vérité terrain) :"
                         )
-                        iou_cols = st.columns(len(config.CLASS_NAMES))
-                        for iou_col, class_name in zip(iou_cols, config.CLASS_NAMES):
+                        iou_cols = st.columns(len(class_names))
+                        for iou_col, class_name in zip(iou_cols, class_names):
                             iou_col.metric(f"IoU ({class_name})", f"{ious[class_name]:.1%}")
                 with col_right:
-                    current_status = st.session_state.statuses.get(filename, config.DEFAULT_STATUS)
+                    current_status = st.session_state.statuses.get(
+                        prediction_key, config.DEFAULT_STATUS
+                    )
                     st.markdown(
                         f'<p style="font-size:{STATUS_FONT_SIZE_PX}px;">Statut : <strong>{current_status}</strong></p>',
                         unsafe_allow_html=True,
                     )
                     for status in config.STATUS_OPTIONS:
-                        if st.button(status.capitalize(), key=f"status_{filename}_{status}"):
+                        if st.button(
+                            status.capitalize(), key=f"status_{prediction_key}_{status}"
+                        ):
                             previous_status = st.session_state.statuses.get(
-                                filename, config.DEFAULT_STATUS
+                                prediction_key, config.DEFAULT_STATUS
                             )
                             try:
                                 if status == "bonne":
                                     data_utils.add_image_to_training_set(
-                                        filename, pred["image"], pred["masks"]
+                                        filename,
+                                        pred["image"],
+                                        pred["masks"],
+                                        image_type=image_type,
                                     )
                                 elif previous_status == "bonne":
-                                    data_utils.remove_image_from_training_set(filename)
+                                    data_utils.remove_image_from_training_set(
+                                        filename, image_type=image_type
+                                    )
 
                                 if status == "mauvaise":
                                     data_utils.add_image_to_labellisation_set(
-                                        filename, pred["image"], pred["masks"]
+                                        filename,
+                                        pred["image"],
+                                        pred["masks"],
+                                        image_type=image_type,
                                     )
                                 elif previous_status == "mauvaise":
-                                    data_utils.remove_image_from_labellisation_set(filename)
+                                    data_utils.remove_image_from_labellisation_set(
+                                        filename, image_type=image_type
+                                    )
                             except (OSError, ValueError, KeyError, data_utils.DataStoreError) as exc:
                                 logger.exception(
                                     "Échec du changement de statut",
@@ -484,32 +596,46 @@ with tab_prediction:
                                 )
                                 st.error(f"{filename} : statut non enregistré ({exc}).")
                             else:
-                                st.session_state.statuses[filename] = status
+                                st.session_state.statuses[prediction_key] = status
+                                st.session_state.volume_result = None
                                 st.rerun()
 
-                    if filename not in st.session_state.editing:
+                    if prediction_key not in st.session_state.editing:
                         relabel_col, delete_col = st.columns(2)
                         with relabel_col:
-                            if st.button("Re-labellisation", key=f"edit_toggle_{filename}"):
-                                st.session_state.editing[filename] = {
+                            if st.button(
+                                "Re-labellisation", key=f"edit_toggle_{prediction_key}"
+                            ):
+                                st.session_state.editing[prediction_key] = {
                                     "masks": {c: m.copy() for c, m in pred["masks"].items()},
                                     "pending": None,
                                     "tool": None,
                                 }
                                 st.rerun()
                         with delete_col:
-                            if filename in st.session_state.corrected:
+                            if prediction_key in st.session_state.corrected:
                                 if st.button(
-                                    "Supprimer labellisation", key=f"delete_correction_{filename}"
+                                    "Supprimer labellisation",
+                                    key=f"delete_correction_{prediction_key}",
                                 ):
                                     try:
                                         # Ne retirer la seule correction valide qu'une fois
                                         # son remplacement par une prédiction confirmé.
-                                        models = model_utils.load_models()
-                                        result = model_utils.predict(
-                                            models, pred["image"], pred["id_image"]
+                                        models = (
+                                            model_utils.load_egg_models()
+                                            if image_type == "oeufs"
+                                            else model_utils.load_models()
                                         )
-                                        data_utils.remove_image_from_corrected_set(filename)
+                                        result = (
+                                            model_utils.predict_eggs(models, pred["image"])
+                                            if image_type == "oeufs"
+                                            else model_utils.predict(
+                                                models, pred["image"], pred["id_image"]
+                                            )
+                                        )
+                                        data_utils.remove_image_from_corrected_set(
+                                            filename, image_type=image_type
+                                        )
                                     except (
                                         OSError,
                                         ValueError,
@@ -527,165 +653,158 @@ with tab_prediction:
                                     else:
                                         pred["masks"] = result["masks"]
                                         pred["confidences"] = result["confidences"]
-                                        st.session_state.corrected.discard(filename)
-                                        st.session_state.statuses[filename] = (
-                                            data_utils.get_disk_status(filename)
+                                        if image_type == "oeufs":
+                                            pred["instances"] = result["instances"]
+                                        st.session_state.corrected.discard(prediction_key)
+                                        st.session_state.statuses[prediction_key] = (
+                                            data_utils.get_disk_status(
+                                                filename, image_type=image_type
+                                            )
                                             or config.DEFAULT_STATUS
                                         )
+                                        st.session_state.volume_result = None
                                         st.toast(
                                             f"Labellisation de {filename} supprimée !", icon="🗑️"
                                         )
                                         st.rerun()
 
-                if filename in st.session_state.editing:
-                    render_mask_editor(filename, pred)
+                if prediction_key in st.session_state.editing:
+                    render_mask_editor(prediction_key, pred)
                 st.divider()
 
 
-    st.header("Calcul du volume")
-    if st.button("Calcul du volume"):
+    st.header("Calculs")
+    if st.button("Calculer les volumes et la fécondité"):
         if not predictions:
             st.warning("Aucune prédiction disponible. Lancez d'abord une prédiction.")
         elif not selected_fish:
             st.warning("Veuillez sélectionner un poisson dans la liste ci-dessus.")
         else:
-            fish_items = [
-                (fn, p)
-                for fn, p in predictions.items()
-                if p["id_poisson"] == selected_fish
-                and st.session_state.statuses.get(fn, config.DEFAULT_STATUS) != "mauvaise"
-            ]
-            if not fish_items:
+            result = result_workflow.calculate_fish_result(
+                selected_fish, predictions, st.session_state.statuses
+            )
+            if not result["has_eligible_images"]:
                 st.warning(
                     "Toutes les images de ce poisson sont marquées 'mauvaise', "
                     "aucune surface ne peut être calculée."
                 )
             else:
-                images_ordered = []
-                error = False
-                fish_echelle_ocr = None
-                for filename, pred in fish_items:
-                    meta = metadata_utils.lookup(pred["id_image"])
-                    if meta is None:
-                        st.error(
-                            f"{filename} : aucune métadonnée trouvée pour id_image="
-                            f"'{pred['id_image']}' (position/long_gonade requis pour le volume)."
-                        )
-                        error = True
-                        continue
-                    echelle = meta["echelle"]
-                    if np.isnan(echelle):
-                        if fish_echelle_ocr is None:
-                            fish_echelle_ocr = calcul_volume_gonade.determine_fish_echelle(
-                                [p["image"] for _, p in fish_items]
-                            )
-                            st.info(
-                                f"Echelle : {fish_echelle_ocr} cm déterminée par OCR"
-                            )
-                        echelle = fish_echelle_ocr
-                    surface = calcul_volume_gonade.surface_cm2(
-                        pred["masks"]["Gonade"], echelle, pred["image"].height
+                for error in result["errors"]:
+                    st.error(error)
+                if result["cavity_ocr_scale"] is not None:
+                    st.info(
+                        f"Echelle : {result['cavity_ocr_scale']} cm déterminée par OCR"
                     )
-                    surface_cavite = calcul_volume_gonade.surface_cm2(
-                        pred["masks"]["Cavite"], echelle, pred["image"].height
-                    )
-                    images_ordered.append(
-                        {
-                            "id_image": pred["id_image"],
-                            "surface_cm2": surface,
-                            "surface_cavite_cm2": surface_cavite,
-                            "position": meta["position"],
-                            "long_gonade": meta["long_gonade"],
-                        }
-                    )
-
-                if not error and images_ordered:
-                    images_ordered.sort(key=lambda item: item["position"])
-                    anomalies = calcul_volume_gonade.detect_surface_gonade_anomalies(
-                        images_ordered
-                    )
-                    result = calcul_volume_gonade.compute_fish_volume(images_ordered)
-                    volume_total = result["volume_total_cm3"]
-                    result_cavite = calcul_volume_gonade.compute_fish_volume(
-                        images_ordered, surface_key="surface_cavite_cm2"
-                    )
-                    volume_total_cavite = result_cavite["volume_total_cm3"]
-                    rows = [
-                        {
-                            "Id_poisson": str(selected_fish),
-                            "Id_image": item["id_image"],
-                            "Position": str(item["position"]),
-                            "Surface_gonades_cm2": round(item["surface_cm2"], 4),
-                            "Surface_cavité_cm2": round(item["surface_cavite_cm2"], 4),
-                            "Rayon_gonades_cm": round(float(np.sqrt(item["surface_cm2"] / np.pi)), 4),
-                            "Volume_total_gonades_cm3": (
-                                round(volume_total, 4) if volume_total is not None else None
-                            ),
-                            "Volume_total_cavité_cm3": (
-                                round(volume_total_cavite, 4)
-                                if volume_total_cavite is not None
-                                else None
-                            ),
-                        }
-                        for item in result["surfaces"]
-                    ]
-                    st.session_state.volume_result = {
-                        "selected_fish": selected_fish,
-                        "rows": rows,
-                        "anomalies": anomalies,
-                        "volume_total": volume_total,
-                    }
+                st.session_state.volume_result = result
 
     volume_result = st.session_state.volume_result
     if volume_result is not None:
         rows = volume_result["rows"]
         anomalies = volume_result["anomalies"]
         volume_total = volume_result["volume_total"]
-        df_result = pd.DataFrame(rows)
+        volume_total_cavite = volume_result["volume_total_cavite"]
+        egg_rows = volume_result["egg_rows"]
+        egg_mean = volume_result["egg_mean"]
+        fecundity = volume_result["fecundity"]
 
-        def _highlight_anomaly(row):
-            style = (
-                "color: red; font-weight: 600;" if row["Id_image"] in anomalies else ""
-            )
-            return [style] * len(row)
+        st.subheader("Volume des gonades et de la cavité")
+        if rows:
+            df_result = pd.DataFrame(rows)
 
-        st.dataframe(
-            df_result.style.apply(_highlight_anomaly, axis=1),
-            use_container_width=True,
-        )
-        if anomalies:
-            st.caption(
-                "Surface de gonade potentiellement incohérente (variation "
-                "anormale entre échos consécutifs) pour l'image / les images : "
-                + ", ".join(sorted(anomalies))
-            )
-        if volume_total is not None:
-            st.metric("Volume total de la gonade", f"{volume_total:.4f} cm³")
-        else:
-            st.warning("Au moins 2 images sont nécessaires pour calculer un volume.")
-
-        if st.button("Save"):
-            config.RESULTATS_DIR.mkdir(parents=True, exist_ok=True)
-            new_rows_df = pd.DataFrame(rows)
-            if config.RESULTATS_CSV_PATH.exists():
-                existing_df = pd.read_csv(
-                    config.RESULTATS_CSV_PATH, encoding="utf-8", dtype={"Id_poisson": str}
+            def _highlight_anomaly(row):
+                style = (
+                    "color: red; font-weight: 600;" if row["Id_image"] in anomalies else ""
                 )
-                existing_df = existing_df[
-                    existing_df["Id_poisson"] != str(volume_result["selected_fish"])
-                ]
-                combined_df = pd.concat([existing_df, new_rows_df], ignore_index=True)
+                return [style] * len(row)
+
+            st.dataframe(
+                df_result.style.apply(_highlight_anomaly, axis=1),
+                use_container_width=True,
+            )
+            if anomalies:
+                st.caption(
+                    "Surface de gonade potentiellement incohérente (variation "
+                    "anormale entre échos consécutifs) pour l'image / les images : "
+                    + ", ".join(sorted(anomalies))
+                )
+            if volume_total is not None:
+                gonad_volume_col, cavity_volume_col = st.columns(2)
+                gonad_volume_col.metric(
+                    "Volume total de la gonade", f"{volume_total:.4f} cm³"
+                )
+                cavity_volume_col.metric(
+                    "Volume total de la cavité",
+                    (
+                        f"{volume_total_cavite:.4f} cm³"
+                        if volume_total_cavite is not None
+                        else "N/A"
+                    ),
+                )
             else:
-                combined_df = new_rows_df
-            combined_df.to_csv(config.RESULTATS_CSV_PATH, index=False, encoding="utf-8")
-            st.success(f"Résultats enregistrés dans {config.RESULTATS_CSV_PATH}")
+                st.warning("Au moins 2 images cavité sont nécessaires pour calculer un volume.")
+        elif volume_result["cavity_error"]:
+            st.error("Le volume de la gonade n'a pas pu être calculé à cause des métadonnées.")
+        else:
+            st.info("Aucune image cavité bonne/ok n'est disponible pour ce poisson.")
+
+        st.subheader("Volume moyen des œufs")
+        if egg_rows:
+            egg_display_rows = [
+                {
+                    "Id_image": row["id_image"],
+                    "Nombre d'œufs utilisés pour la moyenne": row[
+                        "nombre_oeufs_utilises_pour_moyenne"
+                    ],
+                    "Surface_moyenne_oeufs_cm2": round(
+                        row["surface_moyenne_oeufs_cm2"], 6
+                    ),
+                    "Volume_moyen_oeufs_cm3": round(row["volume_moyen_oeufs_cm3"], 8),
+                }
+                for row in egg_rows
+            ]
+            st.dataframe(pd.DataFrame(egg_display_rows), use_container_width=True)
+            if egg_mean is not None and egg_mean > 0:
+                st.metric("Volume moyen d'un œuf", f"{egg_mean:.4f} cm³")
+            else:
+                st.warning("Aucune instance d'œuf exploitable n'a été détectée.")
+        else:
+            st.info("Aucune image d'œufs bonne/ok n'est disponible pour ce poisson.")
+
+        st.subheader("Fécondité")
+        if fecundity is not None:
+            st.metric("Fécondité estimée", f"{int(round(fecundity))} œufs")
+        else:
+            st.info(
+                "Le volume de la gonade et un volume moyen d'œuf strictement positif "
+                "sont nécessaires pour estimer la fécondité."
+            )
+
+        if result_workflow.has_exportable_result(volume_result) and st.button("Save"):
+            try:
+                result_workflow.save_fish_results(
+                    [volume_result], config.RESULTATS_CSV_PATH
+                )
+            except (OSError, ValueError, KeyError, pd.errors.ParserError) as exc:
+                logger.exception("Échec de sauvegarde manuelle des résultats")
+                st.error(f"Les résultats n'ont pas pu être enregistrés ({exc}).")
+            else:
+                st.success(f"Résultats enregistrés dans {config.RESULTATS_CSV_PATH}")
+        elif not result_workflow.has_exportable_result(volume_result):
+            st.caption(
+                "Aucun résultat calculé n'est disponible pour la sauvegarde CSV."
+            )
 
 with tab_entrainement:
     st.header("Ré-entraînement du modèle")
     added_count = len(data_utils.list_added_filenames())
+    egg_added_count = len(data_utils.list_egg_added_filenames())
     st.write(
         f"{added_count} image(s) validée(s) 'bonne' actuellement ajoutées de façon "
         "permanente aux données d'entraînement (voir `data/train_added/`)."
+    )
+    st.write(
+        f"{egg_added_count} image(s) d'œufs validée(s) 'bonne' sont conservées dans "
+        "`data/train_added_oeufs/` pour un futur ré-entraînement dédié."
     )
 
     epochs = st.number_input("Nombre d'epochs (par fold)", min_value=1, value=5, step=1)

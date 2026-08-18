@@ -26,6 +26,9 @@ def _ensure_dirs() -> None:
         config.TRAIN_ADDED_IMAGES_DIR,
         config.LABELLISATION_IMAGES_DIR,
         config.CORRECTED_IMAGES_DIR,
+        config.EGG_TRAIN_ADDED_IMAGES_DIR,
+        config.EGG_LABELLISATION_IMAGES_DIR,
+        config.EGG_CORRECTED_IMAGES_DIR,
     ):
         directory.mkdir(parents=True, exist_ok=True)
 
@@ -36,7 +39,7 @@ def _safe_filename(filename: str) -> str:
     return filename
 
 
-def _validate_store(data: object, path: Path) -> dict:
+def _validate_store(data: object, path: Path, num_classes: int = config.NUM_CLASSES) -> dict:
     if not isinstance(data, dict) or not isinstance(data.get("images"), list) or not isinstance(
         data.get("annotations"), list
     ):
@@ -66,13 +69,13 @@ def _validate_store(data: object, path: Path) -> dict:
             raise DataStoreError(f"Identifiant d'annotation dupliqué dans {path}.")
         if image_id not in image_ids:
             raise DataStoreError(f"Annotation orpheline (image_id={image_id}) dans {path}.")
-        if not 1 <= category_id <= config.NUM_CLASSES:
+        if not 1 <= category_id <= num_classes:
             raise DataStoreError(f"Catégorie {category_id} inconnue dans {path}.")
         annotation_ids.add(annotation_id)
     return data
 
 
-def load_added_annotations(path: Path | None = None) -> dict:
+def load_added_annotations(path: Path | None = None, num_classes: int = config.NUM_CLASSES) -> dict:
     """Charge et valide un magasin d'annotations géré par l'application."""
     path = Path(path or config.TRAIN_ADDED_ANN_PATH)
     _ensure_dirs()
@@ -80,7 +83,7 @@ def load_added_annotations(path: Path | None = None) -> dict:
         return {"images": [], "annotations": []}
     try:
         with path.open("r", encoding="utf-8") as stream:
-            return _validate_store(json.load(stream), path)
+            return _validate_store(json.load(stream), path, num_classes=num_classes)
     except DataStoreError:
         logger.exception("Magasin d'annotations invalide", extra={"path": str(path)})
         raise
@@ -108,9 +111,11 @@ def _atomic_write_bytes(path: Path, content: bytes) -> None:
         raise
 
 
-def _save_added_annotations(data: dict, path: Path | None = None) -> None:
+def _save_added_annotations(
+    data: dict, path: Path | None = None, num_classes: int = config.NUM_CLASSES
+) -> None:
     path = Path(path or config.TRAIN_ADDED_ANN_PATH)
-    _validate_store(data, path)
+    _validate_store(data, path, num_classes=num_classes)
     serialized = json.dumps(data, indent=2, ensure_ascii=False).encode("utf-8")
     _atomic_write_bytes(path, serialized)
 
@@ -127,20 +132,39 @@ def list_corrected_filenames() -> list:
     return list_added_filenames(config.CORRECTED_ANN_PATH)
 
 
-def get_disk_status(filename: str) -> str | None:
+def list_egg_added_filenames() -> list:
+    return list_added_filenames(config.EGG_TRAIN_ADDED_ANN_PATH)
+
+
+def get_disk_status(filename: str, image_type: str = "cavite") -> str | None:
     """Retourne le statut persistant de l'image, ou ``None`` si elle est nouvelle."""
     _safe_filename(filename)
-    if filename in list_added_filenames():
+    if image_type not in {"cavite", "oeufs"}:
+        raise ValueError(f"Type d'image inconnu : {image_type!r}.")
+    train_path = (
+        config.EGG_TRAIN_ADDED_ANN_PATH
+        if image_type == "oeufs"
+        else config.TRAIN_ADDED_ANN_PATH
+    )
+    label_path = (
+        config.EGG_LABELLISATION_ANN_PATH
+        if image_type == "oeufs"
+        else config.LABELLISATION_ANN_PATH
+    )
+    if filename in list_added_filenames(train_path):
         return "bonne"
-    if filename in list_labellisation_filenames():
+    if filename in list_added_filenames(label_path):
         return "mauvaise"
     return None
 
 
-def _normalize_masks(masks: dict, image_size: tuple[int, int]) -> dict[str, np.ndarray]:
+def _normalize_masks(
+    masks: dict, image_size: tuple[int, int], class_names: list[str] | None = None
+) -> dict[str, np.ndarray]:
     width, height = image_size
+    class_names = class_names or config.CLASS_NAMES
     normalized: dict[str, np.ndarray] = {}
-    for class_name in config.CLASS_NAMES:
+    for class_name in class_names:
         if class_name not in masks:
             raise ValueError(f"Masque manquant pour la classe {class_name!r}.")
         mask = np.asarray(masks[class_name], dtype=bool)
@@ -152,10 +176,13 @@ def _normalize_masks(masks: dict, image_size: tuple[int, int]) -> dict[str, np.n
     return normalized
 
 
-def _encode_masks(masks: dict, image_id: int, start_ann_id: int) -> list:
+def _encode_masks(
+    masks: dict, image_id: int, start_ann_id: int, class_names: list[str] | None = None
+) -> list:
+    class_names = class_names or config.CLASS_NAMES
     annotations = []
     ann_id = start_ann_id
-    for class_idx, class_name in enumerate(config.CLASS_NAMES):
+    for class_idx, class_name in enumerate(class_names):
         binary_mask = masks[class_name]
         if not binary_mask.any():
             continue
@@ -185,13 +212,19 @@ def _image_bytes(image: Image.Image, filename: str) -> bytes:
 
 
 def _add_image(
-    filename: str, image: Image.Image, masks: dict, image_dir: Path, ann_path: Path
+    filename: str,
+    image: Image.Image,
+    masks: dict,
+    image_dir: Path,
+    ann_path: Path,
+    class_names: list[str] | None = None,
 ) -> None:
     filename = _safe_filename(filename)
-    normalized_masks = _normalize_masks(masks, image.size)
+    class_names = class_names or config.CLASS_NAMES
+    normalized_masks = _normalize_masks(masks, image.size, class_names)
     image_path = image_dir / filename
     try:
-        data = load_added_annotations(ann_path)
+        data = load_added_annotations(ann_path, num_classes=len(class_names))
         previous = next((item for item in data["images"] if item["file_name"] == filename), None)
         if previous is not None:
             previous_id = previous["id"]
@@ -206,15 +239,17 @@ def _add_image(
         data["images"].append(
             {"id": image_id, "file_name": filename, "width": width, "height": height}
         )
-        data["annotations"].extend(_encode_masks(normalized_masks, image_id, next_ann_id))
+        data["annotations"].extend(
+            _encode_masks(normalized_masks, image_id, next_ann_id, class_names)
+        )
 
         # Préparer et valider les deux contenus avant le premier remplacement.
         encoded_image = _image_bytes(image, filename)
-        _validate_store(data, ann_path)
+        _validate_store(data, ann_path, num_classes=len(class_names))
         previous_image = image_path.read_bytes() if image_path.exists() else None
         _atomic_write_bytes(image_path, encoded_image)
         try:
-            _save_added_annotations(data, ann_path)
+            _save_added_annotations(data, ann_path, num_classes=len(class_names))
         except Exception:
             # Le JSON encore en place référence l'ancienne image. On la restaure
             # donc si le second remplacement échoue.
@@ -233,29 +268,83 @@ def _add_image(
         raise DataStoreError(f"Impossible d'enregistrer {filename}: {exc}.") from exc
 
 
-def add_image_to_training_set(filename: str, image: Image.Image, masks: dict) -> None:
-    _add_image(filename, image, masks, config.TRAIN_ADDED_IMAGES_DIR, config.TRAIN_ADDED_ANN_PATH)
+def add_image_to_training_set(
+    filename: str, image: Image.Image, masks: dict, image_type: str = "cavite"
+) -> None:
+    if image_type == "oeufs":
+        _add_image(
+            filename,
+            image,
+            masks,
+            config.EGG_TRAIN_ADDED_IMAGES_DIR,
+            config.EGG_TRAIN_ADDED_ANN_PATH,
+            config.EGG_CLASS_NAMES,
+        )
+    elif image_type == "cavite":
+        _add_image(
+            filename, image, masks, config.TRAIN_ADDED_IMAGES_DIR, config.TRAIN_ADDED_ANN_PATH
+        )
+    else:
+        raise ValueError(f"Type d'image inconnu : {image_type!r}.")
 
 
-def add_image_to_labellisation_set(filename: str, image: Image.Image, masks: dict) -> None:
-    _add_image(
-        filename, image, masks, config.LABELLISATION_IMAGES_DIR, config.LABELLISATION_ANN_PATH
-    )
+def add_image_to_labellisation_set(
+    filename: str, image: Image.Image, masks: dict, image_type: str = "cavite"
+) -> None:
+    if image_type == "oeufs":
+        _add_image(
+            filename,
+            image,
+            masks,
+            config.EGG_LABELLISATION_IMAGES_DIR,
+            config.EGG_LABELLISATION_ANN_PATH,
+            config.EGG_CLASS_NAMES,
+        )
+    elif image_type == "cavite":
+        _add_image(
+            filename, image, masks, config.LABELLISATION_IMAGES_DIR, config.LABELLISATION_ANN_PATH
+        )
+    else:
+        raise ValueError(f"Type d'image inconnu : {image_type!r}.")
 
 
-def add_image_to_corrected_set(filename: str, image: Image.Image, masks: dict) -> None:
-    _add_image(filename, image, masks, config.CORRECTED_IMAGES_DIR, config.CORRECTED_ANN_PATH)
+def add_image_to_corrected_set(
+    filename: str, image: Image.Image, masks: dict, image_type: str = "cavite"
+) -> None:
+    if image_type == "oeufs":
+        _add_image(
+            filename,
+            image,
+            masks,
+            config.EGG_CORRECTED_IMAGES_DIR,
+            config.EGG_CORRECTED_ANN_PATH,
+            config.EGG_CLASS_NAMES,
+        )
+    elif image_type == "cavite":
+        _add_image(filename, image, masks, config.CORRECTED_IMAGES_DIR, config.CORRECTED_ANN_PATH)
+    else:
+        raise ValueError(f"Type d'image inconnu : {image_type!r}.")
 
 
-def load_corrected_image_and_masks(filename: str) -> dict | None:
+def load_corrected_image_and_masks(filename: str, image_type: str = "cavite") -> dict | None:
     """Recharge une correction et vérifie l'image ainsi que tous ses RLE."""
     filename = _safe_filename(filename)
-    data = load_added_annotations(config.CORRECTED_ANN_PATH)
+    if image_type == "oeufs":
+        ann_path = config.EGG_CORRECTED_ANN_PATH
+        image_dir = config.EGG_CORRECTED_IMAGES_DIR
+        class_names = config.EGG_CLASS_NAMES
+    elif image_type == "cavite":
+        ann_path = config.CORRECTED_ANN_PATH
+        image_dir = config.CORRECTED_IMAGES_DIR
+        class_names = config.CLASS_NAMES
+    else:
+        raise ValueError(f"Type d'image inconnu : {image_type!r}.")
+    data = load_added_annotations(ann_path, num_classes=len(class_names))
     image_entry = next((item for item in data["images"] if item["file_name"] == filename), None)
     if image_entry is None:
         return None
 
-    image_path = config.CORRECTED_IMAGES_DIR / filename
+    image_path = image_dir / filename
     try:
         if not image_path.is_file():
             raise DataStoreError(f"Image corrigée manquante : {image_path}.")
@@ -269,11 +358,11 @@ def load_corrected_image_and_masks(filename: str) -> dict | None:
             )
 
         width, height = expected_size
-        masks = {name: np.zeros((height, width), dtype=bool) for name in config.CLASS_NAMES}
+        masks = {name: np.zeros((height, width), dtype=bool) for name in class_names}
         for annotation in data["annotations"]:
             if annotation["image_id"] != image_entry["id"]:
                 continue
-            class_name = config.CLASS_NAMES[int(annotation["category_id"]) - 1]
+            class_name = class_names[int(annotation["category_id"]) - 1]
             segmentation = annotation.get("segmentation")
             if (
                 not isinstance(segmentation, dict)
@@ -299,12 +388,23 @@ def load_corrected_image_and_masks(filename: str) -> dict | None:
         raise DataStoreError(f"Impossible de charger la correction de {filename}: {exc}.") from exc
 
 
-def load_coco_ground_truth_masks(filename: str) -> dict | None:
-    """Charge les masques de vérité terrain d'origine, si l'image est présente."""
+def load_coco_ground_truth_masks(
+    filename: str, image_type: str = "cavite"
+) -> dict | None:
+    """Charge les masques COCO d'origine du type demandé, si l'image est présente."""
     filename = _safe_filename(filename)
-    if not config.COCO_ANN_PATH.exists():
+    if image_type == "oeufs":
+        ann_path = config.EGG_COCO_ANN_PATH
+        class_names = config.EGG_CLASS_NAMES
+    elif image_type == "cavite":
+        ann_path = config.COCO_ANN_PATH
+        class_names = config.CLASS_NAMES
+    else:
+        raise ValueError(f"Type d'image inconnu : {image_type!r}.")
+
+    if not ann_path.exists():
         return None
-    with config.COCO_ANN_PATH.open("r", encoding="utf-8") as stream:
+    with ann_path.open("r", encoding="utf-8") as stream:
         data = json.load(stream)
     image_entry = next((item for item in data["images"] if item["file_name"] == filename), None)
     if image_entry is None:
@@ -312,15 +412,15 @@ def load_coco_ground_truth_masks(filename: str) -> dict | None:
 
     image_id = image_entry["id"]
     height, width = image_entry["height"], image_entry["width"]
-    masks = {name: np.zeros((height, width), dtype=bool) for name in config.CLASS_NAMES}
+    masks = {name: np.zeros((height, width), dtype=bool) for name in class_names}
     for annotation in data["annotations"]:
         if annotation["image_id"] != image_id:
             continue
         class_idx = annotation["category_id"] - 1
-        if not 0 <= class_idx < config.NUM_CLASSES:
+        if not 0 <= class_idx < len(class_names):
             continue
         decoded = dataset.decode_segmentation(annotation["segmentation"], height, width)
-        masks[config.CLASS_NAMES[class_idx]] |= np.asarray(decoded, dtype=bool)
+        masks[class_names[class_idx]] |= np.asarray(decoded, dtype=bool)
     return masks
 
 
@@ -357,13 +457,32 @@ def _remove_image(filename: str, image_dir: Path, ann_path: Path) -> None:
         raise DataStoreError(f"Impossible de supprimer {filename}: {exc}.") from exc
 
 
-def remove_image_from_training_set(filename: str) -> None:
-    _remove_image(filename, config.TRAIN_ADDED_IMAGES_DIR, config.TRAIN_ADDED_ANN_PATH)
+def remove_image_from_training_set(filename: str, image_type: str = "cavite") -> None:
+    if image_type == "oeufs":
+        _remove_image(
+            filename, config.EGG_TRAIN_ADDED_IMAGES_DIR, config.EGG_TRAIN_ADDED_ANN_PATH
+        )
+    elif image_type == "cavite":
+        _remove_image(filename, config.TRAIN_ADDED_IMAGES_DIR, config.TRAIN_ADDED_ANN_PATH)
+    else:
+        raise ValueError(f"Type d'image inconnu : {image_type!r}.")
 
 
-def remove_image_from_labellisation_set(filename: str) -> None:
-    _remove_image(filename, config.LABELLISATION_IMAGES_DIR, config.LABELLISATION_ANN_PATH)
+def remove_image_from_labellisation_set(filename: str, image_type: str = "cavite") -> None:
+    if image_type == "oeufs":
+        _remove_image(
+            filename, config.EGG_LABELLISATION_IMAGES_DIR, config.EGG_LABELLISATION_ANN_PATH
+        )
+    elif image_type == "cavite":
+        _remove_image(filename, config.LABELLISATION_IMAGES_DIR, config.LABELLISATION_ANN_PATH)
+    else:
+        raise ValueError(f"Type d'image inconnu : {image_type!r}.")
 
 
-def remove_image_from_corrected_set(filename: str) -> None:
-    _remove_image(filename, config.CORRECTED_IMAGES_DIR, config.CORRECTED_ANN_PATH)
+def remove_image_from_corrected_set(filename: str, image_type: str = "cavite") -> None:
+    if image_type == "oeufs":
+        _remove_image(filename, config.EGG_CORRECTED_IMAGES_DIR, config.EGG_CORRECTED_ANN_PATH)
+    elif image_type == "cavite":
+        _remove_image(filename, config.CORRECTED_IMAGES_DIR, config.CORRECTED_ANN_PATH)
+    else:
+        raise ValueError(f"Type d'image inconnu : {image_type!r}.")

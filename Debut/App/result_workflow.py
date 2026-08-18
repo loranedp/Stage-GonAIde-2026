@@ -1,0 +1,386 @@
+"""Traitements partagés de prédiction, calcul et export des résultats."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from io import BytesIO
+from pathlib import Path
+from typing import Mapping, Sequence
+
+import numpy as np
+import pandas as pd
+from PIL import Image
+
+import calcul_volume_gonade
+import config
+import data_utils
+import metadata_utils
+import model_utils
+from filename_utils import parse_filename
+from utils import calcul_volume_fct
+
+
+RESULT_CSV_COLUMNS = [
+    "Id_poisson",
+    "Volume_gonades",
+    "Volume_cavite",
+    "Volume_moyen_oeufs",
+    "Fecondite_estimee",
+]
+LEGACY_RESULT_COLUMNS = {
+    "Volume_gonades": "Volume_total_gonades_cm3",
+    "Volume_cavite": "Volume_total_cavité_cm3",
+    "Volume_moyen_oeufs": "Volume_moyen_oeuf_cm3",
+    "Fecondite_estimee": "Fecondite_estimee",
+}
+
+
+@dataclass(frozen=True)
+class UploadedImage:
+    """Copie persistante d'un fichier fourni au widget Streamlit."""
+
+    name: str
+    data: bytes
+
+
+@dataclass(frozen=True)
+class WorkflowIssue:
+    filename: str
+    message: str
+    fish_id: str | None = None
+
+
+@dataclass
+class PredictionBatch:
+    predictions: dict[str, dict] = field(default_factory=dict)
+    statuses: dict[str, str] = field(default_factory=dict)
+    corrected_keys: set[str] = field(default_factory=set)
+    issues: list[WorkflowIssue] = field(default_factory=list)
+
+    @property
+    def failed_fish_ids(self) -> set[str]:
+        return {issue.fish_id for issue in self.issues if issue.fish_id is not None}
+
+
+def predict_uploads(
+    uploads_by_type: Mapping[str, Sequence[UploadedImage]],
+) -> PredictionBatch:
+    """Prédit les fichiers fournis, en chargeant chaque famille de modèles au plus une fois."""
+
+    batch = PredictionBatch()
+    models_by_type: dict[str, list | None] = {"cavite": None, "oeufs": None}
+    model_errors: dict[str, Exception] = {}
+
+    for image_type in ("cavite", "oeufs"):
+        for uploaded in uploads_by_type.get(image_type, ()):
+            filename = uploaded.name
+            try:
+                parsed = parse_filename(filename)
+            except ValueError as exc:
+                batch.issues.append(WorkflowIssue(filename, str(exc)))
+                continue
+
+            prediction_key = f"{image_type}:{filename}"
+            try:
+                is_corrected = False
+                corrected_data = data_utils.load_corrected_image_and_masks(
+                    filename, image_type=image_type
+                )
+                if corrected_data is not None:
+                    image = corrected_data["image"]
+                    masks = corrected_data["masks"]
+                    confidences = {}
+                    instances = (
+                        model_utils.split_egg_mask(masks["Oeuf"])
+                        if image_type == "oeufs"
+                        else None
+                    )
+                    is_corrected = True
+                else:
+                    image = Image.open(BytesIO(uploaded.data)).convert("RGB")
+                    if image_type in model_errors:
+                        raise model_errors[image_type]
+                    if models_by_type[image_type] is None:
+                        try:
+                            models_by_type[image_type] = (
+                                model_utils.load_egg_models()
+                                if image_type == "oeufs"
+                                else model_utils.load_models()
+                            )
+                        except (OSError, ValueError, KeyError, RuntimeError) as exc:
+                            model_errors[image_type] = exc
+                            raise
+                    result = (
+                        model_utils.predict_eggs(models_by_type[image_type], image)
+                        if image_type == "oeufs"
+                        else model_utils.predict(
+                            models_by_type[image_type], image, parsed.id_image
+                        )
+                    )
+                    masks = result["masks"]
+                    confidences = result["confidences"]
+                    instances = result.get("instances")
+                status = (
+                    data_utils.get_disk_status(filename, image_type=image_type)
+                    or config.DEFAULT_STATUS
+                )
+            except (
+                OSError,
+                ValueError,
+                KeyError,
+                RuntimeError,
+                data_utils.DataStoreError,
+            ) as exc:
+                batch.issues.append(
+                    WorkflowIssue(filename, f"{filename} : {exc}", parsed.id_poisson)
+                )
+                continue
+
+            prediction = {
+                "filename": filename,
+                "image_type": image_type,
+                "image": image,
+                "masks": masks,
+                "confidences": confidences,
+                "id_image": parsed.id_image,
+                "heure": parsed.heure,
+                "id_poisson": parsed.id_poisson,
+            }
+            if instances is not None:
+                prediction["instances"] = instances
+            batch.predictions[prediction_key] = prediction
+            batch.statuses[prediction_key] = status
+            if is_corrected:
+                batch.corrected_keys.add(prediction_key)
+
+    return batch
+
+
+def calculate_fish_result(
+    fish_id: str,
+    predictions: Mapping[str, dict],
+    statuses: Mapping[str, str],
+) -> dict:
+    """Calcule les résultats affichables/exportables d'un poisson."""
+
+    fish_items = [
+        (prediction_key, pred)
+        for prediction_key, pred in predictions.items()
+        if pred["id_poisson"] == fish_id
+        and statuses.get(prediction_key, config.DEFAULT_STATUS) != "mauvaise"
+    ]
+    cavity_items = [item for item in fish_items if item[1]["image_type"] == "cavite"]
+    egg_items = [item for item in fish_items if item[1]["image_type"] == "oeufs"]
+    errors: list[str] = []
+
+    images_ordered = []
+    cavity_error = False
+    fish_echelle_ocr = None
+    for _, pred in cavity_items:
+        filename = pred["filename"]
+        meta = metadata_utils.lookup(pred["id_image"])
+        if meta is None:
+            errors.append(
+                f"{filename} : aucune métadonnée trouvée pour id_image="
+                f"'{pred['id_image']}' (position/long_gonade requis pour le volume)."
+            )
+            cavity_error = True
+            continue
+        echelle = meta["echelle"]
+        if not np.isfinite(echelle):
+            if fish_echelle_ocr is None:
+                fish_echelle_ocr = calcul_volume_gonade.determine_fish_echelle(
+                    [p["image"] for _, p in cavity_items]
+                )
+            echelle = fish_echelle_ocr
+        surface = calcul_volume_gonade.surface_cm2(
+            pred["masks"]["Gonade"], echelle, pred["image"].height
+        )
+        surface_cavite = calcul_volume_gonade.surface_cm2(
+            pred["masks"]["Cavite"], echelle, pred["image"].height
+        )
+        images_ordered.append(
+            {
+                "id_image": pred["id_image"],
+                "surface_cm2": surface,
+                "surface_cavite_cm2": surface_cavite,
+                "position": meta["position"],
+                "long_gonade": meta["long_gonade"],
+            }
+        )
+
+    rows = []
+    anomalies = set()
+    volume_total = None
+    volume_total_cavite = None
+    if not cavity_error and images_ordered:
+        images_ordered.sort(key=lambda item: item["position"])
+        anomalies = calcul_volume_gonade.detect_surface_gonade_anomalies(images_ordered)
+        result = calcul_volume_gonade.compute_fish_volume(images_ordered)
+        volume_total = result["volume_total_cm3"]
+        result_cavite = calcul_volume_gonade.compute_fish_volume(
+            images_ordered, surface_key="surface_cavite_cm2"
+        )
+        volume_total_cavite = result_cavite["volume_total_cm3"]
+        rows = [
+            {
+                "Id_poisson": str(fish_id),
+                "Id_image": item["id_image"],
+                "Position": str(item["position"]),
+                "Surface_gonades_cm2": round(item["surface_cm2"], 4),
+                "Surface_cavité_cm2": round(item["surface_cavite_cm2"], 4),
+                "Rayon_gonades_cm": round(
+                    float(np.sqrt(item["surface_cm2"] / np.pi)), 4
+                ),
+            }
+            for item in result["surfaces"]
+        ]
+
+    egg_inputs = []
+    egg_echelle_ocr = None
+    for _, pred in egg_items:
+        meta = metadata_utils.lookup(pred["id_image"])
+        echelle = meta["echelle"] if meta is not None else np.nan
+        if not np.isfinite(echelle):
+            if egg_echelle_ocr is None:
+                egg_echelle_ocr = calcul_volume_gonade.determine_fish_echelle(
+                    [p["image"] for _, p in egg_items]
+                )
+            echelle = egg_echelle_ocr
+        instances = pred.get("instances")
+        if instances is None:
+            instances = model_utils.split_egg_mask(pred["masks"]["Oeuf"])
+            pred["instances"] = instances
+        egg_inputs.append(
+            {
+                "id_image": pred["id_image"],
+                "instances": instances,
+                "echelle": echelle,
+                "image_height": pred["image"].height,
+            }
+        )
+
+    egg_result = calcul_volume_fct.calculate_mean_egg_volume(egg_inputs)
+    egg_rows = egg_result["images"]
+    egg_mean = egg_result["volume_moyen_oeufs_cm3"]
+    fecundity = (
+        float(volume_total / egg_mean)
+        if volume_total is not None and egg_mean is not None and egg_mean > 0
+        else None
+    )
+
+    return {
+        "selected_fish": fish_id,
+        "rows": rows,
+        "anomalies": anomalies,
+        "volume_total": volume_total,
+        "volume_total_cavite": volume_total_cavite,
+        "egg_rows": egg_rows,
+        "egg_mean": egg_mean,
+        "fecundity": fecundity,
+        "has_cavity_images": bool(cavity_items),
+        "has_egg_images": bool(egg_items),
+        "has_eligible_images": bool(fish_items),
+        "cavity_error": cavity_error,
+        "cavity_ocr_scale": fish_echelle_ocr,
+        "errors": errors,
+    }
+
+
+def _rounded_number(value, digits: int = 4):
+    if value is None or pd.isna(value):
+        return None
+    number = float(value)
+    return round(number, digits) if np.isfinite(number) else None
+
+
+def result_summary_row(result: Mapping) -> dict:
+    """Convertit un résultat détaillé en une ligne synthétique pour le CSV."""
+
+    fecundity_value = result.get("fecundity")
+    fecundity = (
+        float(fecundity_value)
+        if fecundity_value is not None and not pd.isna(fecundity_value)
+        else None
+    )
+    if fecundity is not None and not np.isfinite(fecundity):
+        fecundity = None
+    return {
+        "Id_poisson": str(result["selected_fish"]),
+        "Volume_gonades": _rounded_number(result.get("volume_total")),
+        "Volume_cavite": _rounded_number(result.get("volume_total_cavite")),
+        "Volume_moyen_oeufs": _rounded_number(result.get("egg_mean")),
+        "Fecondite_estimee": int(round(fecundity)) if fecundity is not None else None,
+    }
+
+
+def has_exportable_result(result: Mapping) -> bool:
+    row = result_summary_row(result)
+    return any(row[column] is not None for column in RESULT_CSV_COLUMNS[1:])
+
+
+def _summary_dataframe(rows) -> pd.DataFrame:
+    dataframe = pd.DataFrame(rows, columns=RESULT_CSV_COLUMNS)
+    dataframe["Fecondite_estimee"] = pd.array(
+        dataframe["Fecondite_estimee"], dtype="Int64"
+    )
+    return dataframe
+
+
+def migrate_results_dataframe(dataframe: pd.DataFrame) -> pd.DataFrame:
+    """Normalise un CSV synthétique ou consolide l'ancien format par image."""
+
+    if "Id_poisson" not in dataframe.columns:
+        raise ValueError("Le CSV de résultats ne contient pas la colonne Id_poisson.")
+    if set(RESULT_CSV_COLUMNS).issubset(dataframe.columns):
+        source_columns = {column: column for column in RESULT_CSV_COLUMNS[1:]}
+    elif set(LEGACY_RESULT_COLUMNS.values()).issubset(dataframe.columns):
+        source_columns = LEGACY_RESULT_COLUMNS
+    else:
+        raise ValueError("Le schéma du CSV de résultats est incompatible.")
+
+    rows = []
+    for fish_id, group in dataframe.groupby("Id_poisson", sort=False):
+        result = {"selected_fish": str(fish_id)}
+        result_keys = {
+            "Volume_gonades": "volume_total",
+            "Volume_cavite": "volume_total_cavite",
+            "Volume_moyen_oeufs": "egg_mean",
+            "Fecondite_estimee": "fecundity",
+        }
+        for target_column, result_key in result_keys.items():
+            values = group[source_columns[target_column]].dropna()
+            result[result_key] = values.iloc[0] if not values.empty else None
+        if has_exportable_result(result):
+            rows.append(result_summary_row(result))
+
+    return _summary_dataframe(rows)
+
+
+def save_fish_results(results: Sequence[dict], csv_path: Path) -> int:
+    """Crée ou remplace la ligne synthétique de chaque poisson calculé."""
+
+    new_rows = [result_summary_row(result) for result in results if has_exportable_result(result)]
+    if not new_rows:
+        return 0
+
+    new_rows_df = _summary_dataframe(new_rows)
+    new_rows_df = new_rows_df.drop_duplicates(subset="Id_poisson", keep="last")
+    fish_ids = set(new_rows_df["Id_poisson"])
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    if csv_path.exists():
+        existing_df = pd.read_csv(csv_path, encoding="utf-8", dtype={"Id_poisson": str})
+        existing_df = migrate_results_dataframe(existing_df)
+        existing_df = existing_df[~existing_df["Id_poisson"].isin(fish_ids)]
+        combined_df = pd.concat([existing_df, new_rows_df], ignore_index=True)
+    else:
+        combined_df = new_rows_df
+    combined_df = _summary_dataframe(combined_df.to_dict("records"))
+    combined_df.to_csv(
+        csv_path,
+        columns=RESULT_CSV_COLUMNS,
+        index=False,
+        encoding="utf-8",
+        float_format="%.4f",
+    )
+    return len(fish_ids)
