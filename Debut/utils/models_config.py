@@ -148,18 +148,15 @@ def split_dataset(all_samples, all_images_dir, df, IMAGE_SIZE, num_classes, clas
     y = np.array(categories_all) # Les classes
     groups = np.array([sample["image_info"]["file_name"].split("_")[2] for sample in all_samples]) # L'ID du poisson pour chaque image
 
-    # Les exports qui ne contiennent pas les métadonnées d'échographie (ex: oeufs)
-    # ne peuvent pas être traités par StratifiedGroupKFold avec des NaN. On conserve
-    # l'absence de stratification tout en garantissant qu'un même poisson reste dans
-    # un seul sous-ensemble.
+    # Les données sont divisées par StratifiedGroupKFold excepté pour les oeufs, uniquement divisés par groupes
     metadata_available = all(value is not None and not (isinstance(value, float) and np.isnan(value))
                              for value in categories_all)
     if metadata_available and len(np.unique(y)) > 1:
         kf = StratifiedGroupKFold(n_splits=6, shuffle=True, random_state=42)
-        split_iterator = kf.split(X, y, groups)
+        split_iterator = kf.split(X, y, groups) # Divise selon la distribution des classes et les groupes (poissons)
     else:
         kf = GroupKFold(n_splits=6)
-        split_iterator = kf.split(X, groups=groups)
+        split_iterator = kf.split(X, groups=groups) # Divise uniquement selon les groupes (poissons), sans stratification
 
     for cv_idx, test_idx in split_iterator:
         cv_samples, test_samples = X[cv_idx], X[test_idx]
