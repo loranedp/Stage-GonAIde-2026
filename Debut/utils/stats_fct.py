@@ -9,14 +9,14 @@ from matplotlib.colors import BoundaryNorm, ListedColormap
 from matplotlib.patches import Patch
 
 
-def distribution(donnees, titre="Distribution", xlabel="Valeurs", couleur='cornflowerblue'):
+def distribution(donnees, titre="Distribution", xlabel="Valeurs", couleur='cornflowerblue', bins='auto'):
     plt.figure(figsize=(6, 4))
     
     sns.histplot(
         donnees, 
         kde=True,             # Ajoute la densité de probabilité
         color=couleur, 
-        bins='auto',          # intervalles automatiques
+        bins=bins,          # intervalles automatiques
         edgecolor='black',    # Bordure des colonnes
         alpha=0.8
     )

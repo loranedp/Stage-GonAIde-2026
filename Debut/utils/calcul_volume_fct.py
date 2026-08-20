@@ -65,7 +65,7 @@ def calculate_areas(mask_path, image_path, echelle):
 # ---- Calcul du volume : images transversales -----
 def calculate_volumes(df, id, path):
     #---- Initialisation des variables ----
-    resultats = {"id poisson": [], "position echo": [], "surface_cavite": [], "surface_gonade": [], "volume_cavite": [], 
+    resultats = {"id poisson": [], "image_id": [], "position echo": [], "surface_cavite": [], "surface_gonade": [], "volume_cavite": [], 
              "volume_gonade": [], "echelle": [], "augmentation_surface_gonade": [], "augmentation_surface_cavite": []}
     
     last_row = None
@@ -124,6 +124,7 @@ def calculate_volumes(df, id, path):
             print(f"Position de l'écho : {row['position']}, surface gonades : {surface_gonade:.2f} cm2, rayon : {rayon_gonade:.2f} cm, surface cavité : {surface_cavite:.2f} cm2")
 
             resultats["id poisson"].append(str(id))
+            resultats["image_id"].append(row["image_id"])
             resultats["position echo"].append(row["position"])
             resultats["surface_cavite"].append(surface_cavite)
             resultats["surface_gonade"].append(surface_gonade)
@@ -266,7 +267,7 @@ def calculate_mean_egg_volume(images):
 # ---- Calcul du volume : images longitudinales -----
 def calculate_eggs_volumes(df, id, path):
     #---- Initialisation des variables ----
-    resultats = {"id poisson": [], "position echo": [], "surface_moyenne_oeufs": [], "volume_moyen_oeufs": [], "echelle": []}
+    resultats = {"id poisson": [], "image_id": [], "position echo": [], "surface_moyenne_oeufs": [], "volume_moyen_oeufs": [], "echelle": []}
     
     volumes_oeufs_list = []
     count = 0
@@ -299,6 +300,7 @@ def calculate_eggs_volumes(df, id, path):
             print(f"Echo n° : {count}, surface oeufs : {surface_oeufs:.3f} cm2, rayon : {rayon_oeufs:.3f} cm, volume : {volume_oeufs:.4f} cm3")
 
             resultats["id poisson"].append(str(id))
+            resultats["image_id"].append(row["image_id"])
             resultats["surface_moyenne_oeufs"].append(surface_oeufs)
             resultats["volume_moyen_oeufs"].append(volume_oeufs)
             resultats["echelle"].append(echelle)
