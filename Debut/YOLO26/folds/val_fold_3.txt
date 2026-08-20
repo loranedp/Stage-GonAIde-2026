@@ -1,8 +1,9 @@
-../data/YOLO/oeufs/images/0005110_14.31.40_363764_2020.jpg
-../data/YOLO/oeufs/images/0006272_14.59.48_406931_2022.jpg
-../data/YOLO/oeufs/images/0004650_11.22.45_356868_2019.jpg
-../data/YOLO/oeufs/images/0004729_11.16.22_357302_2019.jpg
 ../data/YOLO/oeufs/images/0004591_12.14.18_356430_2019.jpg
+../data/YOLO/oeufs/images/0004596_12.16.39_356434_2019.jpg
+../data/YOLO/oeufs/images/0005110_14.31.40_363764_2020.jpg
+../data/YOLO/oeufs/images/0005986_15.47.15_406037_2022.jpg
+../data/YOLO/oeufs/images/0005988_15.49.37_406037_2022.jpg
 ../data/YOLO/oeufs/images/0006931_10.06.55_426711_2024.jpg
-../data/YOLO/oeufs/images/0004585_12.05.40_356418_2019.jpg
-../data/YOLO/oeufs/images/0006273_15.00.01_406931_2022.jpg
+../data/YOLO/oeufs/images/0006953_11.05.46_426770_2024.jpg
+../data/YOLO/oeufs/images/0007113_09.50.28_427193_2024.jpg
+../data/YOLO/oeufs/images/0007120_09.59.50_427202_2024.jpg
