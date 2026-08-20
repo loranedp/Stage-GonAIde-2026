@@ -23,5 +23,7 @@ Les données et les poids des modèles sont disponibles sur next cloud : https:/
 ## Lancement de l'application
 streamlit run Debut/App/app.py
 
+L'application est alors accessible à l'adresse http://localhost:8501.
+
 ## Résultats
 Les résultats du calcul des volumes et de la fécondité sont disponibles dans 'Debut/Résultats/volumes_poissons.csv'.

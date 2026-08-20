@@ -16,3 +16,5 @@ Debut/YOLO26/*.yaml
 Debut/YOLO26/folds
 Debut/YOLO26/mobileclip2_b.ts
 Debut/YOLO26/runs
+
+Debut/utils/__pycache__
