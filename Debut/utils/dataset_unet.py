@@ -177,10 +177,14 @@ class RoboflowUNetDataset(torch.utils.data.Dataset):
 
 class EggHVDataset(torch.utils.data.Dataset):
     """Dataset COCO d'instances d'œufs pour la sortie masque/H/V."""
-    def __init__(self, samples, image_size, crop_params=(85, 33, 510, 380)):
+    def __init__(self, samples, image_size, crop_params=(85, 33, 510, 380),
+                 is_train=False, seed=42):
         self.samples = samples
         self.image_size = image_size
         self.crop_params = crop_params
+        self.is_train = is_train
+        self.seed = seed
+        self.epoch = 0
 
     def __len__(self):
         return len(self.samples)
@@ -205,5 +209,16 @@ class EggHVDataset(torch.utils.data.Dataset):
         targets_tensor = torch.from_numpy(np.stack([np.asarray(Image.fromarray(channel).resize(self.image_size, Image.Resampling.BILINEAR), dtype=np.float32) for channel in targets]))
         targets_tensor[0].clamp_(0, 1)
         targets_tensor[1:].clamp_(-1, 1)
-        return {'image': image_tensor, 'mask': targets_tensor, 'image_path': sample['image_path'], 'original_size': (width, height), 'crop_params': self.crop_params}
 
+        if self.is_train:
+            item_seed = (
+                self.seed * 1_000_003 + self.epoch * 10_007 + idx
+            ) % (2**31 - 1)
+            rng_state = torch.random.get_rng_state()
+            torch.manual_seed(item_seed)
+            image_tensor, targets_tensor = data_augmentation(
+                image_tensor, targets_tensor, model="egg_hv"
+            )
+            torch.random.set_rng_state(rng_state)
+
+        return {'image': image_tensor, 'mask': targets_tensor, 'image_path': sample['image_path'], 'original_size': (width, height), 'crop_params': self.crop_params}
