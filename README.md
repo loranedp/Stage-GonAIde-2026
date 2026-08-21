@@ -1,7 +1,7 @@
 # Stage-GonAIde-2026
 GonAIde : Application de l'IA à des images d'échographies de gonades pour estimer la fécondité chez la truite commune
 
-## Création d'un environnement virtuel (version ?)
+## Création d'un environnement virtuel (python 3.14)
 cd Stage-GonAIde-2026
 
 python3.14 -m venv mon_venv
