@@ -3,7 +3,9 @@ GonAIde : Application de l'IA à des images d'échographies de gonades pour esti
 
 ## Création d'un environnement virtuel (version ?)
 cd Stage-GonAIde-2026
-python -m venv mon_venv
+
+python3.14 -m venv mon_venv
+
 source mon_venv/bin/activate
 
 ## Installation des packages nécessaires
