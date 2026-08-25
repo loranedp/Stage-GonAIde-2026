@@ -1,20 +1,22 @@
 .venv
 mon_venv
+ultrasam_venv
+OpenUs_venv
 Debut/data
 .vscode
 __pycache__
 __init__.py
+checkpoint
+checkpoints
 
 Debut/UNet/__pycache__
 Debut/UNet/saves
 
-Debut/App/checkpoints
 Debut/App/__pycache__
 
 Debut/YOLO26/*.pt
 Debut/YOLO26/*.yaml
 Debut/YOLO26/folds
-Debut/YOLO26/mobileclip2_b.ts
 Debut/YOLO26/runs
 
 Debut/utils/__pycache__
