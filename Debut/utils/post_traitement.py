@@ -74,13 +74,15 @@ def fill_holes(preds_tensor):
 
 
 # Fonction pour séparer les instances d'œufs (sémantique to instance) ainsi que leur appliquer un post-traitement
-def split_eggs(preds_tensor, min_distance=10, min_area=100):
+def split_eggs(preds_tensor, min_distance=10, min_area=100, ouverture_size=3, ouverture_iterations=1):
     """Sépare un masque sémantique d'œufs en instances par watershed : utilise la transformée de distance pour trouver les centres des œufs et
         applique watershed pour séparer les instances.
     Args:
         preds_tensor (torch.Tensor): Masque binaire prédit par le modèle
         min_distance (int): Distance minimale entre deux centres d'œufs pour les considérer comme des instances distinctes
         min_area (int): Aire minimale d'une instance pour être conservée
+        ouverture_size (int): Taille du noyau d'ouverture morphologique
+        ouverture_iterations (int): Nombre d'itérations d'ouverture morphologique
     """
     # --- Vérification des entrées ---
     if preds_tensor.ndim != 4 or preds_tensor.shape[1] != 1:
@@ -91,16 +93,22 @@ def split_eggs(preds_tensor, min_distance=10, min_area=100):
     # --- Conversion du tenseur en numpy pour le traitement ---
     preds_np = preds_tensor.detach().byte().cpu().numpy()
 
+     # --- Noyau elliptique pour l'ouverture ---
+    opening_kernel = cv2.getStructuringElement(
+        cv2.MORPH_ELLIPSE,
+        (ouverture_size, ouverture_size)
+    )
+
     batch_labels = []
     for batch_mask in preds_np:
         binary = batch_mask[0].astype(np.uint8)
 
-        # --- Récupération des composantes connectées ---
+        # --- 1. Récupération des composantes connectées ---
         num_components, component_labels, stats, _ = cv2.connectedComponentsWithStats(
             binary, 
             connectivity=8 # Voisinage 8 = pixels adjacents horizontalement, verticalement et diagonalement
         )
-        # --- Filtrage des composantes trop petites ---
+        # --- 2.Filtrage des composantes trop petites ---
         clean = np.zeros_like(binary)
         for component_id in range(1, num_components):
             if stats[component_id, cv2.CC_STAT_AREA] >= min_area:
@@ -111,10 +119,10 @@ def split_eggs(preds_tensor, min_distance=10, min_area=100):
             batch_labels.append(np.zeros_like(clean, dtype=np.int32))
             continue
 
-        # --- Transformée de distance pour identifier les centres des œufs ---
+        # --- 3. Transformée de distance pour identifier les centres des œufs ---
         distance = cv2.distanceTransform(clean, cv2.DIST_L2, 5) # calcul pour chaque pixel la distance (L2) au pixel "background" le plus proche
 
-        # --- Identification des maxima locaux -> centre des oeufs ---
+        # --- 4. Identification des maxima locaux -> centre des oeufs ---
         peak_coords = peak_local_max(
             distance,
             min_distance=min_distance, # distance minimale entre deux maxima locaux
@@ -125,7 +133,7 @@ def split_eggs(preds_tensor, min_distance=10, min_area=100):
         for marker_id, (row, col) in enumerate(peak_coords, start=1):
             markers[row, col] = marker_id # Associe chaque centre d'œuf à un marqueur unique
 
-        # --- Gestion des composantes connectées qui n'ont pas de marqueur (ex: œufs très proches) ---
+        # --- 5. Gestion des composantes connectées qui n'ont pas de marqueur (ex: œufs très proches) ---
         clean_count, clean_components = cv2.connectedComponents(clean, connectivity=8)
         next_marker = int(markers.max()) + 1
         for component_id in range(1, clean_count):
@@ -136,10 +144,29 @@ def split_eggs(preds_tensor, min_distance=10, min_area=100):
                 markers[row, col] = next_marker
                 next_marker += 1
 
-        # --- Watershed pour séparer les instances à partir des marqueurs ---
+        # --- 6. Watershed pour séparer les instances à partir des marqueurs ---
         labels = watershed(-distance, markers, mask=clean).astype(np.int32) # Etend les marqueurs à l'ensemble de la zone binaire, en séparant les instances d'œufs
 
-        # --- Masque final avec filtrage des petites instances potentiellement créées ---
+        # --- 7. Ouverture morphologique pour lisser les contours des instances ---
+        opened_labels = np.zeros_like(labels, dtype=np.int32)
+
+        for label_id in np.unique(labels):
+            if label_id == 0:
+                continue
+
+            # Masque binaire correspondant à un seul œuf
+            instance = (labels == label_id).astype(np.uint8)
+
+            opened = cv2.morphologyEx(
+                instance,
+                cv2.MORPH_OPEN,
+                opening_kernel,
+                iterations=ouverture_iterations
+            )
+
+            opened_labels[opened > 0] = label_id
+
+        # --- 8. Masque final avec filtrage des petites instances potentiellement créées ---
         relabelled = np.zeros_like(labels, dtype=np.int32)
         next_label = 1
         for label_id in np.unique(labels):

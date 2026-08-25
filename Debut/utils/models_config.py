@@ -3,11 +3,11 @@ import numpy as np
 import torch
 from torch.nn import functional as F
 from pathlib import Path
+from PIL import Image
 import sys
 import cv2
 import json
 from sklearn.model_selection import GroupKFold, StratifiedGroupKFold
-
 
 sys.path.append(str(Path.cwd().parent)) # Ajoute le dossier parent au chemin de recherche de Python
 
@@ -15,11 +15,14 @@ sys.path.append(str(Path.cwd().parent)) # Ajoute le dossier parent au chemin de 
 from utils.dataset_unet import RoboflowUNetDataset
 from utils.dataset_2_5D import SliceSequenceUNetDataset
 
-# Catégorie d'annotation spéciale : ne devient jamais un canal de sortie du modèle.
-# Sert uniquement à marquer, sur le canal Gonade, des zones où l'annotateur n'est
-# pas certain de la présence d'une gonade (pixels à ignorer en loss/métriques).
-IGNORE_CATEGORY_NAME = "ignore"
+from utils.stats_fct import (
+    plot_segmentation_comparison,
+    mask_to_yolo_polygons,
+    overlay_colored_mask,
+)
 
+# Zones où l'annotateur n'est pas certain de la présence d'une gonade (pixels à ignorer en loss/métriques).
+IGNORE_CATEGORY_NAME = "ignore"
 
 # ----------- Regroupement des images et annotations dans un dictionnaire -----------
 def dataset_to_dict(df, annotations_json, all_images_dir):
@@ -222,82 +225,6 @@ def split_dataset(all_samples, all_images_dir, df, IMAGE_SIZE, num_classes, clas
 
     return cv_samples, test_samples, cv_categories, test_categories, groups_train, groups_test, cv_dataset, test_dataset
 
-# --------------- Définition des fonctions de perte personnalisées pour l'entraînement du modèle ---------------
-# Dice Loss
-class DiceLoss(torch.nn.Module):
-    def __init__(self, smooth=1e-6):
-        super().__init__()
-        self.smooth = smooth
-
-    def forward(self, inputs, targets):
-        inputs = torch.sigmoid(inputs) # Transforme les prédictions en probabilités
-        intersection = (inputs * targets).sum(dim=(2, 3)) # Intersection entre les prédictions et les cibles
-        dice = (2. * intersection + self.smooth) / (inputs.sum(dim=(2, 3)) + targets.sum(dim=(2, 3)) + self.smooth)
-        return 1. - dice.mean()  # Moyenne sur le batch et les classes
-    
-# Binary Cross-Entropy Loss + Dice Loss
-class BCE_DiceLoss(torch.nn.Module):
-    def __init__(self, bce_weight=0.5, dice_weight=0.5):
-        super().__init__()
-        self.bce = torch.nn.BCEWithLogitsLoss()
-        self.dice = DiceLoss()
-        self.bce_weight = bce_weight
-        self.dice_weight = dice_weight
-
-    def forward(self, inputs, targets):
-        bce_loss = self.bce(inputs, targets)
-        dice_loss = self.dice(inputs, targets)
-        return self.bce_weight * bce_loss + self.dice_weight * dice_loss
-
-
-# --------------- Fonctions de pertes avec des pixels ignorés (artefacts) pour l'entraînement du modèle ---------------
-# 1. Dice Loss avec prise en compte de ignore_index
-class DiceLoss_ignore(torch.nn.Module):
-    def __init__(self, smooth=1e-6, ignore_index=-100):
-        super().__init__()
-        self.smooth = smooth
-        self.ignore_index = ignore_index
-
-    def forward(self, inputs, targets):
-        inputs = torch.sigmoid(inputs) # Transforme les prédictions en probabilités
-
-        # --- Ignore des pixels ---
-        valid_mask = (targets != self.ignore_index).float() # Masque binaire des pixels valides
-        targets_clean = torch.where(targets == self.ignore_index, torch.tensor(0.0, device=targets.device), targets) # Remplace les -100 par 0 pour le calcul de la perte
-        inputs_masked = inputs * valid_mask # Neutralise les pixels d'artefacts dans les prédictions
-        targets_masked = targets_clean * valid_mask # Neutralise les pixels d'artefacts dans les cibles
-        
-        # Calcul de l'intersection et de la somme sur les zones valides uniquement
-        intersection = (inputs_masked * targets_masked).sum(dim=(2, 3))
-        total = inputs_masked.sum(dim=(2, 3)) + targets_masked.sum(dim=(2, 3))
-        
-        dice = (2. * intersection + self.smooth) / (total + self.smooth)
-        return 1. - dice.mean()
-
-# 2. BCE + Dice Loss combinée avec ignore_index
-class BCE_DiceLoss_ignore(torch.nn.Module):
-    def __init__(self, bce_weight=0.5, dice_weight=0.5, ignore_index=-100):
-        super().__init__()
-        self.bce = torch.nn.BCEWithLogitsLoss(reduction='none')
-        self.dice = DiceLoss_ignore(ignore_index=ignore_index)
-        self.bce_weight = bce_weight
-        self.dice_weight = dice_weight
-        self.ignore_index = ignore_index
-
-    def forward(self, inputs, targets):
-        # --- Ignore des pixels ---
-        valid_mask = (targets != self.ignore_index).float() # masque binaire des pixels valides
-        targets_clean = torch.where(targets == self.ignore_index, torch.tensor(0.0, device=targets.device), targets) # Remplace les -100 par 0 pour le calcul de la BCE
-        
-        # Calcul de la BCE pixel par pixel puis moyennage uniquement sur les pixels valides
-        bce_raw = self.bce(inputs, targets_clean)
-        bce_loss = (bce_raw * valid_mask).sum() / valid_mask.sum().clamp(min=1e-6)
-        
-        dice_loss = self.dice(inputs, targets)
-        
-        return self.bce_weight * bce_loss + self.dice_weight * dice_loss
-
-
 # Calcul des métriques par image et par classe avec prise en compte de l'échelle et du dataset
 def metrics_by_class(true, preds, echelle, dataset_name) :
     intersection = (preds & true).float().sum((2, 3))
@@ -308,7 +235,11 @@ def metrics_by_class(true, preds, echelle, dataset_name) :
     iou_per_img[union==0] = 1.0 # Si prédiction et vérité sont toutes deux vides, IoU = 1.0
 
     # --- Calcul du Dice Score ---
-    dice_per_img = (2 * intersection) / (preds.float().sum((2, 3)) + true.float().sum((2, 3)) + 1e-6)
+    pred_area = preds.float().sum((2, 3))
+    true_area = true.float().sum((2, 3))
+    dice_per_img = (2 * intersection) / (pred_area + true_area + 1e-6)
+    both_empty = (pred_area == 0) & (true_area == 0)
+    dice_per_img[both_empty] = 1.0
 
     # --- Calcul de la précision et du rappel ---
     false_positive = (preds.float().sum((2, 3)) - intersection)
@@ -317,8 +248,8 @@ def metrics_by_class(true, preds, echelle, dataset_name) :
     recall_per_img = intersection / (intersection + false_negative + 1e-6)
 
     #--- Calcul des surfaces en cm2 ---
-    pred_surf_pixels = preds.float().sum((2, 3))
-    true_surf_pixels = true.float().sum((2, 3))
+    pred_surf_pixels = pred_area
+    true_surf_pixels = true_area
 
     diff_surf_pixels = (true_surf_pixels - pred_surf_pixels).abs()
     if dataset_name != "oeufs":
@@ -334,3 +265,42 @@ def metrics_by_class(true, preds, echelle, dataset_name) :
         diff_surface = diff_surf_pixels  # En pixels pour le dataset "oeufs"
 
     return intersection, union,iou_per_img, dice_per_img, precision_per_img, recall_per_img, diff_surface
+
+def save_validation_masks(masks_dir, best_masks, fold):
+    """Exporte les masques du meilleur epoch du fold au format YOLO."""
+    for file_name, true_mask, pred_mask in best_masks:
+        stem = Path(file_name).stem
+        pred_path = Path(masks_dir) / f"pred_fold_{fold}_{stem}.txt"
+        true_path = Path(masks_dir) / f"true_fold_{fold}_{stem}.txt"
+
+        with pred_path.open("w") as f_pred:
+            for class_idx in range(pred_mask.shape[0]):
+                polygons = mask_to_yolo_polygons(
+                    pred_mask[class_idx], class_idx, target_size=(510, 380)
+                )
+                if polygons:
+                    f_pred.write("\n".join(polygons) + "\n")
+
+        with true_path.open("w") as f_true:
+            for class_idx in range(true_mask.shape[0]):
+                polygons = mask_to_yolo_polygons(
+                    true_mask[class_idx], class_idx, target_size=(510, 380)
+                )
+                if polygons:
+                    f_true.write("\n".join(polygons) + "\n")
+
+
+def save_validation_overlays(results_dir, best_images, dataset_name=None,
+                             class_names=None):
+    """Sauvegarde les prédictions avec une couleur par instance ou classe."""
+    for file_name, image, pred_mask in best_images:
+        stem = Path(file_name).stem
+        overlay = overlay_colored_mask(
+            image,
+            pred_mask,
+            alpha=0.45,
+            dataset_name=dataset_name,
+            class_names=class_names,
+        )
+        output_path = Path(results_dir) / f"pred_overlay_{stem}.png"
+        Image.fromarray(overlay).save(output_path)

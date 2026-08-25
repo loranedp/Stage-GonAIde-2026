@@ -181,11 +181,19 @@ def plot_evolution_curves(df):
 
 # ----- Fonctions pour la visualisation des masques et images -----
 def tensor_to_numpy_image(tensor):
-    img = tensor.cpu().numpy()
-    if img.ndim == 3 and img.shape[0] > 3: # Conserve que les 3 premiers canaux si plus de 3
-        img = img[:3]
-    if img.ndim == 3 and img.shape[0] == 3:
-        img = np.transpose(img, (1, 2, 0))
+    if hasattr(tensor, "detach"):
+        img = tensor.detach().cpu().numpy()
+    else:
+        img = np.asarray(tensor)
+    if img.ndim == 3:
+        # Les tenseurs sont généralement CHW, mais les images numpy peuvent
+        # déjà être HWC. Ne pas tronquer par erreur la hauteur d'une image HWC.
+        if img.shape[0] <= 4 and img.shape[-1] > 4:
+            img = img[:3]
+            if img.shape[0] == 3:
+                img = np.transpose(img, (1, 2, 0))
+        elif img.shape[-1] <= 4:
+            img = img[..., :3]
     if img.max() > 1.0:
         img = img / 255.0
     return img
@@ -231,6 +239,92 @@ def overlay_mask(image_tensor, mask_tensor, alpha=0.4, target_size=None):
                 overlay[..., rgb_channel]
             )
     return overlay
+
+
+# Couleurs RGB stables pour les datasets sémantiques : classe 1, 2 et 3.
+CLASS_OVERLAY_COLORS = np.array([
+    [40, 100, 220],   # bleu
+    [40, 190, 170],   # vert/turquoise
+    [145, 70, 200],   # violet
+], dtype=np.uint8)
+
+# Palette volontairement fixe : elle ne dépend ni de l'ordre d'itération ni
+# d'un générateur aléatoire, et reste donc identique d'une exécution à l'autre.
+INSTANCE_OVERLAY_COLORS = np.array([
+    [230, 70, 60],
+    [55, 185, 75],
+    [55, 125, 225],
+    [205, 65, 175],
+    [235, 160, 45],
+    [35, 185, 190],
+    [150, 75, 215],
+    [225, 85, 125],
+], dtype=np.uint8)
+
+
+def overlay_colored_mask(image, mask, alpha=0.45, dataset_name=None,
+                         class_names=None, target_size=None):
+    """Superpose un masque coloré sur une image.
+
+    Pour ``dataset_name == "oeufs"``, ``mask`` est une carte 2D d'identifiants
+    d'instances (ou un masque ``(1, H, W)``). Chaque identifiant positif reçoit
+    une couleur déterministe, avec une palette cyclique. Pour les autres
+    datasets, ``mask`` est un masque multi-canaux ``(C, H, W)`` et chaque canal
+    présent reçoit la couleur fixe de sa classe.
+    """
+    if not 0 <= alpha <= 1:
+        raise ValueError("alpha doit être compris entre 0 et 1.")
+
+    def as_numpy(value):
+        if hasattr(value, "detach"):
+            value = value.detach().cpu().numpy()
+        return np.asarray(value)
+
+    base = tensor_to_numpy_image(image)
+    if base.ndim == 2:
+        base = np.repeat(base[..., None], 3, axis=2)
+    if base.shape[-1] == 1:
+        base = np.repeat(base, 3, axis=2)
+    base = np.clip(base, 0, 1) if np.issubdtype(base.dtype, np.floating) else base
+    if base.max() <= 1.0:
+        base = base * 255
+    base = np.clip(base, 0, 255).astype(np.uint8)
+    if target_size is not None:
+        base = cv2.resize(base, target_size, interpolation=cv2.INTER_LINEAR)
+
+    raw_mask = as_numpy(mask)
+    if dataset_name == "oeufs":
+        if raw_mask.ndim == 3 and raw_mask.shape[0] == 1:
+            raw_mask = raw_mask[0]
+        if raw_mask.ndim != 2:
+            raise ValueError("Le masque d'instances doit avoir la forme (H, W) ou (1, H, W).")
+        labels = raw_mask
+    else:
+        if raw_mask.ndim == 2:
+            raw_mask = raw_mask[None, ...]
+        if raw_mask.ndim != 3:
+            raise ValueError("Le masque sémantique doit avoir la forme (C, H, W).")
+        labels = np.zeros(raw_mask.shape[1:], dtype=np.int32)
+        # En cas de chevauchement, le canal de classe le plus élevé est retenu.
+        for class_idx, class_mask in enumerate(raw_mask):
+            labels[class_mask > 0.5] = class_idx + 1
+
+    if labels.shape != base.shape[:2]:
+        labels = cv2.resize(labels.astype(np.int32), (base.shape[1], base.shape[0]),
+                            interpolation=cv2.INTER_NEAREST)
+    labels = np.rint(labels).astype(np.int64)
+    output = base.copy()
+    colors = INSTANCE_OVERLAY_COLORS if dataset_name == "oeufs" else CLASS_OVERLAY_COLORS
+    for label_id in np.unique(labels):
+        if label_id <= 0:
+            continue
+        color = colors[(int(label_id) - 1) % len(colors)]
+        pixels = labels == label_id
+        output[pixels] = (
+            output[pixels].astype(np.float32) * (1 - alpha)
+            + color.astype(np.float32) * alpha
+        ).astype(np.uint8)
+    return output
 
 
 def plot_segmentation_comparison(
