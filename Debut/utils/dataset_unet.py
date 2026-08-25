@@ -178,12 +178,13 @@ class RoboflowUNetDataset(torch.utils.data.Dataset):
 class EggHVDataset(torch.utils.data.Dataset):
     """Dataset COCO d'instances d'œufs pour la sortie masque/H/V."""
     def __init__(self, samples, image_size, crop_params=(85, 33, 510, 380),
-                 is_train=False, seed=42):
+                 is_train=False, seed=42, egg_category_id=None):
         self.samples = samples
         self.image_size = image_size
         self.crop_params = crop_params
         self.is_train = is_train
         self.seed = seed
+        self.egg_category_id = egg_category_id
         self.epoch = 0
 
     def __len__(self):
@@ -196,8 +197,21 @@ class EggHVDataset(torch.utils.data.Dataset):
         image = Image.open(sample['image_path']).convert('RGB')
         width, height = image.size
         instances = []
+        category_id = self.egg_category_id
+        if category_id is None:
+            category_ids = {
+                ann.get('category_id')
+                for ann in sample['annotations']
+                if ann.get('category_id') is not None
+            }
+            if len(category_ids) != 1:
+                raise ValueError(
+                    "egg_category_id doit être fourni lorsque l'échantillon "
+                    "contient zéro ou plusieurs catégories COCO."
+                )
+            category_id = next(iter(category_ids))
         for ann in sample['annotations']:
-            if ann.get('category_id') != 1:
+            if ann.get('category_id') != category_id:
                 continue
             instances.append(decode_segmentation(ann['segmentation'], height, width))
         mask, horizontal, vertical = generate_hv_targets(instances, height, width)
