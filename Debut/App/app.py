@@ -13,7 +13,6 @@ import metadata_utils
 from metrics_utils import compute_iou_per_class
 import model_utils
 import result_workflow
-import train
 from utils import calcul_volume_fct
 from canvas_adapter import st_stable_canvas
 from mask_editor_utils import apply_pending_stroke, extract_stroke_mask
@@ -293,7 +292,7 @@ def render_mask_editor(prediction_key: str, pred: dict) -> None:
 
 
 init_state()
-tab_prediction, tab_entrainement = st.tabs(["Prédiction", "Entraînement"])
+tab_prediction = st.container()
 
 with tab_prediction:
     st.header("Données")
@@ -793,65 +792,3 @@ with tab_prediction:
             st.caption(
                 "Aucun résultat calculé n'est disponible pour la sauvegarde CSV."
             )
-
-with tab_entrainement:
-    st.header("Ré-entraînement du modèle")
-    added_count = len(data_utils.list_added_filenames())
-    egg_added_count = len(data_utils.list_egg_added_filenames())
-    st.write(
-        f"{added_count} image(s) validée(s) 'bonne' actuellement ajoutées de façon "
-        "permanente aux données d'entraînement (voir `data/train_added/`)."
-    )
-    st.write(
-        f"{egg_added_count} image(s) d'œufs validée(s) 'bonne' sont conservées dans "
-        "`data/train_added_oeufs/` pour un futur ré-entraînement dédié."
-    )
-
-    epochs = st.number_input("Nombre d'epochs (par fold)", min_value=1, value=5, step=1)
-    lr = st.number_input("Taux d'apprentissage", min_value=1e-6, value=1e-4, format="%.6f")
-
-    if st.button("Ré-entraîner le modèle"):
-        progress_bar = st.progress(0.0)
-        status_text = st.empty()
-
-        def _progress_callback(fold_idx: int, num_folds: int, epoch: int, total_epochs: int, loss: float) -> None:
-            overall = ((fold_idx - 1) * total_epochs + epoch) / (num_folds * total_epochs)
-            progress_bar.progress(overall)
-            status_text.text(f"Fold {fold_idx}/{num_folds} — epoch {epoch}/{total_epochs} — loss : {loss:.4f}")
-
-        try:
-            with st.spinner("Ré-entraînement en cours..."):
-                result = train.train_model(
-                    epochs=int(epochs), lr=float(lr), progress_callback=_progress_callback
-                )
-            model_utils.load_models.clear()
-            losses_str = ", ".join(f"{loss:.4f}" for loss in result["final_losses"])
-            st.success(
-                f"Modèle ré-entraîné sur {result['num_samples']} images "
-                f"(loss finale par fold : {losses_str})."
-            )
-
-            st.subheader("Validation par fold (généralisation sur poissons non vus par ce fold)")
-            fold_rows = [
-                {
-                    "Fold": m["fold"],
-                    "Images train": m["num_train"],
-                    "Images val (held-out)": m["num_val"],
-                    "Loss entraînement finale": round(m["train_loss"], 4),
-                    "Score Dice validation": (
-                        round(m["val_dice"], 4) if m["val_dice"] is not None else "N/A"
-                    ),
-                }
-                for m in result["fold_metrics"]
-            ]
-            st.dataframe(pd.DataFrame(fold_rows), use_container_width=True)
-            if any(m["val_dice"] is None for m in result["fold_metrics"]):
-                st.warning(
-                    "Certains folds n'ont aucune image de validation disponible (trop peu "
-                    "de poissons distincts par rapport au nombre de folds) : leur score de "
-                    "généralisation est marqué 'N/A'. Ces folds restent entraînés "
-                    "normalement, seule leur évaluation honnête n'est pas mesurable pour "
-                    "l'instant."
-                )
-        except ValueError as exc:
-            st.error(str(exc))
