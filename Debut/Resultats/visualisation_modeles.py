@@ -13,16 +13,16 @@ import re
 from collections import defaultdict
 import torchvision.transforms.functional as TF
 
-# Résout la racine du projet à partir de ce fichier, indépendamment du
-# répertoire depuis lequel le script est lancé.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 from utils.stats_fct import overlay_mask
 
 
 # ============================ 2. Définition des chemins et paramètres ============================
-EVAL_ROOT = PROJECT_ROOT / 'UNet' / 'masks' / 'eval'
+UNET_ROOT = PROJECT_ROOT / 'UNet' / 'masks' / 'eval'
+YOLO_ROOT = PROJECT_ROOT / 'YOLO26' / 'masks' / 'eval'
 IMAGE_ROOT = PROJECT_ROOT / 'data' / 'images'
+LABEL_ROOT = PROJECT_ROOT / 'data' / 'labels' / 'YOLO'
 OUTPUT_ROOT = PROJECT_ROOT / 'Resultats' / 'visualisation'
 
 TASKS = {
@@ -31,6 +31,7 @@ TASKS = {
 }
 
 # ============================ 3. Visualisation des résultats ============================
+# Forme de la grille de visualisation et coordonnées du crop à afficher
 COLS = 3
 CROP = (85, 33, 510, 380)
 
@@ -60,6 +61,56 @@ def mask_from_yolo_file(mask_path, num_classes, width, height):
             cv2.fillPoly(mask[class_id], [coords.astype(np.int32)], 1.0)
     return torch.from_numpy(mask)
 
+def mask_from_source_label(label_path, num_classes, original_size, crop):
+    """Charge un label YOLO original et le reprojette dans le crop affiché."""
+    original_width, original_height = original_size
+    crop_x, crop_y, crop_width, crop_height = crop
+    mask = np.zeros((num_classes, crop_height, crop_width), dtype=np.float32)
+
+    if not label_path.exists():
+        return torch.from_numpy(mask)
+
+    with label_path.open('r') as file:
+        for line in file:
+            if not line.strip():
+                continue
+            parts = list(map(float, line.split()))
+            if len(parts) < 3 or len(parts[1:]) % 2:
+                raise ValueError(f'Polygone YOLO invalide dans {label_path}')
+
+            class_id = int(parts[0])
+            if not 0 <= class_id < num_classes:
+                continue
+
+            coords = np.asarray(parts[1:], dtype=np.float32).reshape(-1, 2)
+            coords[:, 0] = coords[:, 0] * original_width - crop_x
+            coords[:, 1] = coords[:, 1] * original_height - crop_y
+            cv2.fillPoly(mask[class_id], [np.rint(coords).astype(np.int32)], 1.0)
+
+    return torch.from_numpy(mask)
+
+
+def prediction_sources(task_name):
+    """Retourne les dossiers de prédictions à comparer pour une tâche.
+
+    Les sorties UNet sont organisées comme ``eval/<modele>/<tache>`` tandis
+    que les sorties YOLO sont organisées comme ``eval/<type>/<tache>``.
+    """
+    sources = []
+
+    if UNET_ROOT.is_dir():
+        for model_dir in sorted(UNET_ROOT.iterdir()):
+            task_dir = model_dir / task_name
+            if model_dir.is_dir() and task_dir.is_dir():
+                sources.append((model_dir.name, task_dir))
+
+    for yolo_type in ('instance', 'semantique'):
+        task_dir = YOLO_ROOT / yolo_type / task_name
+        if task_dir.is_dir():
+            sources.append((f'YOLO_{yolo_type}', task_dir))
+
+    return sources
+
 for task_name, task_config in TASKS.items():
     num_classes = task_config['num_classes']
     image_dir = IMAGE_ROOT / task_config['image_dir']
@@ -68,26 +119,13 @@ for task_name, task_config in TASKS.items():
 
     # Indexe toutes les prédictions par image et par modèle.
     predictions_by_image = defaultdict(dict)
-    model_dirs = sorted(
-        path for path in EVAL_ROOT.iterdir()
-        if path.is_dir() and (path / task_name).is_dir()
-    )
-    for model_dir in model_dirs:
-        for mask_path in sorted((model_dir / task_name).glob('pred_*.txt')):
+    sources = prediction_sources(task_name)
+    for source_name, source_dir in sources:
+        for mask_path in sorted(source_dir.glob('pred_*.txt')):
             image_id = image_id_from_prediction(mask_path)
-            predictions_by_image[image_id][model_dir.name] = mask_path
+            predictions_by_image[image_id][source_name] = mask_path
 
-    # La vérité terrain est commune aux modèles : on ne conserve qu'un
-    # fichier par image pour l'afficher une seule fois dans la grille.
-    true_masks_by_image = {}
-    for model_dir in model_dirs:
-        for mask_path in sorted((model_dir / task_name).glob('true_*.txt')):
-            match = re.fullmatch(r'true_fold_\d+_(.+)\.txt', mask_path.name)
-            if match is None:
-                raise ValueError(f'Nom de vérité terrain inattendu : {mask_path.name}')
-            true_masks_by_image.setdefault(match.group(1), mask_path)
-
-    print(f'Sauvegarde des résultats pour {task_name}: {len(model_dirs)} modèles, '
+    print(f'Sauvegarde des résultats pour {task_name}: {len(sources)} modèles, '
           f'{len(predictions_by_image)} images')
 
     for image_id in sorted(predictions_by_image):
@@ -101,21 +139,19 @@ for task_name, task_config in TASKS.items():
         image = original_image.crop((x, y, x + width, y + height))
         image_tensor = TF.to_tensor(image)
 
-        true_display = None
-        true_mask_path = true_masks_by_image.get(image_id)
-        if true_mask_path is not None:
-            true_mask_tensor = mask_from_yolo_file(
-                true_mask_path, num_classes, width, height
-            )
-            true_display = overlay_mask(
-                image_tensor, true_mask_tensor, alpha=0.4,
-                target_size=image.size
-            )
+        label_path = LABEL_ROOT / task_config['image_dir'] / f'{image_id}.txt'
+        true_mask_tensor = mask_from_source_label(
+            label_path, num_classes, original_image.size, CROP
+        )
+        true_display = overlay_mask(
+            image_tensor, true_mask_tensor, alpha=0.4,
+            target_size=image.size
+        ) if label_path.exists() else None
 
         displays = []
         model_names = []
-        for model_dir in model_dirs:
-            mask_path = predictions_by_image[image_id].get(model_dir.name)
+        for source_name, _ in sources:
+            mask_path = predictions_by_image[image_id].get(source_name)
             if mask_path is None:
                 continue
             mask_tensor = mask_from_yolo_file(
@@ -125,7 +161,7 @@ for task_name, task_config in TASKS.items():
                 overlay_mask(image_tensor, mask_tensor, alpha=0.4,
                              target_size=image.size)
             )
-            model_names.append(model_dir.name)
+            model_names.append(source_name)
 
         num_panels = len(displays) + 1 + (true_display is not None)
         rows = (num_panels + COLS - 1) // COLS
