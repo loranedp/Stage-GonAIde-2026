@@ -185,7 +185,7 @@ class ResultWorkflowTests(unittest.TestCase):
             pd.DataFrame(
                 [
                     ["123", 1.0, 2.0, None, None],
-                    ["999", 3.0, 4.0, 0.02, 150],
+                    ["999", 3.0, 4.0, 20.0, 150],
                 ],
                 columns=columns,
             ).to_csv(csv_path, index=False)
@@ -193,7 +193,7 @@ class ResultWorkflowTests(unittest.TestCase):
                 "selected_fish": "123",
                 "volume_total": 5.123456,
                 "volume_total_cavite": 6.987654,
-                "egg_mean": 0.0150599,
+                "egg_mean": 15.0599,
                 "fecundity": 340.6,
             }
             skipped = {
@@ -215,7 +215,7 @@ class ResultWorkflowTests(unittest.TestCase):
         updated = saved.loc[saved["Id_poisson"] == "123"].iloc[0]
         self.assertEqual(updated["Volume_gonades"], 5.1235)
         self.assertEqual(updated["Volume_cavite"], 6.9877)
-        self.assertEqual(updated["Volume_moyen_oeufs"], 0.0151)
+        self.assertEqual(updated["Volume_moyen_oeufs_mm3"], 15.0599)
         self.assertEqual(updated["Fecondite_estimee"], 341)
 
     def test_partial_summary_is_exportable_but_empty_summary_is_not(self):
@@ -223,7 +223,7 @@ class ResultWorkflowTests(unittest.TestCase):
             "selected_fish": "123",
             "volume_total": None,
             "volume_total_cavite": None,
-            "egg_mean": 0.012345,
+            "egg_mean": 12.345,
             "fecundity": None,
         }
         empty = {
@@ -237,8 +237,8 @@ class ResultWorkflowTests(unittest.TestCase):
         self.assertTrue(result_workflow.has_exportable_result(partial))
         self.assertFalse(result_workflow.has_exportable_result(empty))
         self.assertEqual(
-            result_workflow.result_summary_row(partial)["Volume_moyen_oeufs"],
-            0.0123,
+            result_workflow.result_summary_row(partial)["Volume_moyen_oeufs_mm3"],
+            12.345,
         )
 
     def test_migrates_legacy_rows_and_drops_fish_without_results(self):
@@ -264,8 +264,29 @@ class ResultWorkflowTests(unittest.TestCase):
         self.assertEqual(migrated["Id_poisson"].tolist(), ["123"])
         self.assertEqual(migrated.iloc[0]["Volume_gonades"], 1.2346)
         self.assertEqual(migrated.iloc[0]["Volume_cavite"], 2.3457)
-        self.assertEqual(migrated.iloc[0]["Volume_moyen_oeufs"], 0.0151)
+        self.assertEqual(migrated.iloc[0]["Volume_moyen_oeufs_mm3"], 15.0599)
         self.assertEqual(migrated.iloc[0]["Fecondite_estimee"], 679)
+
+    def test_migrates_previous_summary_volume_from_cm3_to_mm3(self):
+        previous = pd.DataFrame(
+            [["123", 1.0, 2.0, 0.015, 67]],
+            columns=[
+                "Id_poisson",
+                "Volume_gonades",
+                "Volume_cavite",
+                "Volume_moyen_oeufs",
+                "Fecondite_estimee",
+            ],
+        )
+
+        migrated = result_workflow.migrate_results_dataframe(previous)
+
+        self.assertEqual(migrated.iloc[0]["Volume_moyen_oeufs_mm3"], 15.0)
+
+    def test_fecundity_converts_gonad_volume_from_cm3_to_mm3(self):
+        self.assertEqual(result_workflow.calculate_fecundity(2.0, 4.0), 500.0)
+        self.assertIsNone(result_workflow.calculate_fecundity(2.0, 0.0))
+        self.assertIsNone(result_workflow.calculate_fecundity(2.0, np.nan))
 
 
 if __name__ == "__main__":

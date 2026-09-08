@@ -28,7 +28,7 @@ OCR_SCALE_CROP = (530, 350, 250, 200)  # x, y, w, h ; zone d'affichage de l'éch
 ENCODER_NAME = "resnet34"
 
 # Classes de segmentation (sortie sigmoïde multi-label, pas de classe fond).
-# Index 0/1/2 = category_id 1/2/3 de data/COCO/annotations.json.
+# Index 0/1/2 = category_id 1/2/3 de data/labels/COCO/cavite/annotations.json.
 CLASS_NAMES = ["Cavite", "Gonade", "Intestin"]
 EGG_CLASS_NAMES = ["Oeuf"]
 NUM_CLASSES = len(CLASS_NAMES)
@@ -43,9 +43,12 @@ EGG_MIN_AREA = 150
 METADATA_XLSX_PATH = ROOT_DIR / "utils" / "correspondance_echo_final.xlsx"
 
 # --- Données d'entraînement ---
-COCO_ANN_PATH = DATA_DIR / "COCO" / "annotations.json"
-EGG_COCO_ANN_PATH = DATA_DIR / "COCO" / "annotations.oeufs.json"
-COCO_IMAGES_DIR = DATA_DIR / "COCO" / "images"
+COCO_LABELS_DIR = DATA_DIR / "labels" / "COCO"
+YOLO_LABELS_DIR = DATA_DIR / "labels" / "YOLO"
+COCO_ANN_PATH = COCO_LABELS_DIR / "cavite" / "annotations.json"
+EGG_COCO_ANN_PATH = COCO_LABELS_DIR / "oeufs" / "annotations.oeufs.json"
+COCO_IMAGES_DIR = DATA_DIR / "images" / "cavite"
+EGG_COCO_IMAGES_DIR = DATA_DIR / "images" / "oeufs"
 
 # Dossier des images validées "bonne" depuis l'app, ajoutées de façon permanente
 # et conservées séparément des données d'origine pour pouvoir les différencier.

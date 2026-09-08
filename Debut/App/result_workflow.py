@@ -24,13 +24,13 @@ RESULT_CSV_COLUMNS = [
     "Id_poisson",
     "Volume_gonades",
     "Volume_cavite",
-    "Volume_moyen_oeufs",
+    "Volume_moyen_oeufs_mm3",
     "Fecondite_estimee",
 ]
 LEGACY_RESULT_COLUMNS = {
     "Volume_gonades": "Volume_total_gonades_cm3",
     "Volume_cavite": "Volume_total_cavité_cm3",
-    "Volume_moyen_oeufs": "Volume_moyen_oeuf_cm3",
+    "Volume_moyen_oeufs_mm3": "Volume_moyen_oeuf_cm3",
     "Fecondite_estimee": "Fecondite_estimee",
 }
 
@@ -262,12 +262,8 @@ def calculate_fish_result(
 
     egg_result = calcul_volume_fct.calculate_mean_egg_volume(egg_inputs)
     egg_rows = egg_result["images"]
-    egg_mean = egg_result["volume_moyen_oeufs_cm3"]
-    fecundity = (
-        float(volume_total / egg_mean)
-        if volume_total is not None and egg_mean is not None and egg_mean > 0
-        else None
-    )
+    egg_mean = egg_result["volume_moyen_oeufs_mm3"]
+    fecundity = calculate_fecundity(volume_total, egg_mean)
 
     return {
         "selected_fish": fish_id,
@@ -294,6 +290,18 @@ def _rounded_number(value, digits: int = 4):
     return round(number, digits) if np.isfinite(number) else None
 
 
+def calculate_fecundity(volume_total_cm3, egg_mean_mm3):
+    """Calcule la fécondité après conversion du volume de gonade en mm³."""
+
+    if volume_total_cm3 is None or egg_mean_mm3 is None:
+        return None
+    gonad_volume = float(volume_total_cm3)
+    egg_volume = float(egg_mean_mm3)
+    if not np.isfinite(gonad_volume) or not np.isfinite(egg_volume) or egg_volume <= 0:
+        return None
+    return (gonad_volume * 1000) / egg_volume
+
+
 def result_summary_row(result: Mapping) -> dict:
     """Convertit un résultat détaillé en une ligne synthétique pour le CSV."""
 
@@ -309,7 +317,7 @@ def result_summary_row(result: Mapping) -> dict:
         "Id_poisson": str(result["selected_fish"]),
         "Volume_gonades": _rounded_number(result.get("volume_total")),
         "Volume_cavite": _rounded_number(result.get("volume_total_cavite")),
-        "Volume_moyen_oeufs": _rounded_number(result.get("egg_mean")),
+        "Volume_moyen_oeufs_mm3": _rounded_number(result.get("egg_mean")),
         "Fecondite_estimee": int(round(fecundity)) if fecundity is not None else None,
     }
 
@@ -332,10 +340,26 @@ def migrate_results_dataframe(dataframe: pd.DataFrame) -> pd.DataFrame:
 
     if "Id_poisson" not in dataframe.columns:
         raise ValueError("Le CSV de résultats ne contient pas la colonne Id_poisson.")
+    egg_volume_is_cm3 = False
     if set(RESULT_CSV_COLUMNS).issubset(dataframe.columns):
         source_columns = {column: column for column in RESULT_CSV_COLUMNS[1:]}
+    elif {
+        "Id_poisson",
+        "Volume_gonades",
+        "Volume_cavite",
+        "Volume_moyen_oeufs",
+        "Fecondite_estimee",
+    }.issubset(dataframe.columns):
+        source_columns = {
+            "Volume_gonades": "Volume_gonades",
+            "Volume_cavite": "Volume_cavite",
+            "Volume_moyen_oeufs_mm3": "Volume_moyen_oeufs",
+            "Fecondite_estimee": "Fecondite_estimee",
+        }
+        egg_volume_is_cm3 = True
     elif set(LEGACY_RESULT_COLUMNS.values()).issubset(dataframe.columns):
         source_columns = LEGACY_RESULT_COLUMNS
+        egg_volume_is_cm3 = True
     else:
         raise ValueError("Le schéma du CSV de résultats est incompatible.")
 
@@ -345,12 +369,19 @@ def migrate_results_dataframe(dataframe: pd.DataFrame) -> pd.DataFrame:
         result_keys = {
             "Volume_gonades": "volume_total",
             "Volume_cavite": "volume_total_cavite",
-            "Volume_moyen_oeufs": "egg_mean",
+            "Volume_moyen_oeufs_mm3": "egg_mean",
             "Fecondite_estimee": "fecundity",
         }
         for target_column, result_key in result_keys.items():
             values = group[source_columns[target_column]].dropna()
-            result[result_key] = values.iloc[0] if not values.empty else None
+            value = values.iloc[0] if not values.empty else None
+            if (
+                target_column == "Volume_moyen_oeufs_mm3"
+                and value is not None
+                and egg_volume_is_cm3
+            ):
+                value = float(value) * 1000
+            result[result_key] = value
         if has_exportable_result(result):
             rows.append(result_summary_row(result))
 

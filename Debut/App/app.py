@@ -544,7 +544,7 @@ with tab_prediction:
                             pred["masks"], gt_masks, class_names
                         )
                         st.caption(
-                            "Image présente dans data/COCO — IoU par classe (vs vérité terrain) :"
+                            "Image présente dans data/labels/COCO/cavite — IoU par classe (vs vérité terrain) :"
                         )
                         iou_cols = st.columns(len(class_names))
                         for iou_col, class_name in zip(iou_cols, class_names):
@@ -754,16 +754,16 @@ with tab_prediction:
                     "Nombre d'œufs utilisés pour la moyenne": row[
                         "nombre_oeufs_utilises_pour_moyenne"
                     ],
-                    "Surface_moyenne_oeufs_cm2": round(
-                        row["surface_moyenne_oeufs_cm2"], 6
+                    "Surface_moyenne_oeufs_mm2": round(
+                        row["surface_moyenne_oeufs_mm2"], 4
                     ),
-                    "Volume_moyen_oeufs_cm3": round(row["volume_moyen_oeufs_cm3"], 8),
+                    "Volume_moyen_oeufs_mm3": round(row["volume_moyen_oeufs_mm3"], 4),
                 }
                 for row in egg_rows
             ]
             st.dataframe(pd.DataFrame(egg_display_rows), use_container_width=True)
             if egg_mean is not None and egg_mean > 0:
-                st.metric("Volume moyen d'un œuf", f"{egg_mean:.4f} cm³")
+                st.metric("Volume moyen d'un œuf", f"{egg_mean:.4f} mm³")
             else:
                 st.warning("Aucune instance d'œuf exploitable n'a été détectée.")
         else:

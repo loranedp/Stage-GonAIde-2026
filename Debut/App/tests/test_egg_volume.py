@@ -23,7 +23,7 @@ class EggVolumeTests(unittest.TestCase):
     def test_uses_twenty_percent_largest_instances(self):
         labels = self.label_map([20, 40, 60, 80, 100])
         surface = calculate_eggs_area_from_instances(labels, echelle=2.0, image_height=10)
-        self.assertAlmostEqual(surface, 4.0)
+        self.assertAlmostEqual(surface, 400.0)
 
     def test_counts_distinct_and_selected_instances(self):
         for egg_count, expected_selected_count in ((0, 0), (1, 1), (5, 1), (10, 2)):
@@ -48,12 +48,14 @@ class EggVolumeTests(unittest.TestCase):
             ]
         )
 
+        self.assertAlmostEqual(first_values["surface_moyenne_oeufs_mm2"], 400.0)
         radius = np.sqrt(4.0 / np.pi)
         expected_first = 4 / 3 * np.pi * radius**3
-        self.assertAlmostEqual(first_values["volume_moyen_oeufs_cm3"], expected_first)
+        self.assertAlmostEqual(first_values["volume_moyen_oeufs_mm3"], expected_first * 1000)
         expected_second = expected_first / 8
         self.assertAlmostEqual(
-            result["volume_moyen_oeufs_cm3"], (expected_first + expected_second) / 2
+            result["volume_moyen_oeufs_mm3"],
+            ((expected_first + expected_second) / 2) * 1000,
         )
         self.assertEqual(result["images"][0]["nombre_oeufs_distincts"], 1)
         self.assertEqual(
@@ -63,7 +65,7 @@ class EggVolumeTests(unittest.TestCase):
     def test_empty_inputs_are_safe(self):
         empty = np.zeros((8, 8), dtype=np.int32)
         self.assertEqual(calculate_eggs_area_from_instances(empty, 3.1, 480), 0.0)
-        self.assertIsNone(calculate_mean_egg_volume([])["volume_moyen_oeufs_cm3"])
+        self.assertIsNone(calculate_mean_egg_volume([])["volume_moyen_oeufs_mm3"])
 
 
 if __name__ == "__main__":
