@@ -19,8 +19,8 @@ Les données et les poids des modèles sont disponibles sur next cloud : https:/
 
 ## Ajout de nouvelles données :
 - Telecharger depuis Roboflow les données au format "YOLO26" et "COCO segmentation"
-- Mettre dans le dossier "data" avec la même architecture que présentement
-- Relancer le script "pre-traitement.ipynb"
+- Mettre dans le dossier "data" avec la même architecture que présentement (les images et les labels)
+- Lancer le pretraitement des nouvelles données : utils/python3 pretraitement.py
 
 ## Lancement de l'application
 streamlit run Debut/App/app.py
