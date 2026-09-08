@@ -167,6 +167,10 @@ def calculate_volumes(df, id, path):
 
 # ---- Calcul de la surface : images longitudinales -----
 def calculate_eggs_areas(mask_path, image_path, echelle):
+    """Calcule la surface moyenne des œufs en mm².
+
+    ``echelle`` reste fournie en centimètres sur la hauteur de l'image.
+    """
     # Importer l'image
     image = cv2.imread(image_path)
     image_height = image.shape[0]
@@ -191,18 +195,18 @@ def calculate_eggs_areas(mask_path, image_path, echelle):
     # ---- Faire la moyenne des surfaces sélectionnées ----
     mean_area_eggs = np.mean(area_eggs) if area_eggs else 0
 
-    # ---- Transformation des pixels en mm ----
-    surface_cm2_eggs = (echelle / image_height) ** 2 * mean_area_eggs
+    # ---- Transformation des pixels en mm² ----
+    surface_mm2_eggs = ((echelle * 10) / image_height) ** 2 * mean_area_eggs
 
-    return surface_cm2_eggs
+    return surface_mm2_eggs
 
 
 def calculate_eggs_area_from_instances(instance_labels, echelle, image_height):
-    """Calcule la surface moyenne des 50 % plus grandes instances d'œufs.
+    """Calcule en mm² la surface moyenne des 50 % plus grandes instances d'œufs.
 
     ``instance_labels`` est une carte 2D d'identifiants (0 = fond). La règle de
     sélection est identique à :func:`calculate_eggs_areas`, mais travaille
-    directement sur une prédiction en mémoire.
+    directement sur une prédiction en mémoire. ``echelle`` est exprimée en cm.
     """
     labels = np.asarray(instance_labels)
     if labels.ndim != 2:
@@ -220,7 +224,7 @@ def calculate_eggs_area_from_instances(instance_labels, echelle, image_height):
     areas.sort(reverse=True)
     selected = areas[: max(1, int(0.5 * len(areas)))]
     mean_area_pixels = float(np.mean(selected))
-    return (float(echelle) / float(image_height)) ** 2 * mean_area_pixels
+    return ((float(echelle) * 10) / float(image_height)) ** 2 * mean_area_pixels
 
 
 def count_egg_instances(instance_labels):
@@ -232,15 +236,17 @@ def count_egg_instances(instance_labels):
 
 
 def calculate_egg_volume_from_instances(instance_labels, echelle, image_height):
-    """Volume sphérique associé à la surface moyenne des œufs d'une image."""
-    surface = calculate_eggs_area_from_instances(instance_labels, echelle, image_height)
+    """Volume sphérique en mm³ associé à la surface moyenne des œufs."""
+    surface_mm2 = calculate_eggs_area_from_instances(
+        instance_labels, echelle, image_height
+    )
     egg_count = count_egg_instances(instance_labels)
     selected_egg_count = max(1, int(0.5 * egg_count)) if egg_count else 0
-    radius = np.sqrt(surface / np.pi)
-    volume = 4 / 3 * np.pi * radius**3
+    radius_mm = np.sqrt(surface_mm2 / np.pi)
+    volume_mm3 = 4 / 3 * np.pi * radius_mm**3
     return {
-        "surface_moyenne_oeufs_cm2": float(surface),
-        "volume_moyen_oeufs_cm3": float(volume),
+        "surface_moyenne_oeufs_mm2": float(surface_mm2),
+        "volume_moyen_oeufs_mm3": float(volume_mm3),
         "nombre_oeufs_distincts": egg_count,
         "nombre_oeufs_utilises_pour_moyenne": selected_egg_count,
     }
@@ -259,15 +265,22 @@ def calculate_mean_egg_volume(images):
             item["instances"], item["echelle"], item["image_height"]
         )
         rows.append({"id_image": item["id_image"], **values})
-    volumes = [row["volume_moyen_oeufs_cm3"] for row in rows]
+    volumes = [row["volume_moyen_oeufs_mm3"] for row in rows]
     mean_volume = float(np.mean(volumes)) if volumes else None
-    return {"images": rows, "volume_moyen_oeufs_cm3": mean_volume}
+    return {"images": rows, "volume_moyen_oeufs_mm3": mean_volume}
 
 
 # ---- Calcul du volume : images longitudinales -----
 def calculate_eggs_volumes(df, id, path):
     #---- Initialisation des variables ----
-    resultats = {"id poisson": [], "image_id": [], "position echo": [], "surface_moyenne_oeufs": [], "volume_moyen_oeufs": [], "echelle": []}
+    resultats = {
+        "id poisson": [],
+        "image_id": [],
+        "position echo": [],
+        "surface_moyenne_oeufs_mm2": [],
+        "volume_moyen_oeufs_mm3": [],
+        "echelle": [],
+    }
     
     volumes_oeufs_list = []
     count = 0
@@ -287,22 +300,26 @@ def calculate_eggs_volumes(df, id, path):
             echelle = row["echelle"] # Récupère l'échelle de l'image
 
             # --- Calcul de la surface moyenne des oeufs ---
-            surface_oeufs = calculate_eggs_areas(mask_path, image_path, echelle)
+            surface_oeufs_mm2 = calculate_eggs_areas(mask_path, image_path, echelle)
 
-            # ---- Calcul du rayon du cercle à partir des surfaces ----
-            rayon_oeufs = np.sqrt(surface_oeufs/np.pi)
+            # ---- Calcul du rayon en mm à partir de la surface en mm² ----
+            rayon_oeufs_mm = np.sqrt(surface_oeufs_mm2 / np.pi)
 
-            # ---- Calcul du volume des spheres ----
-            volume_oeufs = 4/3 * np.pi * rayon_oeufs**3
+            # ---- Calcul du volume des sphères en mm³ ----
+            volume_oeufs_mm3 = 4/3 * np.pi * rayon_oeufs_mm**3
 
-            volumes_oeufs_list.append(volume_oeufs)
+            volumes_oeufs_list.append(volume_oeufs_mm3)
 
-            print(f"Echo n° : {count}, surface oeufs : {surface_oeufs:.3f} cm2, rayon : {rayon_oeufs:.3f} cm, volume : {volume_oeufs:.4f} cm3")
+            print(
+                f"Echo n° : {count}, surface oeufs : {surface_oeufs_mm2:.3f} mm², "
+                f"rayon : {rayon_oeufs_mm:.3f} mm, "
+                f"volume : {volume_oeufs_mm3:.4f} mm³"
+            )
 
             resultats["id poisson"].append(str(id))
             resultats["image_id"].append(row["image_id"])
-            resultats["surface_moyenne_oeufs"].append(surface_oeufs)
-            resultats["volume_moyen_oeufs"].append(volume_oeufs)
+            resultats["surface_moyenne_oeufs_mm2"].append(surface_oeufs_mm2)
+            resultats["volume_moyen_oeufs_mm3"].append(volume_oeufs_mm3)
             resultats["echelle"].append(echelle)
             resultats["position echo"].append(row["type_image"])
 
@@ -311,7 +328,10 @@ def calculate_eggs_volumes(df, id, path):
        # Faire la moyenne des volumes calculés pour chaque échographie
         volume_total_oeufs = np.mean(volumes_oeufs_list)
 
-        print(f"Poisson n°: {id}, Nombre d'échos : {count}/{len(df)}, Volume total oeufs: {volume_total_oeufs:.4f} cm3")
+        print(
+            f"Poisson n°: {id}, Nombre d'échos : {count}/{len(df)}, "
+            f"Volume moyen oeufs: {volume_total_oeufs:.4f} mm³"
+        )
         print("-----------------------")
 
     return resultats

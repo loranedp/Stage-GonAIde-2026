@@ -485,3 +485,35 @@ def mask_to_yolo_polygons(mask_bool, class_id, target_size=(640, 480)):
             polygons.append(f"{class_id} " + " ".join(poly_str))
 
     return polygons
+
+
+
+# Affiche une image avec les masques superposés (pour l'instant non utilisée)
+def display_image_with_masks(image_path, true_mask_path, pred_mask_path):
+    # Charger l'image et les masques
+    image = plt.imread(image_path)
+    true_mask = plt.imread(true_mask_path)
+    pred_mask = plt.imread(pred_mask_path)
+
+    # Créer une figure avec 3 sous-graphes
+    fig, axs = plt.subplots(1, 3, figsize=(15, 5))
+
+    # Afficher l'image originale
+    axs[0].imshow(image)
+    axs[0].set_title('Image originale')
+    axs[0].axis('off')
+
+    # Afficher l'image avec le masque de vérité terrain superposé
+    axs[1].imshow(image)
+    axs[1].imshow(true_mask, alpha=0.5)  # Superposition avec transparence
+    axs[1].set_title('Masque de vérité terrain')
+    axs[1].axis('off')
+
+    # Afficher l'image avec le masque prédit superposé
+    axs[2].imshow(image)
+    axs[2].imshow(pred_mask, alpha=0.5)  # Superposition avec transparence
+    axs[2].set_title('Masque prédit')
+    axs[2].axis('off')
+
+    plt.tight_layout()
+    plt.show()
