@@ -4,6 +4,8 @@ ultrasam_venv
 OpenUs_venv
 Debut/data
 .vscode
+.codex
+.agents
 __pycache__
 __init__.py
 checkpoint
