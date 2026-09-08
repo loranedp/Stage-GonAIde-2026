@@ -254,11 +254,10 @@ def metrics_by_class(true, preds, echelle, dataset_name, egg_instance_labels=Non
     return intersection, union,iou_per_img, dice_per_img, precision_per_img, recall_per_img, diff_surface
 
 def save_validation_masks(masks_dir, best_masks, fold):
-    """Exporte les masques du meilleur epoch du fold au format YOLO."""
-    for file_name, true_mask, pred_mask in best_masks:
+    """Exporte les prédictions du meilleur epoch du fold au format YOLO."""
+    for file_name, _true_mask, pred_mask in best_masks:
         stem = Path(file_name).stem
         pred_path = Path(masks_dir) / f"pred_fold_{fold}_{stem}.txt"
-        true_path = Path(masks_dir) / f"true_fold_{fold}_{stem}.txt"
 
         with pred_path.open("w") as f_pred:
             for class_idx in range(pred_mask.shape[0]):
@@ -267,14 +266,6 @@ def save_validation_masks(masks_dir, best_masks, fold):
                 )
                 if polygons:
                     f_pred.write("\n".join(polygons) + "\n")
-
-        with true_path.open("w") as f_true:
-            for class_idx in range(true_mask.shape[0]):
-                polygons = mask_to_yolo_polygons(
-                    true_mask[class_idx], class_idx, target_size=(510, 380)
-                )
-                if polygons:
-                    f_true.write("\n".join(polygons) + "\n")
 
 
 def save_validation_overlays(results_dir, best_images, dataset_name=None,

@@ -255,7 +255,7 @@ for item in os.listdir(source_dir):
         shutil.copy2(source_item, destination_item)
 
 
-delete_classes_YOLO(input_dir = "../data/labels/YOLO/oeufs/labels_2_classes/", output_dir = "../data/labels/YOLO/oeufs/labels_2_classes/", excluded_classes=[0]) # Suppression la gonade (classe 0)
+delete_classes_YOLO(input_dir = "../data/labels/YOLO/oeufs/", output_dir = "../data/labels/YOLO/oeufs/", excluded_classes=[0]) # Suppression la gonade (classe 0)
 
 
 # ================== 5. Enrichissement du fichier metadata ==================
