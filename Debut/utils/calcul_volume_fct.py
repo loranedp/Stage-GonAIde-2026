@@ -85,7 +85,7 @@ def calculate_volumes(df, id, path):
 
         # --- Importation des images et des masques ---
         mask_path = f"../{path}{file_path}.txt"
-        image_path = f"../data/COCO/images/{file_path}.jpg"
+        image_path = f"../data/images/cavite/{file_path}.jpg"
 
         if os.path.exists(mask_path) : # Vérifie si le fichier existe
             count += 1
@@ -280,7 +280,7 @@ def calculate_eggs_volumes(df, id, path):
 
         # --- Importation des images et des masques ---
         mask_path = f"../{path}{file_path}.txt"
-        image_path = f"../data/COCO/oeufs/{file_path}.jpg"
+        image_path = f"../data/images/oeufs/{file_path}.jpg"
 
         if os.path.exists(mask_path) : # Vérifie si le fichier existe
             count += 1

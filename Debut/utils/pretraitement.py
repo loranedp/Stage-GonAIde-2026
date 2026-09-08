@@ -1,0 +1,469 @@
+# SCRIPT POUR LE PRETRAITEMENT DES DONNEES AVANT L'ENTRAINEMENT DES MODELES
+# A lancer si ajout de nouvelles données dans le dataset
+
+
+# ================== 1. Importation des packages ==================
+import pandas as pd
+import os
+import json
+import numpy as np
+import pytesseract
+from pytesseract import Output
+import cv2
+import shutil
+from pathlib import Path
+from PIL import Image
+import numpy as np
+from stats_fct import overlay_colored_mask
+from yolo_metrics import load_yolo_polygon_masks
+
+
+# ================== 2. Gestion des metadata ==================
+# Importation du fichier avec les metadatas
+df = pd.read_excel('Correspondance_Capture-Echographe.xlsx', sheet_name = 2, usecols=[0,1,4,5,6])
+df = df.rename({"id_image": "name_file"}, axis = 1)
+
+print("Importation de toutes les métadonnées :")
+df_cap = pd.read_excel('Correspondance_Capture-Echographe.xlsx', sheet_name = 1, usecols=[4,10,11,20])
+
+# Filtre sur les lignes sans identifiants et sans nom
+df = df[df.cap_id != "?"]
+df = df[df.name_file != "na"]
+
+print(f"Nombre de poissons différents : {len(df['cap_id'].value_counts())}")
+print(f"Nombre d'échographies totales : {len(df)}")
+print(f"Nombre d'échographies de gonades : {len(df[df.type_image != 'œufs'])}")
+print(f"Nombre d'échographies d'œufs : {len(df[df.type_image == 'œufs'])}")
+print("---------------------------------")
+
+
+# ================== 3. Ajout de l'identifiant des échographies ==================
+names = []
+for name in df.name_file :
+    if len(name.split("[")) > 1:
+        ref_csv = name.split("[")[1]
+        ref_csv = ref_csv.split("]")[0]
+        names.append(ref_csv)
+    else :
+        names.append("NA")
+
+df["image_id"] = names
+
+
+# ================== 4. Transformation des masques et images ==================
+# -------- 4.1 Ordonne les classes des masques YOLO --------
+def sort_classes(label_dir):
+    for file_name in os.listdir(label_dir):
+        if file_name.endswith(".txt"):
+            file_path = os.path.join(label_dir, file_name)
+            with open(file_path, "r") as f: # Ouverture du fichier .txt
+                lines = f.readlines()
+
+            # Filtre sur les lignes vides
+            lines = [line.strip() for line in lines if line.strip()]
+
+            # Ordonne les lignes selon leur classe (premier élément de chaque ligne)
+            lines.sort(key=lambda line: int(line.split()[0]))
+
+            # Ajoute un saut de ligne à la fin de chaque ligne
+            lines = [line + "\n" for line in lines]
+
+            # Écrire ligne par ligne les nouvelles lignes dans le fichier
+            with open(file_path, "w") as f:
+                f.writelines(lines)
+
+sort_classes("../data/labels/YOLO/oeufs")
+sort_classes("../data/labels/YOLO/cavite")
+
+print(f"Nombre d'images importées de la cavite : {len(os.listdir('../data/images/cavite/'))}")
+print(f"Nombre d'images importées des oeufs : {len(os.listdir('../data/images/oeufs/'))}")
+
+# -------- 4.2 Renomage des images et des masques YOLO --------
+def rename(path, format):
+    for file_name in os.listdir(path):
+        if "-" in file_name : # Vérifie si l'image n'a pas déjà été renomée
+            split_name = file_name.split("_")
+
+            if len(split_name) == 4:
+                # Récupère du nom l'id de l'image et son heure
+                heures = split_name[0]
+                cap_id = split_name[2]
+
+                cap_id = cap_id.split("-")[1]
+                heures = heures.replace("-",".")
+                heures = heures.split(" ")[0]
+
+                try:
+                    # Récupère l'année
+                    annee = str(df.loc[df.image_id == cap_id, 'annee'].item())
+                    # Récupère l'identifiant de la capture (poisson)
+                    poisson = str(df.loc[df.image_id == cap_id, 'cap_id'].item())
+
+                    # Nouveau nom
+                    new_file_name = f"{cap_id}_{heures}_{poisson}_{annee}.{format}"
+
+                except ValueError:
+                    # Si cap_id non trouvé ou non unique
+                    print(f"L'année n'a pas été trouvée. Le nom n'a pas été changé.")
+
+            # Si déjà renommé avant l'annotation
+            if len(split_name) == 5:
+                new_file_name = "_".join(split_name[0:4])
+                new_file_name = f"{new_file_name.replace("-",".")}.{format}"
+                print(new_file_name)
+
+            os.rename(path + file_name, path + new_file_name)
+
+    return True
+
+# Renommages des images
+rename("../data/images/cavite/", "jpg")
+rename("../data/images/oeufs/", "jpg")
+
+# Renommages des labels YOLO
+rename("../data/labels/YOLO/cavite/", "txt")
+rename("../data/labels/YOLO/oeufs/", "txt")
+
+# Les noms renommés suivent le format : image_id_heure_cap_id_annee.jpg
+poissons_importes = {
+    fichier.stem.split("_")[2]
+    for dossier in (Path("../data/images/cavite"), Path("../data/images/oeufs"))
+    for fichier in dossier.iterdir()
+    if fichier.is_file() and len(fichier.stem.split("_")) >= 4
+}
+print(f"Nombre de poissons différents importés : {len(poissons_importes)}")
+print("---------------------------------")
+
+
+# -------- 4.3 Renomage des masques COCO --------
+def rename_json(json_path, output_json_path):
+    if os.path.exists(json_path) :
+        # Ouvrir le fichier JSON
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        for image in data['images']:
+            file_name = image['file_name']
+            
+            if "-" in file_name:
+                split_name = file_name.split("_")
+
+                if len(split_name) == 4:
+                    heures = split_name[0]
+                    cap_id = split_name[2]
+                    
+                    cap_id = cap_id.split("-")[1]
+                    heures = heures.replace("-", ".")
+                    heures = heures.split(" ")[0]
+                        
+                    try:
+                        # Récupère l'année
+                        annee = str(df.loc[df.image_id == cap_id, 'annee'].item())
+                        # Récupère l'identifiant de la capture (poisson)
+                        poisson = str(df.loc[df.image_id == cap_id, 'cap_id'].item())
+                        
+                        # Nouveau nom
+                        new_file_name = f"{cap_id}_{heures}_{poisson}_{annee}.jpg"
+                        
+                        # Mise à jour de la valeur dans le JSON
+                        image['file_name'] = new_file_name
+                        
+                    except ValueError:
+                        # Si cap_id non trouvé ou non unique
+                        print(f"L'année n'a pas été trouvée. Le nom n'a pas été changé.")
+
+                # Si déjà renommé avant l'annotation
+                if len(split_name) == 5:
+                    new_file_name = "_".join(split_name[0:4])
+                    new_file_name = f"{new_file_name.replace("-",".")}.jpg"
+                    image['file_name'] = new_file_name
+
+        with open(output_json_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=4)
+
+    return True
+
+rename_json("../data/labels/COCO/cavite/_annotations.coco.json", "../data/labels/COCO/cavite/annotations.json")
+rename_json("../data/labels/COCO/oeufs/_annotations.coco.json", "../data/labels/COCO/oeufs/annotations.oeufs_2_classes.json")
+
+# -------- 4.4 Suppression de classes COCO --------
+def delete_classes_COCO(input_path, output_path, excluded_categories):
+    with open(input_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    excluded_ids = {c['id'] for c in data['categories'] if c['name'] in excluded_categories}
+
+    data['categories'] = [c for c in data['categories'] if c['id'] not in excluded_ids]
+    data['annotations'] = [a for a in data['annotations'] if a['category_id'] not in excluded_ids]
+
+    with open(output_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=4)
+
+    return True
+
+# Suppression de l'intestin
+delete_classes_COCO(input_path = "../data/labels/COCO/cavite/annotations.json", output_path = "../data/labels/COCO/cavite/annotations_2_classes.json", excluded_categories=["Intestin"])
+# Suppression de la gonade
+delete_classes_COCO(input_path = "../data/labels/COCO/oeufs/annotations.oeufs_2_classes.json", output_path = "../data/labels/COCO/oeufs/annotations.oeufs.json", excluded_categories=["Gonade"])
+
+# -------- 4.5 Suppression de classes YOLO --------
+def delete_classes_YOLO(input_dir, output_dir, excluded_classes):
+    for file_name in os.listdir(input_dir):
+        if file_name.endswith(".txt"):
+            file_path = os.path.join(input_dir, file_name)
+            with open(file_path, "r") as f:
+                lines = f.readlines()
+
+            # Filtre les lignes selon les classes exclues
+            filtered_lines = [line for line in lines if int(line.split()[0]) not in excluded_classes]
+
+            # Décrémente les classes restantes si nécessaire
+            for i in range(len(filtered_lines)):
+                parts = filtered_lines[i].split()
+                class_id = int(parts[0])
+                # Décrémente la classe si elle est supérieure à la plus grande classe exclue
+                if class_id > max(excluded_classes):
+                    parts[0] = str(class_id - len(excluded_classes))
+                    filtered_lines[i] = " ".join(parts) + "\n"
+            
+
+            # Écrire les lignes filtrées dans le nouveau fichier
+            output_file_path = os.path.join(output_dir, file_name)
+            with open(output_file_path, "w") as f:
+                f.writelines(filtered_lines)
+    return True
+
+# Copie les labels avec toutes les classes dans un sous-dossier dédié
+source_dir = "../data/labels/YOLO/oeufs"
+backup_dir = os.path.join(source_dir, "labels_2_classes")
+
+# Remplace entièrement la copie précédente si elle existe
+if os.path.exists(backup_dir):
+    shutil.rmtree(backup_dir)
+os.makedirs(backup_dir)
+
+# Copie le contenu source sans recopier le sous-dossier de destination
+for item in os.listdir(source_dir):
+    if item == "labels_2_classes":
+        continue
+
+    source_item = os.path.join(source_dir, item)
+    destination_item = os.path.join(backup_dir, item)
+    if os.path.isdir(source_item):
+        shutil.copytree(source_item, destination_item)
+    else:
+        shutil.copy2(source_item, destination_item)
+
+
+delete_classes_YOLO(input_dir = "../data/labels/YOLO/oeufs/labels_2_classes/", output_dir = "../data/labels/YOLO/oeufs/labels_2_classes/", excluded_classes=[0]) # Suppression la gonade (classe 0)
+
+
+# ================== 5. Enrichissement du fichier metadata ==================
+# -------- 5.1 Ajout des nouveau nom dans le jeu de données --------
+df["new_name_file"] = ""
+
+for index, row in df.iterrows():
+    file_name = row["name_file"]
+    image_id = row["image_id"]
+
+    split_name = file_name.split("_")
+    heures = split_name[0]
+    heures = heures.replace("-", ".")
+    heures = heures.split(" ")[0]
+
+    annee = str(row['annee'])  # Récupère l'année depuis la ligne actuelle
+    poisson = str(row['cap_id'])  # Récupère l'identifiant du poisson depuis la ligne actuelle
+
+    new_name_file = f"{image_id}_{heures}_{poisson}_{annee}"
+    df.at[index, "new_name_file"] = new_name_file
+
+# -------- 5.2 Création de nouvelles colonne pour obtenir la position de l'échographie --------
+df['position'] = df[df['type_image'] != "œufs"]['type_image'].str.replace('+', '', regex=False).str[2:].astype(float)
+df["position_ratio"] = df.position / df.long_gonade
+
+# -------- 5.3 Associer une catégorie à chaque échographie --------
+# Trie les données par poisson et par position pour s'assurer que les échographies sont dans le bon ordre
+df = df.sort_values(by=["cap_id", "position"]).reset_index(drop=True)
+
+# Récupère les identifiants uniques des poissons
+unique_id = df["cap_id"].unique()
+
+for id in unique_id:
+    # Récupère les lignes correspondant au poisson
+    all_fish_rows = df["cap_id"] == id
+    rows = all_fish_rows & (df['type_image'] != "œufs") # Ignore les écho d'oeufs
+
+    if rows.any():
+        first_row = df[rows].index[0] # Récupère la première échographie
+        last_row = df[rows].index[-1] # Récupère la dernière échographie
+
+        # 1. Associe une catégorie à chaque image selon la position de l'échographie
+        df.loc[rows, "categorie"] = np.where(df.loc[rows, "position_ratio"] > 1, "erreur", 
+                                             np.where(df.loc[rows, "position_ratio"] > 0.6, "fin", 
+                                                      np.where(df.loc[rows, "position"] > 1, "milieu", "debut"))
+                                             )
+        
+        # 2. Si deux erreurs consécutives détectées, on ne conserve pas le poisson
+        if df.loc[rows, "categorie"].eq("erreur").sum() >= 2:
+            df = df.drop(df[rows].index)
+            continue # Passe au poisson suivant
+
+        # 3. Gestion des petites erreurs
+        df.loc[rows, "position"] = np.where(df.loc[rows, "position"] - df.loc[rows, "long_gonade"] < 0, df.loc[rows, "position"],
+                                            np.where(df.loc[rows, "position"] - df.loc[rows, "long_gonade"] < 0.5, df.loc[rows, "long_gonade"], df.loc[rows, "position"])
+                                            )
+        df.loc[rows, "categorie"] = np.where(df.loc[rows, "position"] - df.loc[rows, "long_gonade"] < 0, df.loc[rows, "categorie"],
+                                            np.where(df.loc[rows, "position"] - df.loc[rows, "long_gonade"] < 0.5, "fin", df.loc[rows, "categorie"])
+                                            )
+        
+        # 4. Gestion des grosses erreurs (décalage important)
+        if (df.loc[rows, "categorie"]=="erreur").any(): # Décale progressif de l'erreur pour chaque échographie (sauf la première) pour essayer d'être le plus proche de la réalité
+            progressions = np.arange(0, len(df[rows])) / (len(df[rows])-1)  # Crée un tableau de progression pour chaque échographie
+            total_error = df.loc[last_row, "position"] - df.loc[last_row, "long_gonade"] # L'erreur entre la dernière échographie et la longueur de la gonade
+            df.loc[rows, "position"] = df.loc[rows, "position"] - (total_error * progressions) # Décale chaque échographie en fonction de sa position
+            
+            # Mise à jour la position de la dernière échographie pour qu'elle corresponde à la longueur de la gonade
+            df.loc[last_row, "position"] = df.loc[last_row, "long_gonade"]
+
+            # Recalcule le ratio après le décalage
+            df.loc[rows, "position_ratio"] = df.loc[rows, "position"] / df.loc[rows, "long_gonade"]
+
+            # Mise à jour des catégories après le décalage
+            df.loc[rows, "categorie"] = np.where(df.loc[rows, "position_ratio"] > 1, "erreur", 
+                                                 np.where(df.loc[rows, "position_ratio"] > 0.6, "fin", 
+                                                          np.where(df.loc[rows, "position"] > 1, "milieu", "debut"))
+                                                          )
+
+        # 5. Supprime les doublons de positions pour un même poisson (sauf oeufs)
+        duplicates = df.loc[rows].duplicated(subset=["cap_id", "position"], keep="last")
+        df = df.drop(df[rows].index[duplicates])
+
+        # 6. Regroupe les catégories dans une nouvelle colonne
+        categories = str(list(df.loc[rows, "categorie"]))
+        df.loc[rows, "categories"] = categories
+
+# 7. Supprime les lignes vides
+df = df.dropna(how = 'all')
+
+print("Catégories de toutes les échographies de gonades :")
+print(f"Nombre d'images au début : {len(df[df['categorie'] == 'debut'])}") 
+print(f"Nombre d'images au milieu : {len(df[df['categorie'] == 'milieu'])}") 
+print(f"Nombre d'images à la fin : {len(df[df['categorie'] == 'fin'])}") 
+print(f"Nombre de combinaisons différentes par poisson : {len(df['categories'].value_counts())}")
+print("---------------------------------")
+
+# -------- 5.4 Ajoute les informations du poisson --------
+df_unique = df[~df.duplicated(subset=["cap_id"], keep = 'first')] # Garde qu'une ligne par poisson
+id_unique = df_unique["cap_id"]
+
+# Les âges peuvent être des valeurs textuelles (ex. "2+") ou numériques.
+df["age_poisson"] = pd.Series(index=df.index, dtype="object")
+
+for id in id_unique:
+    # Récupère la ligne correspondant au poisson
+    row = df_cap[df_cap.cap_id == id]
+
+    # Complète df avec le poids, la taile et l'age du poisson
+    df.loc[df.cap_id == id, "poids_poisson"] = float(str(row["cap_poids"].values[0]).replace(",", "."))
+    df.loc[df.cap_id == id, "long_poisson"] = float(row["cap_lf"].values[0])
+    df.loc[df.cap_id == id, "age_poisson"] = row["age_referent"].values[0]
+
+
+# -------- 5.5 Récupère l'échelle de l'échographie --------
+def OCR(image_path):
+    # ---- Récupération de l'échelle par OCR ----
+    image = cv2.imread(image_path)
+
+    # Crop et redimensionnement de l'image
+    x, y, w, h = 530, 350, 250, 200  # crop left, crop top, size right, size bottom
+    new_width, new_height = 280, 300
+    cropped_img = image[y:y+h, x:x+w] # crop
+    resized_img = cv2.resize(cropped_img, (new_width, new_height)) # Redimensionne
+
+    text = pytesseract.image_to_string(resized_img,lang='eng').strip()
+
+    return text
+
+for id in id_unique :
+    echos = df[df.cap_id.isin([id])]
+    echelle = 0
+
+    for index,row in echos.iterrows():
+        file_path = row["new_name_file"]
+        image_path = f"../data/images/oeufs/{file_path}.jpg" # "../data/images/cavite/{file_path}.jpg" ou "../data/images/oeufs/{file_path}.jpg"
+
+        if os.path.exists(image_path):
+            # --- Récupération de l'échelle par OCR ---
+            ocr = OCR(image_path)
+            if ocr == "3,8":
+                echelle = float(ocr.replace(",",".").split()[0])
+                continue
+            elif ocr == "4.7":
+                echelle = float(ocr.replace(",",".").split()[0])
+                continue
+            elif echelle != 3.8 and echelle != 4.7:
+                echelle = 3.1
+
+    if echelle == 3.8:
+        df.loc[df.cap_id == id, "echelle"] = 3.8
+    if echelle == 4.7:
+        df.loc[df.cap_id == id, "echelle"] = 4.7
+    if echelle == 3.1:
+        df.loc[df.cap_id == id, "echelle"] = 3.1
+ 
+# -------- 5.6 Sauvegarde visuellement les images avec leurs annotations --------
+def sauvegarder_visualisations(images_dir, labels_dir, output_dir, num_classes):
+    images_dir = Path(images_dir)
+    labels_dir = Path(labels_dir)
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    nb_sauvegardees = 0
+    nb_sans_annotation = 0
+
+    for image_path in sorted(images_dir.glob("*.jpg")):
+        label_path = labels_dir / f"{image_path.stem}.txt"
+        if not label_path.exists():
+            print(f"Annotation absente : {label_path.name}")
+            nb_sans_annotation += 1
+            continue
+
+        image = Image.open(image_path).convert("RGB")
+        image_array = np.asarray(image)
+        height, width = image_array.shape[:2]
+        mask = load_yolo_polygon_masks(
+            label_path,
+            (height, width),
+            num_classes=num_classes,
+            semantic=True,
+        )
+        visualisation = overlay_colored_mask(
+            image_array,
+            mask,
+            alpha=0.45,
+        )
+        Image.fromarray(visualisation).save(output_dir / f"{image_path.stem}.png")
+        nb_sauvegardees += 1
+
+    print(f"{nb_sauvegardees} visualisations enregistrées dans {output_dir}")
+    if nb_sans_annotation:
+        print(f"{nb_sans_annotation} images ignorées car l'annotation est absente.")
+
+
+# Sauvegarde des visualisations avec toutes les classes
+visualisation_dir = Path("../data/visualisation")
+sauvegarder_visualisations(
+    images_dir="../data/images/cavite",
+    labels_dir="../data/labels/YOLO/cavite",
+    output_dir=visualisation_dir / "images",
+    num_classes=3,
+)
+sauvegarder_visualisations(
+    images_dir="../data/images/oeufs",
+    labels_dir="../data/labels/YOLO/oeufs/labels_2_classes",
+    output_dir=visualisation_dir / "oeufs",
+    num_classes=2,
+)
+
+#-------- 5.7 Sauvegarde des jeux de données finaux --------
+df.to_excel("correspondance_echo_final.xlsx", index=False)

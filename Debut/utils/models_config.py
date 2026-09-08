@@ -14,6 +14,7 @@ sys.path.append(str(Path.cwd().parent)) # Ajoute le dossier parent au chemin de 
 # Importation des datasets personnalisés pour U-Net : 2D et 2,5D
 from utils.dataset_unet import RoboflowUNetDataset
 from utils.dataset_2_5D import SliceSequenceUNetDataset
+from utils.post_traitement import split_eggs
 
 from utils.stats_fct import (
     plot_segmentation_comparison,
@@ -26,26 +27,29 @@ IGNORE_CATEGORY_NAME = "ignore"
 
 # ----------- Regroupement des images et annotations dans un dictionnaire -----------
 def dataset_to_dict(df, annotations_json, all_images_dir):
+    """
+    Transforme le dataset COCO en un dictionnaire contenant les informations nécessaires pour l'entraînement et l'évaluation.
+    """
     # Fichier d'annotation JSON
     with open(annotations_json, 'r') as f:
         coco_data = json.load(f)
 
     # -------- 1. Création de l'échantillon de données --------
-    # Récupération des classes
+    # --- Récupération de toutes les classes ---
     raw_categories = {cat['id']: cat['name'] for cat in coco_data.get('categories', []) if cat['id'] > 0} # Associe les ID des catégories à leurs noms
 
-    # La catégorie "ignore" (id=4 dans les exports COCO) est retirée des classes réelles :
-    # elle ne doit jamais devenir un canal de sortie du modèle, seulement marquer des pixels à exclure.
+    # --- Suppression de la catégorie "ignore" des classes réelles ---
     ignore_category_id = next((cid for cid, name in raw_categories.items() if name == IGNORE_CATEGORY_NAME), None)
     categories = {cid: name for cid, name in raw_categories.items() if cid != ignore_category_id}
 
+    # --- Tri et affichage des classes détectées ---
     class_ids = sorted(list(categories.keys()))
     num_classes = len(class_ids)
     print(f"Classes détectées ({num_classes}) : {categories}")
     if ignore_category_id is not None:
         print(f"Catégorie ignore détectée : '{IGNORE_CATEGORY_NAME}' (id={ignore_category_id})")
 
-    # Regrouper les annotations par ID d'image
+    # --- Regroupement des annotations par ID d'image ---
     img_to_anns = {}
     for ann in coco_data.get('annotations', []):
         img_id = ann['image_id']
@@ -53,7 +57,7 @@ def dataset_to_dict(df, annotations_json, all_images_dir):
             img_to_anns[img_id] = []
         img_to_anns[img_id].append(ann)
 
-    # Construire d'un dictionnaire avec toutes les images et leurs annotations associées
+    # --- construction d'un dictionnaire avec toutes les images et leurs annotations associées ---
     all_samples = []
     for img_info in coco_data.get('images', []):
         img_id = img_info['id']
@@ -79,7 +83,7 @@ def dataset_to_dict(df, annotations_json, all_images_dir):
             op = matches_op.values[0]
             op_ratio = matches_op_ratio.values[0]
         else:
-            print(f"Image {id_image} introuvable dans les métadonnées Excel !")
+            print(f"Image {id_image} introuvable dans les métadonnées !")
             cat = None
             op = None
             op_ratio = None
@@ -142,8 +146,7 @@ def collate_fn_egg_hv(batch):
     }
 
 
-def split_dataset(all_samples, all_images_dir, df, IMAGE_SIZE, num_classes, class_ids, dim="2",
-                   ignore_category_id=None, ignore_target_class_idx=None, ignore_value=-100.0):
+def split_dataset(all_samples):
     # Récupérer la liste de toutes les catégories
     categories_all = [sample['category'] for sample in all_samples]
 
@@ -151,16 +154,17 @@ def split_dataset(all_samples, all_images_dir, df, IMAGE_SIZE, num_classes, clas
     y = np.array(categories_all) # Les classes
     groups = np.array([sample["image_info"]["file_name"].split("_")[2] for sample in all_samples]) # L'ID du poisson pour chaque image
 
-    # Les données sont divisées par StratifiedGroupKFold excepté pour les oeufs, uniquement divisés par groupes
+    # Les données sont divisées par StratifiedGroupKFold (par groupe et par poisson) excepté pour les oeufs, uniquement divisés par groupes
     metadata_available = all(value is not None and not (isinstance(value, float) and np.isnan(value))
                              for value in categories_all)
     if metadata_available and len(np.unique(y)) > 1:
         kf = StratifiedGroupKFold(n_splits=6, shuffle=True, random_state=42)
         split_iterator = kf.split(X, y, groups) # Divise selon la distribution des classes et les groupes (poissons)
     else:
-        kf = GroupKFold(n_splits=6)
-        split_iterator = kf.split(X, groups=groups) # Divise uniquement selon les groupes (poissons), sans stratification
+        kf = GroupKFold(n_splits=6, shuffle=True, random_state=42)
+        split_iterator = kf.split(X, groups=groups) # Divise uniquement selon les groupes (poissons)
 
+    # --- Division des données en ensembles d'entraînement/validation et de test ---
     for cv_idx, test_idx in split_iterator:
         cv_samples, test_samples = X[cv_idx], X[test_idx]
         cv_categories, test_categories = y[cv_idx], y[test_idx]
@@ -171,62 +175,30 @@ def split_dataset(all_samples, all_images_dir, df, IMAGE_SIZE, num_classes, clas
     print(f"Échantillons train/val        : {len(cv_samples)}")
     print(f"Échantillons de test          : {len(test_samples)}")
 
-    # -------- 2. Création des datasets --------
-    if dim == "2":
-        cv_dataset = RoboflowUNetDataset(
-        samples=cv_samples,
-        image_dir=all_images_dir,
-        df = df,
-        image_size=IMAGE_SIZE,
-        num_classes=num_classes,
-        class_ids=class_ids,
-        is_train = False,
-        ignore_category_id=ignore_category_id,
-        ignore_target_class_idx=ignore_target_class_idx,
-        ignore_value=ignore_value
-        )
-        test_dataset = RoboflowUNetDataset(
-            samples=test_samples,
-            image_dir=all_images_dir,
-            df = df,
-            image_size=IMAGE_SIZE,
-            num_classes=num_classes,
-            class_ids=class_ids,
-            is_train = False,
-            ignore_category_id=ignore_category_id,
-            ignore_target_class_idx=ignore_target_class_idx,
-            ignore_value=ignore_value
-        )
-    else:
-        cv_dataset = SliceSequenceUNetDataset(
-        samples=cv_samples,
-        image_dir=all_images_dir,
-        df = df,
-        image_size=IMAGE_SIZE,
-        num_classes=num_classes,
-        class_ids=class_ids,
-        is_train = False,
-        ignore_category_id=ignore_category_id,
-        ignore_target_class_idx=ignore_target_class_idx,
-        ignore_value=ignore_value
-    )
-        test_dataset = SliceSequenceUNetDataset(
-            samples=test_samples,
-            image_dir=all_images_dir,
-            df = df,
-            image_size=IMAGE_SIZE,
-            num_classes=num_classes,
-            class_ids=class_ids,
-            is_train = False,
-            ignore_category_id=ignore_category_id,
-            ignore_target_class_idx=ignore_target_class_idx,
-            ignore_value=ignore_value
-        )
+    return cv_samples, test_samples, cv_categories, test_categories, groups_train, groups_test
 
-    return cv_samples, test_samples, cv_categories, test_categories, groups_train, groups_test, cv_dataset, test_dataset
+
+def _mean_top_half_instance_area_px(instance_labels):
+    """Surface moyenne en pixels des 50 % plus grandes instances, par image."""
+    if instance_labels.ndim == 2:
+        instance_labels = instance_labels.unsqueeze(0)
+    if instance_labels.ndim != 3:
+        raise ValueError("Les labels d'instances d'œufs doivent avoir la forme (B, H, W).")
+
+    mean_areas = []
+    for labels in instance_labels:
+        label_ids, counts = torch.unique(labels, return_counts=True)
+        areas = counts[label_ids > 0].to(dtype=torch.float32)
+        if areas.numel() == 0:
+            mean_areas.append(torch.zeros((), device=labels.device))
+            continue
+        selected_count = max(1, int(0.5 * areas.numel()))
+        mean_areas.append(torch.topk(areas, selected_count).values.mean())
+    return torch.stack(mean_areas)
+
 
 # Calcul des métriques par image et par classe avec prise en compte de l'échelle et du dataset
-def metrics_by_class(true, preds, echelle, dataset_name) :
+def metrics_by_class(true, preds, echelle, dataset_name, egg_instance_labels=None) :
     intersection = (preds & true).float().sum((2, 3))
     union = (preds | true).float().sum((2, 3))   
 
@@ -247,7 +219,7 @@ def metrics_by_class(true, preds, echelle, dataset_name) :
     precision_per_img = intersection / (intersection + false_positive + 1e-6)
     recall_per_img = intersection / (intersection + false_negative + 1e-6)
 
-    #--- Calcul des surfaces en cm2 ---
+    #--- Calcul des surfaces ---
     pred_surf_pixels = pred_area
     true_surf_pixels = true_area
 
@@ -262,7 +234,22 @@ def metrics_by_class(true, preds, echelle, dataset_name) :
         # Un pixel représente donc (echelle / hauteur_px) ** 2 cm².
         diff_surface = diff_surf_pixels * (echelle / true.shape[2]) ** 2
     else:
-        diff_surface = diff_surf_pixels  # En pixels pour le dataset "oeufs"
+        true_instance_labels = split_eggs(
+            true, min_distance=8, min_area=100, ouverture_size=3, ouverture_iterations=1
+        )
+        if egg_instance_labels is None:
+            egg_instance_labels = split_eggs(
+                preds, min_distance=8, min_area=100, ouverture_size=3, ouverture_iterations=1
+            )
+        else:
+            egg_instance_labels = torch.as_tensor(egg_instance_labels, device=true.device)
+        predicted_mean_area = _mean_top_half_instance_area_px(egg_instance_labels)
+        true_mean_area = _mean_top_half_instance_area_px(true_instance_labels)
+        echelle = echelle.to(device=true.device, dtype=torch.float32).reshape(-1)
+
+        # ``echelle`` est exprimée en cm ; conversion finale en mm².
+        diff_surface = (true_mean_area - predicted_mean_area).abs().unsqueeze(1)
+        diff_surface *= ((echelle * 10) / true.shape[2]).unsqueeze(1) ** 2
 
     return intersection, union,iou_per_img, dice_per_img, precision_per_img, recall_per_img, diff_surface
 
