@@ -1,0 +1,521 @@
+---
+title: "Résultats sur l'échantillon sélectionné"
+format: 
+    html :
+        page-layout: full
+jupyter: python3
+execute:
+  echo: false
+---
+
+```{python}
+# -------- 1. Importation des pakages nécessaires --------
+from pathlib import Path
+import pandas as pd
+import numpy as np
+import os
+import sys
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
+import seaborn as sns
+
+sys.path.append(str(Path.cwd().parent))
+
+from utils.calcul_volume_fct import calculate_volumes, calculate_eggs_volumes, calculate_eggs_areas
+from utils.stats_fct import distribution, nuage_points, linear_regression, plot_evolution_curves
+```
+
+
+```{python}
+# -------- 2. Importation du fichier avec les metadatas --------
+file_path = '../utils/correspondance_echo_final.xlsx'
+df = pd.read_excel(file_path, dtype={"image_id": str})
+unique_id = np.unique(df.cap_id)
+```
+
+
+```{python}
+#| output: false
+
+# -------- 3. Récupère le vrai volume des gonades et des oeufs de l'échantillon --------
+all_resultats_cavite = []
+all_resultats_oeufs = []
+surfaces_eggs_list = []
+
+# --- Calcul des volumes par poisson ----
+for id in unique_id:
+    # On récupère les échographies associées au poisson
+    echos_poisson = df[df.cap_id == id]
+    
+    # Calcul des volumes
+    res_poisson_cavite = calculate_volumes(echos_poisson, id, "data/labels/YOLO/cavite/") # "data/labels/YOLO/cavite/" ou "U-NET/masks/3_classes/true_"
+    res_poisson_oeufs, surfaces_all = calculate_eggs_volumes(echos_poisson, id, "data/labels/YOLO/oeufs/") # "data/labels/YOLO/oeufs/" ou "U-NET/masks/3_classes/true_"
+    
+    # On convertit le dict du poisson en DataFrame et on l'ajoute à la liste globale
+    all_resultats_cavite.append(pd.DataFrame(res_poisson_cavite))
+    all_resultats_oeufs.append(pd.DataFrame(res_poisson_oeufs))
+    surfaces_eggs_list.extend(surfaces_all)
+
+# On fusionne tous les résultats en un seul DataFrame final
+df_res_true = pd.concat(all_resultats_cavite + all_resultats_oeufs, ignore_index=True)
+df_res_true = df_res_true.sort_values(by=['id poisson', 'position echo'])
+df_res_true.to_csv("true_volumes_ech.csv", index=False) # Sauvegarde du DataFrame en CSV
+```
+
+```{python}
+# ------- 4. Récupération du volume individuel (non agrégé) de chaque œuf avec son échographie d'origine -------
+oeufs_individuels = []
+df_echos_oeufs = df[df["type_image"] == "œufs"]
+
+for _, echo in df_echos_oeufs.iterrows():
+    mask_path = Path("../data/labels/YOLO/oeufs") / f"{echo['new_name_file']}.txt"
+    image_path = Path("../data/images/oeufs") / f"{echo['new_name_file']}.jpg"
+
+    if not mask_path.exists() or not image_path.exists() or pd.isna(echo["echelle"]):
+        continue
+
+    _, surfaces_oeufs_mm2 = calculate_eggs_areas(
+        str(mask_path), str(image_path), echo["echelle"]
+    )
+
+    for surface_oeuf_mm2 in surfaces_oeufs_mm2:
+        if surface_oeuf_mm2 <= 0:
+            continue
+        rayon_oeuf_mm = np.sqrt(surface_oeuf_mm2 / np.pi)
+        volume_oeuf_mm3 = 4 / 3 * np.pi * rayon_oeuf_mm ** 3
+        oeufs_individuels.append({
+            "id poisson": str(echo["cap_id"]),
+            "image_id": str(echo["image_id"]),
+            "volume_oeuf_mm3": volume_oeuf_mm3,
+        })
+
+df_oeufs_individuels = pd.DataFrame(oeufs_individuels)
+```
+
+```{python}
+# -------- 5. Fusionne les données des échographies avec celles des poissons et calcule la fécondité --------
+# ----- 5.1. Fusionne les données des échographies avec celles des poissons ----
+df_res_true["id poisson"] = df_res_true["id poisson"].astype(str)
+df_res_true = pd.merge(df_res_true, df[[ "image_id", "poids_poisson", "long_poisson", "age_poisson" ]], on="image_id", how="left")
+
+
+# ----- 5.2. Divise les données entre les cavités et les œufs ----
+df_true_fish = df_res_true[df_res_true["position echo"] != "œufs"]
+df_true_eggs = df_res_true[df_res_true["position echo"] == "œufs"]
+
+# ----- 5.3. Divise les données selon la position de l'écho ----
+df_debut = df_true_fish[df_true_fish['position echo'] < 2]
+df_fin = df_true_fish[df_true_fish['position echo'] >= 2]
+
+# ----- 5.4. Jeu de données final avec uniquement les volumes  -----
+df_final_true = df_res_true[["id poisson", "image_id" , "volume_cavite", "volume_gonade", "echelle", "volume_moyen_oeufs_mm3", 
+                        "poids_poisson", "long_poisson", "age_poisson"]].groupby('id poisson', as_index=False).last()
+df_final_true = df_final_true.dropna(subset=["volume_cavite"])
+
+#------ 5.5. Calcul et ajout de la fécondité -------
+df_final_true["fecondite"] = np.where(df_final_true["volume_moyen_oeufs_mm3"] != 0,
+    (df_final_true["volume_gonade"] * 1000) / df_final_true["volume_moyen_oeufs_mm3"], 
+    np.nan
+)
+```
+
+```{python}
+# -------- 6. Division des données --------
+poisson_counts = df_true_fish['id poisson'].value_counts() # Nombre d'échographies par poisson
+
+# Filtrer les poissons avec plus de 2 lignes
+poissons_other = poisson_counts[poisson_counts > 2].index
+df_other = df_true_fish[df_true_fish['id poisson'].isin(poissons_other)]
+```
+
+### Rappel sur l'échantillon
+
+```{python}
+print(f"Nombre de poissons : {len(df_final_true)}")
+print(f"Nombre d'échographies transversales : {len(df_true_fish)}")
+print(f"Nombre d'écho transversales moyennes par poisson : {len(df_true_fish)/len(df_final_true):.2f}")
+print(f"Nombre d'échographies longitudinales : {len(df_true_eggs)} (dont {df_oeufs_individuels['image_id'].nunique()} non vides)")
+print(f"Nombre d'oeufs : {len(df_oeufs_individuels)}")
+```
+
+### Volumes et fécondité par poisson
+
+```{python}
+df_final_true
+```
+
+## Vérification des surfaces des gonades et de la cavité
+
+```{python}
+plot_evolution_curves(df_other)
+```
+
+## Détection des anomalies selon l'augmentation de la surface
+
+```{python}
+for id in df_true_fish['id poisson'].unique():
+    rows = df_true_fish[df_true_fish['id poisson'] == id]
+    nb_rows = len(rows)
+    pb_list = []
+
+    # Détection des potentiels problèmes de surfaces pour des poissons avec plus de 2 échos
+    if nb_rows > 2:
+        for i in range(nb_rows):
+            # Si l'écho est à Op+2, alors elle ne doit pas avoir une augmentation négative de la surface des gonades
+            if rows.iloc[i]["position echo"]==2.0:
+                value = rows.iloc[i].augmentation_surface_gonade
+                if value < -10 : # Tolerance de 10% pour les diminutions de surface des gonades
+                    pb_list.append(1)
+                else:
+                    pb_list.append(0)
+
+            # Si l'écho est à Op+3 ou plus, alors elle ne doit pas avoir une augmentation de la surface des gonades supérieure à 10%
+            elif rows.iloc[i]["position echo"]>2.0:
+                value = rows.iloc[i].augmentation_surface_gonade
+                if value > 10 : # Tolerance de 10% pour les augmentations de surface des gonades
+                    pb_list.append(1)
+                else:
+                    pb_list.append(0)
+            else:
+                pb_list.append(0)
+
+
+        for i in range(len(pb_list)-1):
+            # Si il y a deux "1" à la suite, alors l'erreur est sur la première échographie où il y a un "1"
+            if pb_list[i] == 1 and pb_list[i+1] == 1:
+                print(f"Poisson : {id} - Problèmes : {pb_list}")
+                print(f"Poisson : {id} - Problème sur l'écho à la position {rows.iloc[i]['position echo']} (diminution surface gonade : {rows.iloc[i]['augmentation_surface_gonade']}%)")
+                break
+        # Si il y a un "1" seul à la deuxième position, alors l'erreur est sur la première échographie
+        if pb_list[1] == 1 and pb_list[0] == 0 and pb_list[2] == 0:
+            print(f"Poisson : {id} - Problèmes : {pb_list}")
+            print(f"Poisson : {id} - Problème sur l'écho à la position {rows.iloc[0]['position echo']} (diminution surface gonade : {rows.iloc[0]['augmentation_surface_gonade']}%)")
+```
+
+## Relations entre surfaces des gonades et de la cavité
+
+```{python}
+fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+nuage_points(
+    x=df_true_fish.surface_cavite, 
+    y=df_true_fish.surface_gonade,
+    color_var=df_true_fish['position echo'],  # Utilisation de la variable 'position echo' pour colorier les points
+    titre="Relation surfaces cavité / gonades", 
+    xlabel="Surface de la cavité", 
+    ylabel="Surface des gonades",
+    couleur='teal',
+    ax=axes[0]
+    )
+
+nuage_points(
+    x=df_fin.surface_cavite, 
+    y=df_fin.surface_gonade,
+    color_var=df_fin['position echo'],  # Utilisation de la variable 'position echo' pour colorier les points
+    titre="Relation surfaces cavité / gonades (pour position echo >= 2)", 
+    xlabel="Surface de la cavité (en cm2)", 
+    ylabel="Surface des gonades (en cm2)",
+    couleur='teal',
+    ax=axes[1]
+    )
+
+plt.tight_layout()
+plt.show()
+
+print(f"Corrélation : {df_true_fish.surface_cavite.corr(df_true_fish.surface_gonade):.2f}")
+print(f"Corrélation (pour position echo >= 2) : {df_fin.surface_cavite.corr(df_fin.surface_gonade):.2f}")
+```
+
+## Distribution du volume des gonades
+
+```{python}
+distribution(df_final_true.volume_gonade, titre = "", xlabel = "Volume des gonades (en cm3)", nombre_graduations_x = 15,nombre_barres=15)
+```
+
+## Relations entre le volume des gonades et les caractéristiques des poissons
+
+```{python}
+fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+
+# Poids du poisson
+nuage_points(
+    x=df_true_fish.poids_poisson,
+    y=df_true_fish.volume_gonade,
+    titre="",
+    xlabel="Poids du poisson (en g)",
+    ylabel="Volume des gonades (en cm³)",
+    couleur="teal",
+    ax=axes[0]
+)
+# Longueur du poisson
+nuage_points(
+    x=df_true_fish.long_poisson,
+    y=df_true_fish.volume_gonade,
+    titre="",
+    xlabel="Longueur du poisson (en mm)",
+    ylabel="Volume des gonades (en cm³)",
+    couleur="teal",
+    ax=axes[1]
+)
+plt.tight_layout()
+plt.show()
+
+print(f"Corrélation volume/poids : {df_true_fish.volume_gonade.corr(df_true_fish.poids_poisson):.2f}")
+print(f"Corrélation volume/longueur : {df_true_fish.volume_gonade.corr(df_true_fish.long_poisson):.2f}")
+```
+
+## Relations entre le volume des cavités et les caractéristiques des poissons
+
+```{python}
+fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+
+# Poids du poisson
+nuage_points(
+    x=df_true_fish.poids_poisson,
+    y=df_true_fish.volume_cavite,
+    titre="",
+    xlabel="Poids du poisson (en g)",
+    ylabel="Volume des cavités (en cm³)",
+    couleur="teal",
+    ax=axes[0]
+)
+# Longueur du poisson
+nuage_points(
+    x=df_true_fish.long_poisson,
+    y=df_true_fish.volume_cavite,
+    titre="",
+    xlabel="Longueur du poisson (en mm)",
+    ylabel="Volume des cavités (en cm³)",
+    couleur="teal",
+    ax=axes[1]
+)
+plt.tight_layout()
+plt.show()
+
+print(f"Corrélation volume/poids : {df_true_fish.volume_cavite.corr(df_true_fish.poids_poisson):.2f}")
+print(f"Corrélation volume/longueur : {df_true_fish.volume_cavite.corr(df_true_fish.long_poisson):.2f}")
+```
+
+## Distribution de la surface et du volume des oeufs
+
+```{python}
+# Distribution des volumes individuels des œufs pour chaque échographie
+ordre_images = sorted(df_oeufs_individuels["image_id"].unique())
+ordre_poissons = sorted(df_oeufs_individuels["id poisson"].unique())
+palette_poissons = dict(zip(
+    ordre_poissons, sns.color_palette("Set2", n_colors=len(ordre_poissons))
+))
+
+# Identification des œufs extrêmes selon la règle du boxplot, par échographie
+df_oeufs_individuels_extremes = df_oeufs_individuels.copy()
+volumes_par_image = df_oeufs_individuels_extremes.groupby("image_id")["volume_oeuf_mm3"]
+
+q1 = volumes_par_image.transform(lambda volumes: volumes.quantile(0.25))
+q3 = volumes_par_image.transform(lambda volumes: volumes.quantile(0.75))
+iqr = q3 - q1
+df_oeufs_individuels_extremes["extreme_inferieur"] = (
+    df_oeufs_individuels_extremes["volume_oeuf_mm3"] < q1 - 1.5 * iqr
+)
+df_oeufs_individuels_extremes["extreme_superieur"] = (
+    df_oeufs_individuels_extremes["volume_oeuf_mm3"] > q3 + 1.5 * iqr
+)
+
+resume_extremes = (
+    df_oeufs_individuels_extremes.groupby("image_id")
+    .agg(
+        nombre_oeufs=("volume_oeuf_mm3", "size"),
+        nombre_extremes_inferieurs=("extreme_inferieur", "sum"),
+        nombre_extremes_superieurs=("extreme_superieur", "sum"),
+    )
+    .reindex(ordre_images)
+)
+resume_extremes["proportion_extremes_inferieurs"] = (
+    100 * resume_extremes["nombre_extremes_inferieurs"] / resume_extremes["nombre_oeufs"]
+)
+resume_extremes["proportion_extremes_superieurs"] = (
+    100 * resume_extremes["nombre_extremes_superieurs"] / resume_extremes["nombre_oeufs"]
+)
+```
+
+```{python}
+fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+
+distribution(
+    df_oeufs_individuels.volume_oeuf_mm3,
+    titre="Distribution du volume des oeufs",
+    xlabel = "Volume des oeufs (en mm³)",
+    nombre_graduations_x = 13,
+    nombre_barres=30,
+    ax = axes[0]
+)
+
+distribution(
+    resume_extremes.nombre_oeufs,
+    titre = "Distribution du nombre d'œufs par échographie",
+    xlabel = "Nombre d'œufs",
+    nombre_graduations_x = 15,
+    nombre_barres=13,
+    couleur = "orange",
+    ax = axes[1]
+)
+
+plt.tight_layout()
+plt.show()
+
+print(f"Nombre moyen d'œufs par échographie : {resume_extremes.nombre_oeufs.mean():.2f} (Q1 : {resume_extremes.nombre_oeufs.quantile(0.25):.0f}, Q3 : {resume_extremes.nombre_oeufs.quantile(0.75):.0f})")
+```
+
+```{python}
+fig, ax = plt.subplots(figsize=(17, 7))
+sns.boxplot(
+    data=df_oeufs_individuels,
+    x="image_id", y="volume_oeuf_mm3",
+    hue="id poisson", order=ordre_images, hue_order=ordre_poissons,
+    palette=palette_poissons, dodge=False, ax=ax,
+)
+ax.set(
+    title="Distribution du volume des œufs par échographie",
+    xlabel="Image ID",
+    ylabel="Volume individuel d'un œuf (mm³)",
+)
+ax.tick_params(axis="x", labelrotation=90, labelsize=8)
+ax.grid(axis="y", alpha=0.2)
+fig.subplots_adjust(right=0.78, bottom=0.22)
+ax.legend(
+    title="ID poisson", bbox_to_anchor=(1.01, 1), loc="upper left",
+    ncol=2, fontsize=8, title_fontsize=9
+)
+plt.show()
+```
+
+
+```{python}
+positions = np.arange(len(resume_extremes))
+couleurs_extremes = {"Inférieurs": "#4C78A8", "Supérieurs": "#E45756"}
+fig, (ax_nombres, ax_proportions) = plt.subplots(
+    2, 1, figsize=(12, 8), sharex=True, constrained_layout=True
+)
+
+ax_nombres.bar(
+    positions, resume_extremes["nombre_extremes_inferieurs"],
+    color=couleurs_extremes["Inférieurs"], label="Extrêmes inférieurs",
+)
+ax_nombres.bar(
+    positions, resume_extremes["nombre_extremes_superieurs"],
+    bottom=resume_extremes["nombre_extremes_inferieurs"],
+    color=couleurs_extremes["Supérieurs"], label="Extrêmes supérieurs",
+)
+ax_nombres.set(
+    title="Nombre d'œufs extrêmes par échographie",
+    ylabel="Nombre d'œufs",
+)
+
+ax_proportions.bar(
+    positions, resume_extremes["proportion_extremes_inferieurs"],
+    color=couleurs_extremes["Inférieurs"], label="Extrêmes inférieurs",
+)
+ax_proportions.bar(
+    positions, resume_extremes["proportion_extremes_superieurs"],
+    bottom=resume_extremes["proportion_extremes_inferieurs"],
+    color=couleurs_extremes["Supérieurs"], label="Extrêmes supérieurs",
+)
+ax_proportions.set(
+    title="Proportion d'œufs extrêmes par échographie",
+    xlabel="Image ID",
+    ylabel="Proportion d'œufs (%)",
+)
+ax_proportions.set_ylim(0, 100)
+ax_proportions.set_xticks(positions, resume_extremes.index, rotation=90, fontsize=8)
+
+for ax in (ax_nombres, ax_proportions):
+    ax.grid(axis="y", alpha=0.2)
+    ax.legend(loc="upper right")
+
+plt.show()
+```
+
+
+## Relation entre le volume des oeufs et les caractéristiques des poissons
+
+
+```{python}
+fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+
+nuage_points(
+    x=df_final_true.poids_poisson, # long_poisson ou poids_poisson
+    y=df_final_true.volume_moyen_oeufs_mm3,
+    titre="Relation entre volumes oeufs et poids du poisson", 
+    xlabel="Poids du poisson", 
+    ylabel="Volume des oeufs (mm³)",
+    couleur='teal',
+    ax = axes[0]
+    )
+
+nuage_points(
+    x=df_final_true.volume_gonade, # long_poisson ou poids_poisson
+    y=df_final_true.volume_moyen_oeufs_mm3,
+    titre="Relation entre volumes oeufs et volume de la gonade", 
+    xlabel="Volume de la gonade", 
+    ylabel="Volume des oeufs (mm³)",
+    couleur='teal',
+    ax = axes[1]
+    )
+
+plt.tight_layout()
+plt.show()
+
+print(f"Corrélation oeufs / gonade : {df_final_true.volume_moyen_oeufs_mm3.corr(df_final_true.volume_gonade)}") # Corrélation
+print(f"Corrélation oeufs / poids : {df_final_true.volume_moyen_oeufs_mm3.corr(df_final_true.poids_poisson)}") # Corrélation
+```
+
+## Distribution de la fécondité
+
+```{python}
+df_final_true_NA = df_final_true.dropna(subset=["fecondite"])
+
+print(f"Nombre de poissons avec une fécondité calculable : {len(df_final_true_NA)} sur {len(df_final_true)}")
+```
+
+
+```{python}
+distribution(
+    df_final_true_NA.fecondite,
+    "Distribution de la fécondité",
+    "Nombre d'oeufs",
+    couleur='teal',
+    nombre_graduations_x = 10,
+    nombre_barres=15
+)
+```
+
+## Relations entre la fécondité et les caractéristiques des poissons
+
+```{python}
+fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+
+nuage_points(
+    x=df_final_true_NA.long_poisson, # long_poisson ou poids_poisson
+    y=df_final_true_NA.fecondite,
+    titre="Relation fécondité / longueur du poisson", 
+    xlabel="Longueur du poisson", 
+    ylabel="Fecondité",
+    couleur='teal',
+    ax=axes[0]
+    )
+
+nuage_points(
+    x=df_final_true_NA.poids_poisson, # long_poisson ou poids_poisson
+    y=df_final_true_NA.fecondite,
+    titre="Relation fécondité / poids du poisson", 
+    xlabel="Poids du poisson", 
+    ylabel="Fecondité",
+    couleur='teal',
+    ax=axes[1]
+    )
+
+plt.tight_layout()
+plt.show()
+
+print(f"Corrélation fécondité / longueur : {df_final_true_NA.fecondite.corr(df_final_true_NA.long_poisson)}") # Corrélation
+print(f"Corrélation fécondité / poids : {df_final_true_NA.fecondite.corr(df_final_true_NA.poids_poisson)}") # Corrélation
+```

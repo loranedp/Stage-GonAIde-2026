@@ -15,7 +15,7 @@ import torchvision.transforms.functional as TF
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
-from utils.stats_fct import overlay_mask
+from utils.stats_fct import overlay_colored_mask, overlay_mask
 
 
 # ============================ 2. Définition des chemins et paramètres ============================
@@ -37,12 +37,22 @@ CROP = (85, 33, 510, 380)
 
 def image_id_from_prediction(mask_path):
     match = re.fullmatch(r'pred_fold_\d+_(.+)\.txt', mask_path.name)
-    if match is None:
-        raise ValueError(f'Nom de prédiction inattendu : {mask_path.name}')
-    return match.group(1)
+    if match is not None:
+        return match.group(1)
+    match = re.fullmatch(r'pred_(.+)\.txt', mask_path.name)
+    if match is not None:
+        return match.group(1)
+    raise ValueError(f'Nom de prédiction inattendu : {mask_path.name}')
 
-def mask_from_yolo_file(mask_path, num_classes, width, height):
-    mask = np.zeros((num_classes, height, width), dtype=np.float32)
+def mask_from_yolo_file(mask_path, num_classes, width, height,
+                        preserve_instances=False):
+    """Rasterise une prédiction normalisée dans le repère du crop."""
+    mask_shape = (height, width) if preserve_instances else (
+        num_classes, height, width
+    )
+    mask_dtype = np.int32 if preserve_instances else np.float32
+    mask = np.zeros(mask_shape, dtype=mask_dtype)
+    instance_id = 0
     with mask_path.open('r') as file:
         for line in file:
             if not line.strip():
@@ -56,16 +66,34 @@ def mask_from_yolo_file(mask_path, num_classes, width, height):
                 continue
 
             coords = np.asarray(parts[1:], dtype=np.float32).reshape(-1, 2)
+            if np.any((coords < 0) | (coords > 1)):
+                raise ValueError(
+                    f'Coordonnées YOLO hors de [0, 1] dans {mask_path}'
+                )
             coords[:, 0] *= width
             coords[:, 1] *= height
-            cv2.fillPoly(mask[class_id], [coords.astype(np.int32)], 1.0)
+            if preserve_instances:
+                instance_id += 1
+                cv2.fillPoly(
+                    mask, [np.rint(coords).astype(np.int32)], instance_id
+                )
+                continue
+            cv2.fillPoly(
+                mask[class_id], [np.rint(coords).astype(np.int32)], 1.0
+            )
     return torch.from_numpy(mask)
 
-def mask_from_source_label(label_path, num_classes, original_size, crop):
+def mask_from_source_label(label_path, num_classes, original_size, crop,
+                           preserve_instances=False):
     """Charge un label YOLO original et le reprojette dans le crop affiché."""
     original_width, original_height = original_size
     crop_x, crop_y, crop_width, crop_height = crop
-    mask = np.zeros((num_classes, crop_height, crop_width), dtype=np.float32)
+    mask_shape = (crop_height, crop_width) if preserve_instances else (
+        num_classes, crop_height, crop_width
+    )
+    mask_dtype = np.int32 if preserve_instances else np.float32
+    mask = np.zeros(mask_shape, dtype=mask_dtype)
+    instance_id = 0
 
     if not label_path.exists():
         return torch.from_numpy(mask)
@@ -85,9 +113,24 @@ def mask_from_source_label(label_path, num_classes, original_size, crop):
             coords = np.asarray(parts[1:], dtype=np.float32).reshape(-1, 2)
             coords[:, 0] = coords[:, 0] * original_width - crop_x
             coords[:, 1] = coords[:, 1] * original_height - crop_y
+            if preserve_instances:
+                instance_id += 1
+                cv2.fillPoly(
+                    mask, [np.rint(coords).astype(np.int32)], instance_id
+                )
+                continue
             cv2.fillPoly(mask[class_id], [np.rint(coords).astype(np.int32)], 1.0)
 
     return torch.from_numpy(mask)
+
+
+def overlay_egg_instances(image_tensor, instance_mask, alpha=0.4,
+                          target_size=None):
+    """Colore chaque œuf sans dessiner de contour."""
+    return overlay_colored_mask(
+        image_tensor, instance_mask, alpha=alpha, dataset_name='oeufs',
+        target_size=target_size
+    )
 
 
 def prediction_sources(task_name):
@@ -113,6 +156,7 @@ def prediction_sources(task_name):
 
 for task_name, task_config in TASKS.items():
     num_classes = task_config['num_classes']
+    preserve_instances = task_name == 'oeufs'
     image_dir = IMAGE_ROOT / task_config['image_dir']
     output_dir = OUTPUT_ROOT / task_name
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -141,12 +185,19 @@ for task_name, task_config in TASKS.items():
 
         label_path = LABEL_ROOT / task_config['image_dir'] / f'{image_id}.txt'
         true_mask_tensor = mask_from_source_label(
-            label_path, num_classes, original_image.size, CROP
+            label_path, num_classes, original_image.size, CROP,
+            preserve_instances=preserve_instances
         )
-        true_display = overlay_mask(
-            image_tensor, true_mask_tensor, alpha=0.4,
-            target_size=image.size
-        ) if label_path.exists() else None
+        if label_path.exists():
+            overlay_function = (
+                overlay_egg_instances if preserve_instances else overlay_mask
+            )
+            true_display = overlay_function(
+                image_tensor, true_mask_tensor, alpha=0.4,
+                target_size=image.size
+            )
+        else:
+            true_display = None
 
         displays = []
         model_names = []
@@ -155,11 +206,15 @@ for task_name, task_config in TASKS.items():
             if mask_path is None:
                 continue
             mask_tensor = mask_from_yolo_file(
-                mask_path, num_classes, width, height
+                mask_path, num_classes, width, height,
+                preserve_instances=preserve_instances
+            )
+            overlay_function = (
+                overlay_egg_instances if preserve_instances else overlay_mask
             )
             displays.append(
-                overlay_mask(image_tensor, mask_tensor, alpha=0.4,
-                             target_size=image.size)
+                overlay_function(image_tensor, mask_tensor, alpha=0.4,
+                                 target_size=image.size)
             )
             model_names.append(source_name)
 
