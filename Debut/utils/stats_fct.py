@@ -7,60 +7,136 @@ import cv2
 from PIL import Image
 from matplotlib.colors import BoundaryNorm, ListedColormap
 from matplotlib.patches import Patch
+from matplotlib.ticker import MaxNLocator
 
 
-def distribution(donnees, titre="Distribution", xlabel="Valeurs", couleur='cornflowerblue', bins='auto'):
-    plt.figure(figsize=(6, 4))
-    
-    sns.histplot(
-        donnees, 
-        kde=True,             # Ajoute la densité de probabilité
-        color=couleur, 
-        bins=bins,          # intervalles automatiques
-        edgecolor='black',    # Bordure des colonnes
-        alpha=0.8
-    )
-    
-    # Habillage du graphique
-    plt.title(titre, fontsize=14, pad=15)
-    plt.xlabel(xlabel, fontsize=12)
-    plt.ylabel("Fréquence (Nombre d'observations)", fontsize=12)
-    
-    # Grille horizontale uniquement pour faciliter la lecture des hauteurs
-    plt.grid(True, linestyle='--', alpha=0.5, axis='y')
-    
-    # Affichage
-    plt.show()
+def distribution(
+    donnees,
+    titre="Distribution",
+    xlabel="Valeurs",
+    couleur='cornflowerblue',
+    bins='auto',
+    nombre_graduations_x=None,
+    nombre_barres=None,
+    ax=None
+):
+    """Affiche la distribution des données sous forme d'histogramme."""
 
-def nuage_points(x, y, color_var=None, titre="Nuage de points", xlabel="Axe X", ylabel="Axe Y", couleur='blue'):
-    plt.figure(figsize=(6, 4))
+    for nom, valeur in (
+        ("nombre_graduations_x", nombre_graduations_x),
+        ("nombre_barres", nombre_barres),
+    ):
+        if valeur is not None and (
+            isinstance(valeur, (bool, np.bool_))
+            or not isinstance(valeur, (int, np.integer))
+            or valeur <= 0
+        ):
+            raise ValueError(f"{nom} doit être un entier strictement positif.")
 
-    # Si une variable 'color_var' est fournie, on l'utilise pour la couleur
-    if color_var is not None:
-        scatter = plt.scatter(x, y, 
-                                c=color_var,     # La variable pour colorier les points
-                                cmap='viridis',      # La palette de couleurs
-                                alpha=0.8,           # Transparence des points
-                                edgecolor='black',   # Bordure des points
-                                s=40                 # Taille des points
-                                )
-        # Ajout d'une barre de légende pour les couleurs
-        cbar = plt.colorbar(scatter)
-        cbar.set_label('Position Écho')
+    if nombre_barres is not None:
+        bins_est_automatique = isinstance(bins, str) and bins == 'auto'
+        if not bins_est_automatique:
+            raise ValueError(
+                "Utilisez soit 'bins', soit 'nombre_barres', mais pas les deux."
+            )
+        bins = nombre_barres
+
+    # Crée une figure uniquement si aucun axe n'est fourni
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(6, 4))
+        show_plot = True
     else:
-        # Comportement par défaut si 'color_var' n'est pas renseigné
-        plt.scatter(x, y, color=couleur, alpha=0.8, edgecolor='black', s=40)
+        show_plot = False
 
-    # Ajout des éléments de texte
-    plt.title(titre, fontsize=14, pad=15)
-    plt.xlabel(xlabel, fontsize=12)
-    plt.ylabel(ylabel, fontsize=12)
-    
-    # Ajout d'une grille discrète
-    plt.grid(True, linestyle='--', alpha=0.5)
-    
-    # Affichage du graphique
-    plt.show()
+    sns.histplot(
+        donnees,
+        kde=True,
+        color=couleur,
+        bins=bins,
+        edgecolor='black',
+        alpha=0.8,
+        ax=ax
+    )
+
+    # Habillage du graphique
+    ax.set_title(titre, fontsize=14, pad=15)
+    ax.set_xlabel(xlabel, fontsize=12)
+    ax.set_ylabel("Fréquence", fontsize=12)
+
+    if nombre_graduations_x is not None:
+        ax.xaxis.set_major_locator(
+            MaxNLocator(nbins=nombre_graduations_x)
+        )
+
+    ax.grid(
+        True,
+        linestyle='--',
+        alpha=0.5,
+        axis='y'
+    )
+
+    # Affiche seulement si la fonction a créé elle-même la figure
+    if show_plot:
+        plt.tight_layout()
+        plt.show()
+
+    return ax
+
+def nuage_points(
+    x,
+    y,
+    color_var=None,
+    titre="Nuage de points",
+    xlabel="Axe X",
+    ylabel="Axe Y",
+    couleur="blue",
+    ax=None
+):
+    # Crée une figure seulement si aucun axe n'est fourni
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(6, 4))
+        show_plot = True
+    else:
+        fig = ax.figure
+        show_plot = False
+
+    # Si une variable color_var est fournie, on l'utilise pour la couleur
+    if color_var is not None:
+        scatter = ax.scatter(
+            x,
+            y,
+            c=color_var,
+            cmap="viridis",
+            alpha=0.8,
+            edgecolor="black",
+            s=40
+        )
+
+        # Barre de couleur associée à la bonne figure / au bon axe
+        cbar = fig.colorbar(scatter, ax=ax)
+        cbar.set_label("Position Écho")
+
+    else:
+        ax.scatter(
+            x,
+            y,
+            color=couleur,
+            alpha=0.8,
+            edgecolor="black",
+            s=40
+        )
+
+    ax.set_title(titre, fontsize=14, pad=15)
+    ax.set_xlabel(xlabel, fontsize=12)
+    ax.set_ylabel(ylabel, fontsize=12)
+
+    ax.grid(True, linestyle="--", alpha=0.5)
+
+    # Si la fonction a créé elle-même la figure, on l'affiche
+    if show_plot:
+        plt.show()
+
+    return ax
 
 
 def linear_regression(x, y):
@@ -136,7 +212,8 @@ def linear_regression(x, y):
     return model
 
 
-def plot_evolution_curves(df):
+
+def plot_evolution_curves(df, var1 = "augmentation_surface_gonade", var2 = "augmentation_surface_cavite"):
     # Palette de 20 couleurs distinctes
     colors = plt.cm.tab20(np.linspace(0, 1, 20))
 
@@ -146,14 +223,14 @@ def plot_evolution_curves(df):
         poisson_data = df[df['id poisson'] == poisson_id]
         plt.plot(
             poisson_data['position echo'],
-            poisson_data['augmentation_surface_gonade'],
+            poisson_data[var1],
             marker='o',
             color=colors[i % 20],
             label=f"Poisson {poisson_id}"
         )
-    plt.title("Augmentation de la surface des gonades par position d'échographie")
-    plt.xlabel('Position d\'échographie')
-    plt.ylabel('Augmentation de la surface (%)')
+    plt.title("Augmentation de la surface des gonades selon la position de l'échographie")
+    plt.xlabel('Position de l\'échographie')
+    plt.ylabel('Augmentation de la surface (en %)')
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.grid(True)
     plt.tight_layout()
@@ -165,14 +242,14 @@ def plot_evolution_curves(df):
         poisson_data = df[df['id poisson'] == poisson_id]
         plt.plot(
             poisson_data['position echo'],
-            poisson_data['augmentation_surface_cavite'],
+            poisson_data[var2],
             marker='x',
             color=colors[i % 20],
             label=f"Poisson {poisson_id}"
         )
-    plt.title("Augmentation de la surface de la cavité par position d'échographie")
-    plt.xlabel('Position d\'échographie')
-    plt.ylabel('Augmentation de la surface (%)')
+    plt.title("Augmentation de la surface de la cavité selon la position de l'échographie")
+    plt.xlabel('Position de l\'échographie')
+    plt.ylabel('Augmentation de la surface (en %)')
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.grid(True)
     plt.tight_layout()
@@ -334,8 +411,8 @@ def plot_segmentation_comparison(
 
     En mode standard, les masques sont attendus au format ``(C, H, W)`` avec
     les canaux dans l'ordre suivant : cavité, gonade, intestin. En mode œufs,
-    le masque prédit peut être une carte 2D d'identifiants d'instances ou un
-    masque binaire au format ``(1, H, W)``.
+    les masques réel et prédit peuvent être des cartes 2D d'identifiants
+    d'instances ou des masques binaires au format ``(1, H, W)``.
 
     Args:
         image: Tenseur image au format ``(C, H, W)``.
@@ -376,42 +453,37 @@ def plot_segmentation_comparison(
         return label_map
 
     if is_eggs:
-        true_mask = mask_true.detach().cpu().numpy()
-        if true_mask.ndim == 3 and true_mask.shape[0] == 1:
-            true_mask = true_mask[0]
-        elif true_mask.ndim != 2:
-            raise ValueError("Le masque réel des œufs doit avoir la forme (1, H, W) ou (H, W).")
-        true_labels = (resize_label_map(true_mask) > 0.5).astype(np.uint8)
-
-        pred_mask = mask_pred.detach().cpu().numpy()
-        if pred_mask.ndim == 3 and pred_mask.shape[0] == 1:
-            pred_labels = (
-                resize_label_map(pred_mask[0]) > 0.5
-            ).astype(np.int32)
-        elif pred_mask.ndim == 2:
-            pred_labels = np.rint(resize_label_map(pred_mask)).astype(np.int32)
-            if np.any(pred_labels < 0):
+        def egg_mask_to_label_map(mask_tensor, mask_name):
+            mask = mask_tensor.detach().cpu().numpy()
+            if mask.ndim == 3 and mask.shape[0] == 1:
+                return (resize_label_map(mask[0]) > 0.5).astype(np.int32)
+            if mask.ndim != 2:
+                raise ValueError(
+                    f"Le masque {mask_name} des œufs doit avoir la forme "
+                    "(1, H, W) ou (H, W)."
+                )
+            labels = np.rint(resize_label_map(mask)).astype(np.int32)
+            if np.any(labels < 0):
                 raise ValueError("Les identifiants d'instances doivent être positifs ou nuls.")
-        else:
-            raise ValueError(
-                "Le masque prédit des œufs doit avoir la forme (1, H, W) ou (H, W)."
+            return labels
+
+        def instance_colormap(labels):
+            displayed_instances = max(1, int(labels.max()))
+            colors = ["#000000"] + [
+                plt.cm.tab20(idx % 20) for idx in range(displayed_instances)
+            ]
+            return (
+                ListedColormap(colors),
+                BoundaryNorm(
+                    np.arange(-0.5, displayed_instances + 1.5), len(colors)
+                ),
             )
 
-        instance_count = int(pred_labels.max())
-        true_cmap = ListedColormap(["#000000", plt.cm.tab10(0)])
-        true_norm = BoundaryNorm(np.arange(-0.5, 2.5), true_cmap.N)
-        displayed_instances = max(1, instance_count)
-        pred_colors = ["#000000"] + [
-            plt.cm.tab20(idx % 20) for idx in range(displayed_instances)
-        ]
-        pred_cmap = ListedColormap(pred_colors)
-        pred_norm = BoundaryNorm(
-            np.arange(-0.5, displayed_instances + 1.5), pred_cmap.N
-        )
-        legend_handles = [
-            Patch(color=pred_colors[idx], label=f"Instance {idx}")
-            for idx in range(1, instance_count + 1)
-        ]
+        true_labels = egg_mask_to_label_map(mask_true, "réel")
+        pred_labels = egg_mask_to_label_map(mask_pred, "prédit")
+        true_cmap, true_norm = instance_colormap(true_labels)
+        pred_cmap, pred_norm = instance_colormap(pred_labels)
+        legend_handles = []
     else:
         class_names = ["Cavité", "Gonade", "Intestin"]
         class_colors = [
@@ -462,7 +534,13 @@ def plot_segmentation_comparison(
     return fig, axes
 
 # ----- Fonction pour extraire et formater en YOLO les contours d'un masque COCO ----
-def mask_to_yolo_polygons(mask_bool, class_id, target_size=(640, 480)):
+def mask_to_yolo_polygons(
+    mask_bool,
+    class_id,
+    target_size=(640, 480),
+    *,
+    largest_only=False,
+):
     lines = []
 
     mask_bool_cpu = mask_bool.cpu().numpy()
@@ -475,6 +553,8 @@ def mask_to_yolo_polygons(mask_bool, class_id, target_size=(640, 480)):
     mask_uint8 = np.ascontiguousarray(mask_np.astype(np.uint8) * 255) # S'assurer que le masque est bien au format attendu par OpenCV
     
     contours, _ = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)  # CHAIN_APPROX_NONE permet de garder tous les points du contour
+    if largest_only and contours:
+        contours = [max(contours, key=cv2.contourArea)]
     
     polygons = []
     h, w = mask_np.shape

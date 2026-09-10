@@ -250,14 +250,16 @@ def metrics_by_class(true, preds, echelle, dataset_name, egg_instance_labels=Non
         # ``echelle`` est exprimée en cm ; conversion finale en mm².
         diff_surface = (true_mean_area - predicted_mean_area).abs().unsqueeze(1)
         diff_surface *= ((echelle * 10) / true.shape[2]).unsqueeze(1) ** 2
+        missing_surface = (true_mean_area == 0) | (predicted_mean_area == 0)
+        diff_surface[missing_surface.unsqueeze(1)] = torch.nan
 
     return intersection, union,iou_per_img, dice_per_img, precision_per_img, recall_per_img, diff_surface
 
-def save_validation_masks(masks_dir, best_masks, fold):
-    """Exporte les prédictions du meilleur epoch du fold au format YOLO."""
+def save_validation_masks(masks_dir, best_masks):
+    """Exporte les prédictions du meilleur epoch au format YOLO."""
     for file_name, _true_mask, pred_mask in best_masks:
         stem = Path(file_name).stem
-        pred_path = Path(masks_dir) / f"pred_fold_{fold}_{stem}.txt"
+        pred_path = Path(masks_dir) / f"pred_{stem}.txt"
 
         with pred_path.open("w") as f_pred:
             for class_idx in range(pred_mask.shape[0]):

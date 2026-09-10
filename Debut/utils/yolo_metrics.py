@@ -86,6 +86,30 @@ def load_yolo_polygon_masks(
     return masks
 
 
+def load_yolo_polygon_instances(
+    label_path: str | Path,
+    image_shape: tuple[int, int],
+    *,
+    class_ids: Iterable[int] = (0,),
+    ignore_class_ids: Iterable[int] = (3,),
+) -> np.ndarray:
+    """Return a 2D map whose positive values identify YOLO instances."""
+
+    height, width = image_shape
+    instance_map = np.zeros((height, width), dtype=np.int32)
+    selected = set(int(class_id) for class_id in class_ids)
+    ignored = set(int(class_id) for class_id in ignore_class_ids)
+    next_instance_id = 1
+
+    for class_id, mask, _ in _read_polygons(label_path, image_shape):
+        if class_id not in selected or class_id in ignored:
+            continue
+        instance_map[mask > 0] = next_instance_id
+        next_instance_id += 1
+
+    return instance_map
+
+
 def semantic_result_to_masks(
     semantic_map: np.ndarray,
     result_names: Mapping[int, str],
@@ -108,6 +132,45 @@ def semantic_result_to_masks(
     )
 
 
+def result_to_instance_masks(
+    result,
+    class_names: Iterable[str],
+) -> list[tuple[int, np.ndarray]]:
+    """Convert an Ultralytics result to independent instance masks.
+
+    The returned class indices follow ``class_names`` rather than the model's
+    internal identifiers. Keeping one mask per detection prevents touching
+    instances from being merged before they are exported as YOLO polygons.
+    """
+
+    height, width = result.orig_shape
+    if result.masks is None or result.boxes is None:
+        return []
+
+    target_by_name = {
+        class_name: class_index
+        for class_index, class_name in enumerate(class_names)
+    }
+    names_by_id = {
+        int(class_id): class_name for class_id, class_name in result.names.items()
+    }
+    class_ids = result.boxes.cls.detach().cpu().numpy().astype(int)
+    instances = []
+
+    for class_id, polygon in zip(class_ids, result.masks.xy):
+        target_index = target_by_name.get(names_by_id.get(class_id))
+        points = np.asarray(polygon)
+        if target_index is None or points.ndim != 2 or points.shape[0] < 3:
+            continue
+
+        instance_mask = np.zeros((height, width), dtype=np.uint8)
+        points = np.rint(points).astype(np.int32)
+        cv2.fillPoly(instance_mask, [points], 1)
+        instances.append((target_index, instance_mask))
+
+    return instances
+
+
 def result_to_masks(result, class_names: Iterable[str], num_classes: int, *, semantic: bool) -> np.ndarray:
     """Convert one Ultralytics result to channels ordered by ``class_names``."""
 
@@ -118,20 +181,22 @@ def result_to_masks(result, class_names: Iterable[str], num_classes: int, *, sem
 
     height, width = result.orig_shape
     masks = np.zeros((num_classes, height, width), dtype=np.uint8)
-    if result.masks is None or result.boxes is None:
-        return masks
-
-    names_by_id = {int(class_id): name for class_id, name in result.names.items()}
-    class_ids = result.boxes.cls.detach().cpu().numpy().astype(int)
-    for instance_index, class_id in enumerate(class_ids):
-        class_name = names_by_id.get(class_id)
-        if class_name not in class_names:
-            continue
-        target_index = class_names.index(class_name)
-        points = np.rint(result.masks.xy[instance_index]).astype(np.int32)
-        if len(points) >= 3:
-            cv2.fillPoly(masks[target_index], [points], 1)
+    for target_index, instance_mask in result_to_instance_masks(result, class_names):
+        masks[target_index] = np.maximum(masks[target_index], instance_mask)
     return masks
+
+
+def result_to_instance_map(result, class_names: Iterable[str]) -> np.ndarray:
+    """Convert the instance masks of one Ultralytics result to a 2D ID map."""
+
+    height, width = result.orig_shape
+    instance_map = np.zeros((height, width), dtype=np.int32)
+    for instance_id, (_, instance_mask) in enumerate(
+        result_to_instance_masks(result, class_names), start=1
+    ):
+        instance_map[instance_mask > 0] = instance_id
+
+    return instance_map
 
 
 def metrics_from_counts(

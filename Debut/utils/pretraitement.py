@@ -110,7 +110,6 @@ def rename(path, format):
             if len(split_name) == 5:
                 new_file_name = "_".join(split_name[0:4])
                 new_file_name = f"{new_file_name.replace("-",".")}.{format}"
-                print(new_file_name)
 
             os.rename(path + file_name, path + new_file_name)
 
@@ -235,7 +234,7 @@ def delete_classes_YOLO(input_dir, output_dir, excluded_classes):
 
 # Copie les labels avec toutes les classes dans un sous-dossier dédié
 source_dir = "../data/labels/YOLO/oeufs"
-backup_dir = os.path.join(source_dir, "labels_2_classes")
+backup_dir = os.path.join(source_dir, "oeufs2classes")
 
 # Remplace entièrement la copie précédente si elle existe
 if os.path.exists(backup_dir):
@@ -244,7 +243,7 @@ os.makedirs(backup_dir)
 
 # Copie le contenu source sans recopier le sous-dossier de destination
 for item in os.listdir(source_dir):
-    if item == "labels_2_classes":
+    if item == "oeufs2classes":
         continue
 
     source_item = os.path.join(source_dir, item)
@@ -460,7 +459,7 @@ sauvegarder_visualisations(
 )
 sauvegarder_visualisations(
     images_dir="../data/images/oeufs",
-    labels_dir="../data/labels/YOLO/oeufs/labels_2_classes",
+    labels_dir="../data/labels/YOLO/oeufs/oeufs2classes",
     output_dir=visualisation_dir / "oeufs",
     num_classes=2,
 )
