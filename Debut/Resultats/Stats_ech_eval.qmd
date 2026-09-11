@@ -42,6 +42,9 @@ cavite_true_root = "data/labels/YOLO/cavite"
 cavite_pred_root = "UNet/masks/eval/UNet/3classes"
 eggs_true_root = "data/labels/YOLO/oeufs"
 eggs_pred_root = "YOLO26/masks/eval/instance/oeufs"
+# Les exports YOLO et UNet sont normalisés sur le crop (85, 33, 510, 380).
+# L'échelle physique reste référencée à la hauteur de l'image originale.
+prediction_mask_size = (510, 380)
 
 resultats_cavite_true = []
 resultats_cavite_pred = []
@@ -54,7 +57,7 @@ for id in unique_id:
     echos_poisson = df[df.cap_id == id]
 
     res_cavite_pred = calculate_volumes(
-        echos_poisson, id, f"{cavite_pred_root}/pred_"
+        echos_poisson, id, f"{cavite_pred_root}/pred_", mask_size=prediction_mask_size
     )
     res_cavite_true = calculate_volumes(
         echos_poisson, id, f"{cavite_true_root}/"
@@ -63,7 +66,7 @@ for id in unique_id:
         echos_poisson, id, f"{eggs_true_root}/"
     )
     res_oeufs_pred, _ = calculate_eggs_volumes(
-        echos_poisson, id, f"{eggs_pred_root}/pred_"
+        echos_poisson, id, f"{eggs_pred_root}/pred_", mask_size=prediction_mask_size
     )
 
     resultats_cavite_true.append(pd.DataFrame(res_cavite_true))
@@ -100,7 +103,7 @@ for _, echo in df_echos_oeufs.iterrows():
         continue
 
     _, surfaces_oeufs_mm2_pred = calculate_eggs_areas(
-        str(mask_pred_path), str(image_path), echo["echelle"]
+        str(mask_pred_path), str(image_path), echo["echelle"], mask_size=prediction_mask_size
     )
     _, surfaces_oeufs_mm2_true = calculate_eggs_areas(
         str(mask_true_path), str(image_path), echo["echelle"]
@@ -130,14 +133,6 @@ for _, echo in df_echos_oeufs.iterrows():
 
 df_oeufs_individuels_true = pd.DataFrame(oeufs_individuels_true)
 df_oeufs_individuels_pred = pd.DataFrame(oeufs_individuels_pred)
-
-df_oeufs_individuels = pd.merge(
-    df_oeufs_individuels_pred, 
-    df_oeufs_individuels_true, 
-    on=["id poisson", "image_id"], 
-    suffixes=("_pred", "_true"), 
-    how="inner"
-)
 ```
 
 ```{python}
@@ -300,8 +295,8 @@ nuage_points(
     y=df_cavite.surface_gonade_true,
     color_var=df_cavite['position echo'],  # Utilisation de la variable 'position echo' pour colorier les points
     titre="Relation surfaces cavité / gonades", 
-    xlabel="Surface de la cavité", 
-    ylabel="Surface des gonades",
+    xlabel="Surface de la cavité (en cm2)", 
+    ylabel="Surface des gonades (en cm2)",
     couleur='teal',
     ax=axes[0]
     )
@@ -334,8 +329,8 @@ nuage_points(
     y=df_cavite.surface_gonade_pred,
     color_var=df_cavite['position echo'],  # Utilisation de la variable 'position echo' pour colorier les points
     titre="Relation surfaces cavité / gonades", 
-    xlabel="Surface de la cavité", 
-    ylabel="Surface des gonades",
+    xlabel="Surface de la cavité (en cm2)", 
+    ylabel="Surface des gonades (en cm2)",
     couleur='teal',
     ax=axes[0]
     )
@@ -366,17 +361,17 @@ fig, axes = plt.subplots(1, 2, figsize=(10, 4))
 distribution(
     df_final.volume_gonade_true, 
     titre = "Annotations", 
-    xlabel = "Volume des gonades (en cm3)", 
-    nombre_graduations_x = 15,
+    xlabel = "Volume des gonades (en cm³)", 
     nombre_barres=15,
+    axe_x_fixe = (0, 14, 1),
     ax = axes[0]
     )
 
 distribution(
     df_final.volume_gonade_pred, 
     titre = "Prédictions", 
-    xlabel = "Volume des gonades (en cm3)", 
-    nombre_graduations_x = 10,
+    xlabel = "Volume des gonades (en cm³)",
+    axe_x_fixe = (0, 14, 1),
     nombre_barres=15,
     ax = axes[1]
     )
@@ -453,40 +448,72 @@ print(f"Corrélation prédictions : {df_cavite.volume_cavite_pred.corr(df_cavite
 ```{python}
 # ------------ Calcul du volume des oeufs ------------
 # Distribution des volumes individuels des œufs pour chaque échographie
-ordre_images = sorted(df_oeufs_individuels["image_id"].unique())
-ordre_poissons = sorted(df_oeufs_individuels["id poisson"].unique())
-palette_poissons = dict(zip(
-    ordre_poissons, sns.color_palette("Set2", n_colors=len(ordre_poissons))
+ordre_images_true = sorted(df_oeufs_individuels_true["image_id"].unique())
+ordre_images_pred = sorted(df_oeufs_individuels_pred["image_id"].unique())
+ordre_poissons_true = sorted(df_oeufs_individuels_true["id poisson"].unique())
+ordre_poissons_pred = sorted(df_oeufs_individuels_pred["id poisson"].unique())
+palette_poissons_true = dict(zip(
+    ordre_poissons_true, sns.color_palette("Set2", n_colors=len(ordre_poissons_true))
+))
+palette_poissons_pred = dict(zip(
+    ordre_poissons_pred, sns.color_palette("Set2", n_colors=len(ordre_poissons_pred))
 ))
 
 # Identification des œufs extrêmes selon la règle du boxplot, par échographie
-df_oeufs_individuels_extremes = df_oeufs_individuels.copy()
-volumes_par_image = df_oeufs_individuels_extremes.groupby("image_id")["volume_oeuf_mm3_pred"]
+df_oeufs_individuels_extremes_true = df_oeufs_individuels_true.copy()
+df_oeufs_individuels_extremes_pred = df_oeufs_individuels_pred.copy()
+volumes_par_image_true = df_oeufs_individuels_extremes_true.groupby("image_id")["volume_oeuf_mm3"]
+volume_par_image_pred = df_oeufs_individuels_extremes_pred.groupby("image_id")["volume_oeuf_mm3"]
 
-q1 = volumes_par_image.transform(lambda volumes: volumes.quantile(0.25))
-q3 = volumes_par_image.transform(lambda volumes: volumes.quantile(0.75))
-iqr = q3 - q1
-df_oeufs_individuels_extremes["extreme_inferieur"] = (
-    df_oeufs_individuels_extremes["volume_oeuf_mm3_pred"] < q1 - 1.5 * iqr
+q1_true = volumes_par_image_true.transform(lambda volumes: volumes.quantile(0.25))
+q1_pred = volume_par_image_pred.transform(lambda volumes: volumes.quantile(0.25))
+q3_true = volumes_par_image_true.transform(lambda volumes: volumes.quantile(0.75))
+q3_pred = volume_par_image_pred.transform(lambda volumes: volumes.quantile(0.75))
+iqr_true = q3_true - q1_true
+iqr_pred = q3_pred - q1_pred
+df_oeufs_individuels_extremes_true["extreme_inferieur"] = (
+    df_oeufs_individuels_extremes_true["volume_oeuf_mm3"] < q1_true - 1.5 * iqr_true
 )
-df_oeufs_individuels_extremes["extreme_superieur"] = (
-    df_oeufs_individuels_extremes["volume_oeuf_mm3_pred"] > q3 + 1.5 * iqr
+df_oeufs_individuels_extremes_true["extreme_superieur"] = (
+    df_oeufs_individuels_extremes_true["volume_oeuf_mm3"] > q3_true + 1.5 * iqr_true
+)
+df_oeufs_individuels_extremes_pred["extreme_inferieur"] = (
+    df_oeufs_individuels_extremes_pred["volume_oeuf_mm3"] < q1_pred - 1.5 * iqr_pred
+)
+df_oeufs_individuels_extremes_pred["extreme_superieur"] = (
+    df_oeufs_individuels_extremes_pred["volume_oeuf_mm3"] > q3_pred + 1.5 * iqr_pred
 )
 
-resume_extremes = (
-    df_oeufs_individuels_extremes.groupby("image_id")
+resume_extremes_true = (
+    df_oeufs_individuels_extremes_true.groupby("image_id")
     .agg(
-        nombre_oeufs=("volume_oeuf_mm3_pred", "size"),
+        nombre_oeufs=("volume_oeuf_mm3", "size"),
         nombre_extremes_inferieurs=("extreme_inferieur", "sum"),
         nombre_extremes_superieurs=("extreme_superieur", "sum"),
     )
-    .reindex(ordre_images)
+    .reindex(ordre_images_true)
 )
-resume_extremes["proportion_extremes_inferieurs"] = (
-    100 * resume_extremes["nombre_extremes_inferieurs"] / resume_extremes["nombre_oeufs"]
+resume_extremes_pred = (
+    df_oeufs_individuels_extremes_pred.groupby("image_id")
+    .agg(
+        nombre_oeufs=("volume_oeuf_mm3", "size"),
+        nombre_extremes_inferieurs=("extreme_inferieur", "sum"),
+        nombre_extremes_superieurs=("extreme_superieur", "sum"),
+    )
+    .reindex(ordre_images_pred)
 )
-resume_extremes["proportion_extremes_superieurs"] = (
-    100 * resume_extremes["nombre_extremes_superieurs"] / resume_extremes["nombre_oeufs"]
+resume_extremes_true["proportion_extremes_inferieurs"] = (
+    100 * resume_extremes_true["nombre_extremes_inferieurs"] / resume_extremes_true["nombre_oeufs"]
+)
+resume_extremes_true["proportion_extremes_superieurs"] = (
+    100 * resume_extremes_true["nombre_extremes_superieurs"] / resume_extremes_true["nombre_oeufs"]
+)
+
+resume_extremes_pred["proportion_extremes_inferieurs"] = (
+    100 * resume_extremes_pred["nombre_extremes_inferieurs"] / resume_extremes_pred["nombre_oeufs"]
+)
+resume_extremes_pred["proportion_extremes_superieurs"] = (
+    100 * resume_extremes_pred["nombre_extremes_superieurs"] / resume_extremes_pred["nombre_oeufs"]
 )
 ```
 
@@ -496,20 +523,19 @@ resume_extremes["proportion_extremes_superieurs"] = (
 fig, axes = plt.subplots(1, 2, figsize=(11, 4))
 
 distribution(
-    df_oeufs_individuels.volume_oeuf_mm3_true,
+    df_oeufs_individuels_true.volume_oeuf_mm3,
     titre="Annotations",
     xlabel = "Volume des oeufs (en mm³)",
-    nombre_graduations_x = 13,
-    nombre_barres=30,
-    ax = axes[0]
+    nombre_graduations_x = 15,
+    ax = axes[0],
+    axe_x_fixe = (0, 34, 2)
 )
 
 distribution(
-    df_oeufs_individuels.volume_oeuf_mm3_pred,
+    df_oeufs_individuels_pred.volume_oeuf_mm3,
     titre="Prédictions",
     xlabel = "Volume des oeufs (en mm³)",
-    nombre_graduations_x = 13,
-    nombre_barres=30,
+    axe_x_fixe = (0, 34, 2),
     ax = axes[1]
 )
 
@@ -518,23 +544,98 @@ plt.show()
 ```
 
 
+## Volume du i-ème plus gros œuf par poisson - Annotations
+
+```{python}
+# Les œufs de toutes les échographies d'un même poisson sont regroupés,
+# puis classés du plus grand au plus petit avant le tracé du volume individuel.
+df_volumes_valides = df_oeufs_individuels_true.loc[
+    df_oeufs_individuels_true["volume_oeuf_mm3"].notna()
+    & np.isfinite(df_oeufs_individuels_true["volume_oeuf_mm3"])
+    & (df_oeufs_individuels_true["volume_oeuf_mm3"] > 0)
+].copy()
+
+# Répartition en trois groupes équilibrés selon le volume moyen de tous les œufs.
+moyennes_par_poisson = (
+    df_volumes_valides.groupby("id poisson")["volume_oeuf_mm3"]
+    .mean()
+    .sort_values()
+)
+poissons_avec_oeufs = moyennes_par_poisson.index.tolist()
+groupes_poissons = [
+    groupe.tolist() for groupe in np.array_split(poissons_avec_oeufs, 3) if len(groupe)
+]
+palette_moyennes = dict(zip(
+    poissons_avec_oeufs,
+    sns.color_palette("Set2", n_colors=len(poissons_avec_oeufs)),
+))
+
+fig, axes = plt.subplots(
+    len(groupes_poissons), 1,
+    figsize=(12, 4 * len(groupes_poissons)),
+    sharex=True,
+    squeeze=False,
+)
+axes = axes[:, 0]
+maximum_oeufs = 0
+
+for numero_groupe, (ax, groupe) in enumerate(zip(axes, groupes_poissons), start=1):
+    for id_poisson in groupe:
+        volumes = (
+            df_volumes_valides.loc[
+                df_volumes_valides["id poisson"] == id_poisson,
+                "volume_oeuf_mm3",
+            ]
+            .sort_values(ascending=False)
+        )
+        nombre_oeufs = np.arange(1, len(volumes) + 1)
+        maximum_oeufs = max(maximum_oeufs, len(volumes))
+        ax.plot(
+            nombre_oeufs,
+            volumes.to_numpy(),
+            marker="o",
+            markersize=3,
+            linewidth=1.5,
+            color=palette_moyennes[id_poisson],
+            label=str(id_poisson),
+        )
+
+    borne_min = moyennes_par_poisson.loc[groupe].min()
+    borne_max = moyennes_par_poisson.loc[groupe].max()
+    ax.set_title(
+        f"Groupe {numero_groupe} — volume moyen global : "
+        f"{borne_min:.1f} à {borne_max:.1f} mm³"
+    )
+    ax.set_ylabel("Volume de l'œuf (mm³)")
+    ax.grid(axis="both", alpha=0.2)
+    ax.legend(title="ID poisson", bbox_to_anchor=(1.01, 1), loc="upper left")
+
+axes[-1].set_xlabel("Nombre d'œufs retenus (du plus grand au plus petit)")
+axes[-1].set_xlim(left=1)
+if maximum_oeufs:
+    axes[-1].set_xticks(np.arange(1, maximum_oeufs + 1))
+fig.suptitle("Volume du i-ème plus gros œuf par poisson — Annotations", y=1.02)
+fig.tight_layout()
+plt.show()
+```
+
 ## Distribution du nombre d'œufs par échographie
 
 ```{python}
 fig, axes = plt.subplots(1, 2, figsize=(11, 4))
 
 distribution(
-    resume_extremes.nombre_oeufs,
+    resume_extremes_true.nombre_oeufs,
     titre = "Annotations",
     xlabel = "Nombre d'œufs",
     nombre_graduations_x = 15,
-    nombre_barres=13,
+    axe_x_fixe = (0, 28, 2),
     couleur = "orange",
     ax = axes[0]
 )
 
 distribution(
-    resume_extremes.nombre_oeufs,
+    resume_extremes_pred.nombre_oeufs,
     titre = "Prédictions",
     xlabel = "Nombre d'œufs",
     nombre_graduations_x = 15,
@@ -546,7 +647,7 @@ distribution(
 plt.tight_layout()
 plt.show()
 
-print(f"Nombre moyen d'œufs par échographie : {resume_extremes.nombre_oeufs.mean():.2f} (Q1 : {resume_extremes.nombre_oeufs.quantile(0.25):.0f}, Q3 : {resume_extremes.nombre_oeufs.quantile(0.75):.0f})")
+print(f"Nombre moyen d'œufs par échographie : {resume_extremes_pred.nombre_oeufs.mean():.2f} (Q1 : {resume_extremes_pred.nombre_oeufs.quantile(0.25):.0f}, Q3 : {resume_extremes_pred.nombre_oeufs.quantile(0.75):.0f})")
 ```
 
 
@@ -556,8 +657,8 @@ fig, ax = plt.subplots(figsize=(17, 7))
 sns.boxplot(
     data=df_oeufs_individuels_true,
     x="image_id", y="volume_oeuf_mm3",
-    hue="id poisson", order=ordre_images, hue_order=ordre_poissons,
-    palette=palette_poissons, dodge=False, ax=ax,
+    hue="id poisson", order=ordre_images_true, hue_order=ordre_poissons_true,
+    palette=palette_poissons_true, dodge=False, ax=ax,
 )
 ax.set(
     title="Distribution du volume des œufs par échographie",
@@ -580,8 +681,8 @@ fig, ax = plt.subplots(figsize=(17, 7))
 sns.boxplot(
     data=df_oeufs_individuels_pred,
     x="image_id", y="volume_oeuf_mm3",
-    hue="id poisson", order=ordre_images, hue_order=ordre_poissons,
-    palette=palette_poissons, dodge=False, ax=ax,
+    hue="id poisson", order=ordre_images_pred, hue_order=ordre_poissons_pred,
+    palette=palette_poissons_pred, dodge=False, ax=ax,
 )
 ax.set(
     title="Distribution du volume des œufs par échographie",
@@ -599,20 +700,73 @@ plt.show()
 ```
 
 
+## Comparaison du volume des œufs par poisson : annotations vs prédictions
+
 ```{python}
-positions = np.arange(len(resume_extremes))
+from matplotlib.patches import Patch
+
+ordre_poissons_comparaison = sorted(
+    set(df_oeufs_individuels_true["id poisson"])
+    | set(df_oeufs_individuels_pred["id poisson"])
+)
+palette_poissons_comparaison = dict(zip(
+    ordre_poissons_comparaison,
+    sns.color_palette("Set2", n_colors=len(ordre_poissons_comparaison)),
+))
+
+fig, ax = plt.subplots(
+    figsize=(max(10, 0.45 * len(ordre_poissons_comparaison)), 7),
+    constrained_layout=True,
+)
+for position, poisson in enumerate(ordre_poissons_comparaison):
+    for donnees, decalage, hachures in (
+        (df_oeufs_individuels_true, -0.2, ""),
+        (df_oeufs_individuels_pred, 0.2, "///"),
+    ):
+        volumes = donnees.loc[
+            donnees["id poisson"] == poisson, "volume_oeuf_mm3"
+        ].dropna()
+        if volumes.empty:
+            continue
+        ax.boxplot(
+            volumes, positions=[position + decalage], widths=0.35,
+            patch_artist=True, manage_ticks=False, showfliers=True,
+            boxprops={
+                "facecolor": palette_poissons_comparaison[poisson],
+                "hatch": hachures,
+            },
+            medianprops={"color": "black"},
+        )
+
+ax.set_xticks(np.arange(len(ordre_poissons_comparaison)))
+ax.set_xticklabels(ordre_poissons_comparaison, rotation=90, fontsize=8)
+ax.set(
+    title="",
+    xlabel="ID poisson",
+    ylabel="Volume individuel d'un œuf (mm³)",
+)
+ax.grid(axis="y", alpha=0.2)
+ax.legend(handles=[
+    Patch(facecolor="white", edgecolor="black", label="Annotations"),
+    Patch(facecolor="white", edgecolor="black", hatch="///", label="Prédictions"),
+])
+plt.show()
+```
+
+```{python}
+positions = np.arange(len(resume_extremes_pred))
 couleurs_extremes = {"Inférieurs": "#4C78A8", "Supérieurs": "#E45756"}
 fig, (ax_nombres, ax_proportions) = plt.subplots(
     2, 1, figsize=(12, 8), sharex=True, constrained_layout=True
 )
 
 ax_nombres.bar(
-    positions, resume_extremes["nombre_extremes_inferieurs"],
+    positions, resume_extremes_pred["nombre_extremes_inferieurs"],
     color=couleurs_extremes["Inférieurs"], label="Extrêmes inférieurs",
 )
 ax_nombres.bar(
-    positions, resume_extremes["nombre_extremes_superieurs"],
-    bottom=resume_extremes["nombre_extremes_inferieurs"],
+    positions, resume_extremes_pred["nombre_extremes_superieurs"],
+    bottom=resume_extremes_pred["nombre_extremes_inferieurs"],
     color=couleurs_extremes["Supérieurs"], label="Extrêmes supérieurs",
 )
 ax_nombres.set(
@@ -621,12 +775,12 @@ ax_nombres.set(
 )
 
 ax_proportions.bar(
-    positions, resume_extremes["proportion_extremes_inferieurs"],
+    positions, resume_extremes_pred["proportion_extremes_inferieurs"],
     color=couleurs_extremes["Inférieurs"], label="Extrêmes inférieurs",
 )
 ax_proportions.bar(
-    positions, resume_extremes["proportion_extremes_superieurs"],
-    bottom=resume_extremes["proportion_extremes_inferieurs"],
+    positions, resume_extremes_pred["proportion_extremes_superieurs"],
+    bottom=resume_extremes_pred["proportion_extremes_inferieurs"],
     color=couleurs_extremes["Supérieurs"], label="Extrêmes supérieurs",
 )
 ax_proportions.set(
@@ -635,7 +789,7 @@ ax_proportions.set(
     ylabel="Proportion d'œufs (%)",
 )
 ax_proportions.set_ylim(0, 100)
-ax_proportions.set_xticks(positions, resume_extremes.index, rotation=90, fontsize=8)
+ax_proportions.set_xticks(positions, resume_extremes_pred.index, rotation=90, fontsize=8)
 
 for ax in (ax_nombres, ax_proportions):
     ax.grid(axis="y", alpha=0.2)
@@ -645,17 +799,17 @@ plt.show()
 ```
 
 
-## Relation entre le volume des oeufs et les caractéristiques des poissons
+## Relation entre le volume des oeufs moyens et des gonades
 
 
 ```{python}
 fig, axes = plt.subplots(1, 2, figsize=(12, 4))
 
 nuage_points(
-    x=df_final.poids_poisson, # long_poisson ou poids_poisson
-    y=df_final.volume_moyen_oeufs_mm3_pred,
-    titre="Relation entre volumes oeufs et poids du poisson", 
-    xlabel="Poids du poisson", 
+    x=df_final.volume_gonade_true, # long_poisson ou poids_poisson
+    y=df_final.volume_moyen_oeufs_mm3_true,
+    titre="Annotations", 
+    xlabel="Volume de la gonade", 
     ylabel="Volume des oeufs (mm³)",
     couleur='teal',
     ax = axes[0]
@@ -664,7 +818,7 @@ nuage_points(
 nuage_points(
     x=df_final.volume_gonade_pred, # long_poisson ou poids_poisson
     y=df_final.volume_moyen_oeufs_mm3_pred,
-    titre="Relation entre volumes oeufs et volume de la gonade", 
+    titre="Prédictions", 
     xlabel="Volume de la gonade", 
     ylabel="Volume des oeufs (mm³)",
     couleur='teal',
@@ -674,38 +828,57 @@ nuage_points(
 plt.tight_layout()
 plt.show()
 
-print(f"Corrélation oeufs / gonade : {df_final.volume_moyen_oeufs_mm3_pred.corr(df_final.volume_gonade_pred)}") # Corrélation
-print(f"Corrélation oeufs / poids : {df_final.volume_moyen_oeufs_mm3_pred.corr(df_final.poids_poisson)}") # Corrélation
+print(f"Corrélation annotations : {df_final.volume_moyen_oeufs_mm3_true.corr(df_final.volume_gonade_true)}") # Corrélation
+print(f"Corrélation prédictions : {df_final.volume_moyen_oeufs_mm3_pred.corr(df_final.volume_gonade_pred)}") # Corrélation
 ```
 
 ## Distribution de la fécondité
 
 ```{python}
-df_final_NA = df_final.dropna(subset=["fecondite_pred"])
+df_final_NA_pred = df_final.dropna(subset=["fecondite_pred"])
+df_final_NA_true = df_final.dropna(subset=["fecondite_true"])
 
-print(f"Nombre de poissons avec une fécondité calculable : {len(df_final_NA)} sur {len(df_final)}")
+print(f"Nombre de poissons avec une fécondité calculable : {len(df_final_NA_true)} sur {len(df_final)} (Annotations)")
+print(f"Nombre de poissons avec une fécondité calculable : {len(df_final_NA_pred)} sur {len(df_final)} (Predictions)")
 ```
 
 
 ```{python}
+fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+
 distribution(
-    df_final_NA.fecondite_pred,
-    "Distribution de la fécondité",
+    df_final_NA_true.fecondite_true,
+    "Annotations",
     "Nombre d'oeufs",
     couleur='teal',
-    nombre_graduations_x = 10,
-    nombre_barres=15
-)
+    nombre_barres=15,
+    axe_x_fixe = (0, 1400, 200),
+    ax=axes[0]
+    )
+
+distribution(
+    df_final_NA_pred.fecondite_pred,
+    "Prédictions",
+    "Nombre d'oeufs",
+    couleur='teal',
+    nombre_barres=10,
+    axe_x_fixe = (0, 1400, 200),
+    ax=axes[1]
+    )
+
+plt.tight_layout()
+plt.show()
 ```
 
-## Relations entre la fécondité et les caractéristiques des poissons
+
+## Relations entre la fécondité et les caractéristiques des poissons - Annotations
 
 ```{python}
 fig, axes = plt.subplots(1, 2, figsize=(11, 4))
 
 nuage_points(
-    x=df_final_NA.long_poisson, # long_poisson ou poids_poisson
-    y=df_final_NA.fecondite_pred,
+    x=df_final_NA_true.long_poisson, # long_poisson ou poids_poisson
+    y=df_final_NA_true.fecondite_true,
     titre="Relation fécondité / longueur du poisson", 
     xlabel="Longueur du poisson", 
     ylabel="Fecondité",
@@ -714,8 +887,8 @@ nuage_points(
     )
 
 nuage_points(
-    x=df_final_NA.poids_poisson, # long_poisson ou poids_poisson
-    y=df_final_NA.fecondite_pred,
+    x=df_final_NA_true.poids_poisson, # long_poisson ou poids_poisson
+    y=df_final_NA_true.fecondite_true,
     titre="Relation fécondité / poids du poisson", 
     xlabel="Poids du poisson", 
     ylabel="Fecondité",
@@ -726,6 +899,39 @@ nuage_points(
 plt.tight_layout()
 plt.show()
 
-print(f"Corrélation fécondité / longueur : {df_final_NA.fecondite_pred.corr(df_final_NA.long_poisson)}") # Corrélation
-print(f"Corrélation fécondité / poids : {df_final_NA.fecondite_pred.corr(df_final_NA.poids_poisson)}") # Corrélation
+print(f"Corrélation fécondité / longueur : {df_final_NA_true.fecondite_true.corr(df_final_NA_true.long_poisson)}") # Corrélation
+print(f"Corrélation fécondité / poids : {df_final_NA_true.fecondite_true.corr(df_final_NA_true.poids_poisson)}") # Corrélation
+```
+
+
+## Relations entre la fécondité et les caractéristiques des poissons - Prédictions
+
+```{python}
+fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+
+nuage_points(
+    x=df_final_NA_pred.long_poisson, # long_poisson ou poids_poisson
+    y=df_final_NA_pred.fecondite_pred,
+    titre="Relation fécondité / longueur du poisson", 
+    xlabel="Longueur du poisson", 
+    ylabel="Fecondité",
+    couleur='teal',
+    ax=axes[0]
+    )
+
+nuage_points(
+    x=df_final_NA_pred.poids_poisson, # long_poisson ou poids_poisson
+    y=df_final_NA_pred.fecondite_pred,
+    titre="Relation fécondité / poids du poisson", 
+    xlabel="Poids du poisson", 
+    ylabel="Fecondité",
+    couleur='teal',
+    ax=axes[1]
+    )
+
+plt.tight_layout()
+plt.show()
+
+print(f"Corrélation fécondité / longueur : {df_final_NA_pred.fecondite_pred.corr(df_final_NA_pred.long_poisson)}") # Corrélation
+print(f"Corrélation fécondité / poids : {df_final_NA_pred.fecondite_pred.corr(df_final_NA_pred.poids_poisson)}") # Corrélation
 ```
