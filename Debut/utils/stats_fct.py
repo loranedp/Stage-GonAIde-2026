@@ -18,14 +18,47 @@ def distribution(
     bins='auto',
     nombre_graduations_x=None,
     nombre_barres=None,
-    ax=None
+    ax=None,
+    axe_x_fixe=None
 ):
-    """Affiche la distribution des données sous forme d'histogramme."""
+    if axe_x_fixe is not None:
+        try:
+            minimum_x, maximum_x, pas_x = axe_x_fixe
+        except (TypeError, ValueError) as erreur:
+            raise ValueError(
+                "axe_x_fixe doit contenir exactement (minimum, maximum, pas)."
+            ) from erreur
 
-    for nom, valeur in (
-        ("nombre_graduations_x", nombre_graduations_x),
-        ("nombre_barres", nombre_barres),
-    ):
+        for valeur in (minimum_x, maximum_x, pas_x):
+            if (
+                isinstance(valeur, (bool, np.bool_))
+                or not isinstance(
+                    valeur,
+                    (int, float, np.integer, np.floating),
+                )
+                or not np.isfinite(valeur)
+            ):
+                raise ValueError(
+                    "axe_x_fixe doit contenir uniquement des nombres finis."
+                )
+
+        if minimum_x >= maximum_x:
+            raise ValueError(
+                "Le minimum de axe_x_fixe doit être strictement inférieur "
+                "au maximum."
+            )
+        if pas_x <= 0:
+            raise ValueError(
+                "Le pas de axe_x_fixe doit être strictement positif."
+            )
+
+    parametres_entiers = [("nombre_barres", nombre_barres)]
+    if axe_x_fixe is None:
+        parametres_entiers.append(
+            ("nombre_graduations_x", nombre_graduations_x)
+        )
+
+    for nom, valeur in parametres_entiers:
         if valeur is not None and (
             isinstance(valeur, (bool, np.bool_))
             or not isinstance(valeur, (int, np.integer))
@@ -63,7 +96,26 @@ def distribution(
     ax.set_xlabel(xlabel, fontsize=12)
     ax.set_ylabel("Fréquence", fontsize=12)
 
-    if nombre_graduations_x is not None:
+    if axe_x_fixe is not None:
+        etendue_x = maximum_x - minimum_x
+        nombre_intervalles = etendue_x / pas_x
+        entier_proche = round(nombre_intervalles)
+        if np.isclose(
+            nombre_intervalles,
+            entier_proche,
+            rtol=1e-12,
+            atol=1e-12,
+        ):
+            nombre_intervalles = entier_proche
+        else:
+            nombre_intervalles = np.floor(nombre_intervalles)
+
+        graduations_x = minimum_x + pas_x * np.arange(nombre_intervalles + 1)
+        if np.isclose(graduations_x[-1], maximum_x, rtol=1e-12, atol=1e-12):
+            graduations_x[-1] = maximum_x
+        ax.set_xlim(minimum_x, maximum_x)
+        ax.set_xticks(graduations_x)
+    elif nombre_graduations_x is not None:
         ax.xaxis.set_major_locator(
             MaxNLocator(nbins=nombre_graduations_x)
         )

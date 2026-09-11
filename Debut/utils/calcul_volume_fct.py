@@ -31,11 +31,18 @@ def calculate_polygon_area(yolo_coords, image_width, image_height):
     return area
 
 # ---- Calcul de la surface : images transversales -----
-def calculate_areas(mask_path, image_path, echelle):
+def calculate_areas(mask_path, image_path, echelle, *, mask_size=None):
+    """Surfaces en cm² ; ``mask_size`` est le repère des polygones (largeur, hauteur).
+
+    Par défaut, les polygones sont normalisés sur l'image originale.
+    La calibration ``echelle`` porte toujours sur sa hauteur originale,
+    même lorsque les polygones sont normalisés sur un recadrage.
+    """
     # Importer l'image
     image = cv2.imread(image_path)
     image_height = image.shape[0]
     image_width = image.shape[1]
+    mask_width, mask_height = mask_size if mask_size is not None else (image_width, image_height)
     
     # Importer le masque YOLO
     with open(mask_path, "r") as f:
@@ -49,7 +56,7 @@ def calculate_areas(mask_path, image_path, echelle):
         values = [float(x) for x in line.split()]
         class_id = int(values[0])
         yolo_coords = values[1:]
-        area = calculate_polygon_area(yolo_coords, image_width, image_height)
+        area = calculate_polygon_area(yolo_coords, mask_width, mask_height)
 
         if class_id == 0:
             area_cavite += area
@@ -63,7 +70,8 @@ def calculate_areas(mask_path, image_path, echelle):
     return surface_cm2_gonade, surface_cm2_cavite
 
 # ---- Calcul du volume : images transversales -----
-def calculate_volumes(df, id, path):
+def calculate_volumes(df, id, path, *, mask_size=None):
+    """Calcule les volumes en transmettant le repère des polygones aux surfaces."""
     #---- Initialisation des variables ----
     resultats = {"id poisson": [], "image_id": [], "position echo": [], "surface_cavite": [], "surface_gonade": [], "volume_cavite": [], 
              "volume_gonade": [], "echelle": [], "augmentation_surface_gonade": [], "augmentation_surface_cavite": []}
@@ -93,7 +101,9 @@ def calculate_volumes(df, id, path):
             position = row["position"] # Récupère la position de l'écho
 
             # --- Calcul de la surface des gonades et de la cavité ---
-            surface_gonade, surface_cavite = calculate_areas(mask_path, image_path, echelle)
+            surface_gonade, surface_cavite = calculate_areas(
+                mask_path, image_path, echelle, mask_size=mask_size
+            )
 
             # ---- Calcul du rayon du cercle à partir des surfaces ----
             rayon_gonade = np.sqrt(surface_gonade/np.pi)
@@ -180,34 +190,41 @@ def calculate_volumes(df, id, path):
 
 
 # ---- Calcul de la surface : images longitudinales -----
-def calculate_eggs_areas(mask_path, image_path, echelle):
+def calculate_eggs_areas(mask_path, image_path, echelle, *, mask_size=None):
     """Calcule la surface moyenne des œufs en mm².
 
-    ``echelle`` reste fournie en centimètres sur la hauteur de l'image.
+    ``mask_size`` est le repère des polygones (largeur, hauteur), par défaut
+    celui de l'image originale. ``echelle`` reste fournie en centimètres sur
+    la hauteur originale, y compris pour les polygones d'un recadrage.
     """
     # Importer l'image
     image = cv2.imread(image_path)
     image_height = image.shape[0]
     image_width = image.shape[1]
+    mask_width, mask_height = mask_size if mask_size is not None else (image_width, image_height)
     
     # Importer le masque YOLO
     with open(mask_path, "r") as f:
         lines = [line for line in f.readlines() if line.strip()]
 
-    # --- Calculer l'aire de chaque instance et faire la moyenne des 2 plus grandes surfaces ---
+    # --- Calculer l'aire de chaque instance ---
     area_eggs = []
     for line in lines:
         values = [float(x) for x in line.split()]
         yolo_coords = values[1:]
-        area = calculate_polygon_area(yolo_coords, image_width, image_height)
+        area = calculate_polygon_area(yolo_coords, mask_width, mask_height)
         area_eggs.append(area)
 
-    # --- Prendre les 50% plus grandes surfaces ---
+    # --- Sélectionner les surfaces comprises entre Q1 et Q3 ---
     area_eggs.sort(reverse=True)
-    area_eggs_max = area_eggs[:max(1, int(0.5 * len(area_eggs)))]
+    if area_eggs:
+        q1, q3 = np.percentile(area_eggs, [25, 75])
+        area_eggs_iqr = [area for area in area_eggs if q1 <= area <= q3]
+    else:
+        area_eggs_iqr = []
 
     # ---- Faire la moyenne des surfaces sélectionnées ----
-    mean_area_eggs = np.mean(area_eggs_max) if area_eggs_max else 0
+    mean_area_eggs = np.mean(area_eggs_iqr) if area_eggs_iqr else 0
 
     # ---- Transformation des pixels en mm² ----
     surface_mm2_eggs = ((echelle * 10) / image_height) ** 2 * mean_area_eggs
@@ -217,7 +234,7 @@ def calculate_eggs_areas(mask_path, image_path, echelle):
 
 
 def calculate_eggs_area_from_instances(instance_labels, echelle, image_height):
-    """Calcule en mm² la surface moyenne des 50 % plus grandes instances d'œufs.
+    """Calcule en mm² la surface moyenne des instances entre Q1 et Q3.
     """
     labels = np.asarray(instance_labels)
 
@@ -228,8 +245,8 @@ def calculate_eggs_area_from_instances(instance_labels, echelle, image_height):
     ]
     if not areas:
         return 0.0
-    areas.sort(reverse=True)
-    selected = areas[: max(1, int(0.5 * len(areas)))]
+    q1, q3 = np.percentile(areas, [25, 75])
+    selected = [area for area in areas if q1 <= area <= q3]
     mean_area_pixels = float(np.mean(selected))
     return ((float(echelle) * 10) / float(image_height)) ** 2 * mean_area_pixels
 
@@ -248,7 +265,17 @@ def calculate_egg_volume_from_instances(instance_labels, echelle, image_height):
         instance_labels, echelle, image_height
     )
     egg_count = count_egg_instances(instance_labels)
-    selected_egg_count = max(1, int(0.5 * egg_count)) if egg_count else 0
+    if egg_count:
+        labels = np.asarray(instance_labels)
+        areas = [
+            int(np.count_nonzero(labels == label_id))
+            for label_id in np.unique(labels)
+            if label_id > 0
+        ]
+        q1, q3 = np.percentile(areas, [25, 75])
+        selected_egg_count = sum(q1 <= area <= q3 for area in areas)
+    else:
+        selected_egg_count = 0
     radius_mm = np.sqrt(surface_mm2 / np.pi)
     volume_mm3 = 4 / 3 * np.pi * radius_mm**3
     return {
@@ -278,7 +305,8 @@ def calculate_mean_egg_volume(images):
 
 
 # ---- Calcul du volume : images longitudinales -----
-def calculate_eggs_volumes(df, id, path):
+def calculate_eggs_volumes(df, id, path, *, mask_size=None):
+    """Calcule les volumes d'œufs avec le repère transmis à leurs surfaces."""
     #---- Initialisation des variables ----
     resultats = {
         "id poisson": [],
@@ -308,7 +336,9 @@ def calculate_eggs_volumes(df, id, path):
             echelle = row["echelle"] # Récupère l'échelle de l'image
 
             # --- Calcul de la surface moyenne des oeufs ---
-            surface_oeufs_mm2, surfaces_list = calculate_eggs_areas(mask_path, image_path, echelle)
+            surface_oeufs_mm2, surfaces_list = calculate_eggs_areas(
+                mask_path, image_path, echelle, mask_size=mask_size
+            )
 
             # ---- Calcul du rayon en mm à partir de la surface en mm² ----
             rayon_oeufs_mm = np.sqrt(surface_oeufs_mm2 / np.pi)
