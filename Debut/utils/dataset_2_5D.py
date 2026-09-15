@@ -30,14 +30,14 @@ class SliceSequenceUNetDataset(torch.utils.data.Dataset):
     """
 
     def __init__(self, samples, image_dir, df, image_size, num_classes=3,
-                 class_ids=[1, 2, 3], crop_params=[85, 33, 510, 380],
+                 class_ids=[1, 2, 3],
                  is_train=False, seed=42,
                  ignore_category_id=None, ignore_target_class_idx=None, ignore_value=-100.0):
         # is_train=False forcé : l'augmentation par coupe de RoboflowUNetDataset ne
         # doit jamais s'appliquer ici, l'augmentation est gérée au niveau séquence.
         self._slice_dataset = RoboflowUNetDataset(
             samples=samples, image_dir=image_dir, df=df, image_size=image_size,
-            num_classes=num_classes, class_ids=class_ids, crop_params=crop_params,
+            num_classes=num_classes, class_ids=class_ids,
             is_train=False, seed=seed,
             ignore_category_id=ignore_category_id,
             ignore_target_class_idx=ignore_target_class_idx,
@@ -83,13 +83,12 @@ class SliceSequenceUNetDataset(torch.utils.data.Dataset):
         slice_indices = self.sequences[idx]
 
         images, masks = [], []
-        original_sizes, crop_params_list, image_paths = [], [], []
+        original_sizes, image_paths = [], []
         for slice_idx in slice_indices:
             item = self._slice_dataset[slice_idx]
             images.append(item['image'])
             masks.append(item['mask'])
             original_sizes.append(item['original_size'])
-            crop_params_list.append(item['crop_params'])
             image_paths.append(item['image_path'])
 
         images_seq = torch.stack(images, dim=0)  # (T, C, H, W)
@@ -106,9 +105,6 @@ class SliceSequenceUNetDataset(torch.utils.data.Dataset):
             'image': images_seq,
             'mask': masks_seq,
             'original_size': original_sizes,
-            'crop_params': crop_params_list,
             'image_path': image_paths,
             'id_poisson': self.fish_ids[idx],
         }
-
-    

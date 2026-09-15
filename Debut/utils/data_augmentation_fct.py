@@ -31,7 +31,7 @@ def data_augmentation(image, mask, model="classique"):
     rotation = T.RandomRotation.get_params([-20.0, 20.0])
     affine_rotation, translations, scale, shear = T.RandomAffine.get_params(
         degrees=[0.0, 0.0],
-        translate=[0.2, 0.2],
+        translate=[0.1, 0.1],
         scale_ranges=[0.8, 1.2],
         shears=None,
         img_size=[image.shape[-2], image.shape[-1]],
@@ -69,8 +69,7 @@ def data_augmentation(image, mask, model="classique"):
     return image, mask
 
 
-# Fonction pour la Data augmentation d'une séquence de coupes (dépendance inter-coupes) :
-# applique les mêmes transformation à toutes les coupes.
+# Fonction pour la Data augmentation d'une séquence de coupes (dépendance inter-coupes) pour appliquer les mêmes transformation à toutes les coupes.
 def data_augmentation_sequence(images, masks):
     """Applique la même transformation à toutes les coupes d'une séquence."""
     # --- 1. Tirage unique des paramètres géométriques de la séquence ---
@@ -78,7 +77,7 @@ def data_augmentation_sequence(images, masks):
 
     affine_rotation, translations, scale, shear = T.RandomAffine.get_params(
         degrees=[0.0, 0.0],
-        translate=[0.2, 0.2],
+        translate=[0.1, 0.1],
         scale_ranges=[0.8, 1.2],
         shears=None,
         img_size=[images.shape[-2], images.shape[-1]],
@@ -92,7 +91,7 @@ def data_augmentation_sequence(images, masks):
 
     # --- 4. Transformation de luminosité des images ---
     images_rgb = images[:, 0:3]  # Les 3 canaux RGB d'origine de chaque coupe
-    images_meta = images[:, 3:]  # Canaux méta CME éventuels, non affectés par le jitter
+    images_meta = images[:, 3:]  # Canaux méta CME éventuels
 
     _, brightness_factor, _, _, _ = T.ColorJitter.get_params([0.6, 1.4], None, None, None)
     images_rgb = TF.adjust_brightness(images_rgb, brightness_factor)

@@ -12,41 +12,54 @@ def keep_largest_components(preds_tensor):
     for i in range(B):
         # --- 1. Cavité : garde la composante la plus grande ----
         mask = preds_np[i, 0]
-        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8) # Récupère les composantes connectées
+        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8) # Récupère les composantes connectées (adjacents + diagonaux)
 
-        if num_labels > 2: # Si plus de deux composantes (fond + au moins 2 objets), on garde la plus grande
+        if num_labels > 2: # Si plus de deux composantes, on garde uniquement la plus grande
             largest_label = 1 + np.argmax(stats[1:, cv2.CC_STAT_AREA])
             preds_np[i, 0] = (labels == largest_label)
 
-        # --- 2. Gonades : garde toutes les composantes supérieures à 1000 pixels ---
+        # --- 2. Gonades : garde au plus deux composantes supérieures à 1000 pixels ---
         mask = preds_np[i, 1]
         num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
 
-        if num_labels > 2: # Si plus de deux composantes (fond + au moins 2 objets), on garde toutes celles supérieure à 1000 pixels
-            large_components = stats[1:, cv2.CC_STAT_AREA] > 1000
-            preds_np[i, 1] = np.isin(labels, np.where(large_components)[0] + 1).astype(np.uint8) # +1 car on ignore le label 0 (fond)
+        # Garde les composantes dont l'aire est supérieure à 1000 pixels
+        kept_labels = np.flatnonzero(stats[1:, cv2.CC_STAT_AREA] > 1000) + 1
 
-        # -- 3. Intestin : garde toutes les composantes supérieures à 300 pixels ---
+        # Garde au plus les deux composantes les plus grandes
+        if len(kept_labels) > 2:
+            top_two = np.argpartition(stats[1:, cv2.CC_STAT_AREA][kept_labels - 1], -2)[-2:]
+            kept_labels = kept_labels[top_two]
+        preds_np[i, 1] = np.isin(labels, kept_labels).astype(np.uint8)
+
+        # -- 3. Intestin : garde au plus deux composantes supérieures à 300 pixels ---
         if C > 2: # Si la classe intestin est présente
             mask = preds_np[i, 2]
             num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
 
-            if num_labels > 2: # Si plus de deux composantes (fond + au moins 2 objets), on garde toutes celles supérieure à 300 pixels
-                large_components = stats[1:, cv2.CC_STAT_AREA] > 300
-                preds_np[i, 2] = np.isin(labels, np.where(large_components)[0] + 1).astype(np.uint8) # +1 car on ignore le label 0 (fond)
+            # Garde au plus deux composantes supérieures à 300 pixels
+            kept_labels = np.flatnonzero(stats[1:, cv2.CC_STAT_AREA] > 300) + 1
+            if len(kept_labels) > 2:
+                top_two = np.argpartition(stats[1:, cv2.CC_STAT_AREA][kept_labels - 1], -2)[-2:]
+                kept_labels = kept_labels[top_two]
+            preds_np[i, 2] = np.isin(labels, kept_labels).astype(np.uint8)
 
     return torch.from_numpy(preds_np).to(preds_tensor.device).bool()
 
-# Fonction pour corriger les formes incohérentes des masques prédits (remplissage des trous, suppression des excroissances et des encoches sur le contour,
-# et application d'une enveloppe convexe pour la cavité)
+# Fonction pour corriger les formes incohérentes des masques prédits (nettoyage
+# léger et enveloppe convexe pour la cavité, remplissage des trous et suppression
+# des excroissances pour les autres classes).
 def fill_holes(preds_tensor):
     preds_np = preds_tensor.byte().cpu().numpy() # Transfert du batch sur le CPU pour traitement
     B, C, H, W = preds_np.shape
     
     for i in range(B):
-        # --- 1. Cavité : enveloppe convexe ---
+        # --- 1. Cavité : nettoyage léger puis enveloppe convexe ---
         mask = preds_np[i, 0]
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # Supprime les petites excroissances reliées au contour
+        cavity_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        cleaned_mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, cavity_kernel)
+
+        contours, _ = cv2.findContours(cleaned_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if contours:
             all_points = np.vstack(contours)
             hull = cv2.convexHull(all_points)
@@ -59,7 +72,11 @@ def fill_holes(preds_tensor):
             mask = preds_np[i, c]
 
             # Noyau arrondi pour ne pas créer de contours carrés
-            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (10, 10))
+            if c == 1:  # Gonades
+                kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (13, 13))
+            if c == 2:  # Intestin
+                kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (8, 8))
+                
             # Supression des petites excroissances
             new_mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel) # Ouverture morphologique
             # Remplissage des petites encoches sur le contour
@@ -169,10 +186,10 @@ def split_eggs(preds_tensor, min_distance=10, min_area=100, ouverture_size=3, ou
         # --- 8. Masque final avec filtrage des petites instances potentiellement créées ---
         relabelled = np.zeros_like(labels, dtype=np.int32)
         next_label = 1
-        for label_id in np.unique(labels):
+        for label_id in np.unique(opened_labels):
             if label_id == 0:
                 continue
-            instance = labels == label_id
+            instance = opened_labels == label_id
             if int(instance.sum()) < min_area:
                 continue
             relabelled[instance] = next_label

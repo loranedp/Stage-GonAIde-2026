@@ -309,6 +309,16 @@ def plot_evolution_curves(df, var1 = "augmentation_surface_gonade", var2 = "augm
 
 
 # ----- Fonctions pour la visualisation des masques et images -----
+# Référentiel RGB unique du pipeline cavité : cavité, gonade, intestin.
+# Il est partagé par le pré-traitement, les exports de validation et la
+# comparaison des modèles.
+CLASS_OVERLAY_COLORS = np.array([
+    [26, 12, 176],   # Cavité
+    [69, 209, 179],  # Gonade
+    [199, 182, 179], # Intestin
+], dtype=np.uint8)
+
+
 def tensor_to_numpy_image(tensor):
     if hasattr(tensor, "detach"):
         img = tensor.detach().cpu().numpy()
@@ -349,16 +359,9 @@ def overlay_mask(image_tensor, mask_tensor, alpha=0.4, target_size=None):
             
     mask = resized_mask
     
-    # Couleurs en format 0-255 (R, V, B)
-    colors = [
-        [26, 12, 176],   # Classe 1 : Cavite
-        [69, 209, 179],  # Classe 2 : Gonade
-        [199, 182, 179], # Classe 3 : Intestin
-    ]
-    
     overlay = image.copy()
     for c in range(mask.shape[0]):
-        color = colors[c % len(colors)]
+        color = CLASS_OVERLAY_COLORS[c % len(CLASS_OVERLAY_COLORS)]
         mask_bool = mask[c] > 0.5
         
         for rgb_channel in range(3):
@@ -369,13 +372,6 @@ def overlay_mask(image_tensor, mask_tensor, alpha=0.4, target_size=None):
             )
     return overlay
 
-
-# Couleurs RGB stables pour les datasets sémantiques : classe 1, 2 et 3.
-CLASS_OVERLAY_COLORS = np.array([
-    [40, 100, 220],   # bleu
-    [40, 190, 170],   # vert/turquoise
-    [145, 70, 200],   # violet
-], dtype=np.uint8)
 
 # Palette volontairement fixe : elle ne dépend ni de l'ordre d'itération ni
 # d'un générateur aléatoire, et reste donc identique d'une exécution à l'autre.
@@ -589,7 +585,7 @@ def plot_segmentation_comparison(
 def mask_to_yolo_polygons(
     mask_bool,
     class_id,
-    target_size=(640, 480),
+    target_size=(510, 380),
     *,
     largest_only=False,
 ):

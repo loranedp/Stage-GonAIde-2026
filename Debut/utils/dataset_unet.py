@@ -13,6 +13,7 @@ sys.path.append(str(Path.cwd().parent)) # Ajoute le dossier parent au chemin de 
 from utils.data_augmentation_fct import data_augmentation
 from utils.conditional_metadata_embedding import CME
 from UNet.models.EggSegmentationHVUNet import generate_hv_targets
+from utils.unet_spatial import MODEL_IMAGE_SIZE, pad_array, pad_image
 
 
 def decode_segmentation(segmentation, height: int, width: int) -> np.ndarray:
@@ -27,16 +28,15 @@ def decode_segmentation(segmentation, height: int, width: int) -> np.ndarray:
 
 
 class RoboflowUNetDataset(torch.utils.data.Dataset):
-    def __init__(self, samples, image_dir, df, image_size, num_classes=3, class_ids=[1, 2, 3], crop_params=[85, 33, 510, 380], is_train=False, is_cme = False, seed=42,
+    def __init__(self, samples, image_dir, df, image_size, num_classes=3, class_ids=[1, 2, 3], is_train=False, is_cme = False, seed=42,
                  ignore_category_id=None, ignore_target_class_idx=None, ignore_value=-100.0):
         """
         Args:
             samples (list): Liste des dictionnaires d'échantillons contenant l'image et ses annotations.
             image_dir (str): Chemin vers le dossier unique contenant toutes les images.
-            image_size (tuple): Taille finale (H, W).
+            image_size (tuple): Taille du canevas modèle, obligatoirement (512, 512).
             num_classes (int): Nombre de classes.
             class_ids (list): Liste des IDs de catégories COCO valides.
-            crop_params (list): Paramètres de crop [x, y, w, h] pour recadrer les images et masques.
             ignore_category_id (int, optionnel): ID COCO de la catégorie d'annotation "ignore"
                 (ex: Gonade_ignore). N'est jamais un canal du masque : sert uniquement à marquer
                 des pixels à exclure (loss/métriques) sur le canal `ignore_target_class_idx`.
@@ -47,10 +47,11 @@ class RoboflowUNetDataset(torch.utils.data.Dataset):
         """
         self.samples = samples
         self.image_dir = image_dir
+        if tuple(image_size) != MODEL_IMAGE_SIZE:
+            raise ValueError(f"image_size doit être {MODEL_IMAGE_SIZE}, reçu {image_size}.")
         self.image_size = image_size
         self.num_classes = num_classes
         self.class_ids = class_ids
-        self.crop_params = crop_params
         self.df = df
         self.is_train = is_train
         self.is_cme = is_cme
@@ -103,33 +104,19 @@ class RoboflowUNetDataset(torch.utils.data.Dataset):
                 ignore_np = np.maximum(ignore_np, ann_mask)
 
         # -------- 3. Pré-traitement des données --------
-        # Application du crop
-        if self.crop_params is not None:
-            x, y, w, h = self.crop_params
-            image = image.crop((x, y, x + w, y + h))
-            mask_np = mask_np[:, y:y+h, x:x+w]
-            ignore_np = ignore_np[y:y+h, x:x+w]
-
-        # Redimensionnement de l'image
-        image = image.resize(self.image_size, Image.Resampling.BILINEAR)
+        # Les images et annotations sont déjà cropées en 510x380. On les place
+        # sans déformation dans le canevas 512x512 du modèle.
+        image = pad_image(image)
+        mask_np = pad_array(mask_np)
+        ignore_np = pad_array(ignore_np)
 
         # Normalisation de l'image
         image_np = np.array(image, dtype=np.float32) / 255.0
         image_torch = torch.as_tensor(image_np).permute(2, 0, 1).contiguous()
 
-        # Redimensionnement des masques
-        processed_masks = []
-        for c in range(self.num_classes):
-            mask_pil = Image.fromarray(mask_np[c])
-            mask_pil = mask_pil.resize(self.image_size, Image.Resampling.NEAREST)
-            processed_masks.append(np.array(mask_pil, dtype=np.float32))
+        mask_torch = torch.as_tensor(mask_np.astype(np.float32))
 
-        mask_torch = torch.as_tensor(np.stack(processed_masks, axis=0))
-
-        # Redimensionnement du masque "ignore" (même traitement NEAREST que les masques de classe)
-        ignore_pil = Image.fromarray(ignore_np)
-        ignore_pil = ignore_pil.resize(self.image_size, Image.Resampling.NEAREST)
-        ignore_torch = torch.as_tensor(np.array(ignore_pil, dtype=np.float32)).unsqueeze(0)
+        ignore_torch = torch.as_tensor(ignore_np.astype(np.float32)).unsqueeze(0)
 
         # CME : Ajout de canaux RBG
         if self.is_cme:
@@ -170,18 +157,18 @@ class RoboflowUNetDataset(torch.utils.data.Dataset):
             'image': image_torch,
             'mask': mask_torch,
             'original_size': original_size,
-            'crop_params': self.crop_params,
             'image_path': sample['image_path']
         }
 
 
 class EggHVDataset(torch.utils.data.Dataset):
     """Dataset COCO d'instances d'œufs pour la sortie masque/H/V."""
-    def __init__(self, samples, image_size, crop_params=(85, 33, 510, 380),
+    def __init__(self, samples, image_size,
                  is_train=False, seed=42, egg_category_id=None):
         self.samples = samples
+        if tuple(image_size) != MODEL_IMAGE_SIZE:
+            raise ValueError(f"image_size doit être {MODEL_IMAGE_SIZE}, reçu {image_size}.")
         self.image_size = image_size
-        self.crop_params = crop_params
         self.is_train = is_train
         self.seed = seed
         self.egg_category_id = egg_category_id
@@ -215,12 +202,11 @@ class EggHVDataset(torch.utils.data.Dataset):
                 continue
             instances.append(decode_segmentation(ann['segmentation'], height, width))
         mask, horizontal, vertical = generate_hv_targets(instances, height, width)
-        x, y, w, h = self.crop_params
-        image = image.crop((x, y, x + w, y + h))
-        targets = np.stack([mask[y:y+h, x:x+w], horizontal[y:y+h, x:x+w], vertical[y:y+h, x:x+w]])
-        image = image.resize(self.image_size, Image.Resampling.BILINEAR)
+        targets = np.stack([mask, horizontal, vertical])
+        image = pad_image(image)
+        targets = pad_array(targets)
         image_tensor = torch.from_numpy(np.asarray(image, dtype=np.float32) / 255.0).permute(2, 0, 1).contiguous()
-        targets_tensor = torch.from_numpy(np.stack([np.asarray(Image.fromarray(channel).resize(self.image_size, Image.Resampling.BILINEAR), dtype=np.float32) for channel in targets]))
+        targets_tensor = torch.from_numpy(targets.astype(np.float32))
         targets_tensor[0].clamp_(0, 1)
         targets_tensor[1:].clamp_(-1, 1)
 
@@ -235,4 +221,4 @@ class EggHVDataset(torch.utils.data.Dataset):
             )
             torch.random.set_rng_state(rng_state)
 
-        return {'image': image_tensor, 'mask': targets_tensor, 'image_path': sample['image_path'], 'original_size': (width, height), 'crop_params': self.crop_params}
+        return {'image': image_tensor, 'mask': targets_tensor, 'image_path': sample['image_path'], 'original_size': (width, height)}

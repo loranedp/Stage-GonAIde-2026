@@ -13,6 +13,7 @@ sys.path.append(str(Path.cwd().parent)) # Ajoute le dossier parent au chemin de 
 
 # Importation des datasets personnalisés pour U-Net : 2D et 2,5D
 from utils.dataset_unet import RoboflowUNetDataset
+from utils.unet_spatial import unpad_array
 from utils.dataset_2_5D import SliceSequenceUNetDataset
 from utils.post_traitement import split_eggs
 
@@ -109,14 +110,12 @@ def collate_fn(batch):
     images = torch.stack([item['image'] for item in batch])
     masks = torch.stack([item['mask'] for item in batch])
     original_sizes = [item['original_size'] for item in batch]
-    crop_params = [item['crop_params'] for item in batch]
     file_names = [os.path.basename(item['image_path']) for item in batch]
     
     return {
         'image': images,
         'mask': masks,
         'original_size': original_sizes,
-        'crop_params': crop_params,
         'file_names': file_names
     }
 
@@ -131,7 +130,6 @@ def collate_fn_sequence(batch):
         'image': item['image'].unsqueeze(0),   # (1, T, C, H, W)
         'mask': item['mask'].unsqueeze(0),     # (1, T, num_classes, H, W)
         'original_size': [item['original_size']],
-        'crop_params': [item['crop_params']],
         'image_path': [item['image_path']],
         'id_poisson': [item['id_poisson']],
     }
@@ -142,7 +140,6 @@ def collate_fn_egg_hv(batch):
         'mask': torch.stack([item['mask'] for item in batch]),
         'image_path': [item['image_path'] for item in batch],
         'original_size': [item['original_size'] for item in batch],
-        'crop_params': [item['crop_params'] for item in batch],
     }
 
 
@@ -178,8 +175,8 @@ def split_dataset(all_samples):
     return cv_samples, test_samples, cv_categories, test_categories, groups_train, groups_test
 
 
-def _mean_top_half_instance_area_px(instance_labels):
-    """Surface moyenne en pixels des 50 % plus grandes instances, par image."""
+def _mean_interquartile_instance_area_px(instance_labels):
+    """Surface moyenne en pixels des instances entre Q1 et Q3, par image."""
     if instance_labels.ndim == 2:
         instance_labels = instance_labels.unsqueeze(0)
     if instance_labels.ndim != 3:
@@ -192,8 +189,14 @@ def _mean_top_half_instance_area_px(instance_labels):
         if areas.numel() == 0:
             mean_areas.append(torch.zeros((), device=labels.device))
             continue
-        selected_count = max(1, int(0.5 * areas.numel()))
-        mean_areas.append(torch.topk(areas, selected_count).values.mean())
+        q1 = torch.quantile(areas, 0.25)
+        q3 = torch.quantile(areas, 0.75)
+        interquartile_areas = areas[(areas >= q1) & (areas <= q3)]
+        mean_areas.append(
+            interquartile_areas.mean()
+            if interquartile_areas.numel() > 0
+            else torch.zeros((), device=labels.device)
+        )
     return torch.stack(mean_areas)
 
 
@@ -233,6 +236,8 @@ def metrics_by_class(true, preds, echelle, dataset_name, egg_instance_labels=Non
         # ``echelle`` est la hauteur physique totale de l'image en cm.
         # Un pixel représente donc (echelle / hauteur_px) ** 2 cm².
         diff_surface = diff_surf_pixels * (echelle / true.shape[2]) ** 2
+        missing_surface = (true_surf_pixels == 0) | (pred_surf_pixels == 0)
+        diff_surface[missing_surface] = torch.nan
     else:
         true_instance_labels = split_eggs(
             true, min_distance=8, min_area=100, ouverture_size=3, ouverture_iterations=1
@@ -243,8 +248,8 @@ def metrics_by_class(true, preds, echelle, dataset_name, egg_instance_labels=Non
             )
         else:
             egg_instance_labels = torch.as_tensor(egg_instance_labels, device=true.device)
-        predicted_mean_area = _mean_top_half_instance_area_px(egg_instance_labels)
-        true_mean_area = _mean_top_half_instance_area_px(true_instance_labels)
+        predicted_mean_area = _mean_interquartile_instance_area_px(egg_instance_labels)
+        true_mean_area = _mean_interquartile_instance_area_px(true_instance_labels)
         echelle = echelle.to(device=true.device, dtype=torch.float32).reshape(-1)
 
         # ``echelle`` est exprimée en cm ; conversion finale en mm².
@@ -264,7 +269,7 @@ def save_validation_masks(masks_dir, best_masks):
         with pred_path.open("w") as f_pred:
             for class_idx in range(pred_mask.shape[0]):
                 polygons = mask_to_yolo_polygons(
-                    pred_mask[class_idx], class_idx, target_size=(510, 380)
+                    unpad_array(pred_mask[class_idx]), class_idx, target_size=(510, 380)
                 )
                 if polygons:
                     f_pred.write("\n".join(polygons) + "\n")
@@ -276,11 +281,11 @@ def save_validation_overlays(results_dir, best_images, dataset_name=None,
     for file_name, image, pred_mask in best_images:
         stem = Path(file_name).stem
         overlay = overlay_colored_mask(
-            image,
-            pred_mask,
+            unpad_array(image),
+            unpad_array(pred_mask),
             alpha=0.45,
             dataset_name=dataset_name,
             class_names=class_names,
         )
-        output_path = Path(results_dir) / f"pred_overlay_{stem}.png"
+        output_path = Path(results_dir) / f"{stem}.png"
         Image.fromarray(overlay).save(output_path)

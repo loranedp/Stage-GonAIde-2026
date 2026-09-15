@@ -8,6 +8,7 @@ import os
 import json
 import numpy as np
 import pytesseract
+import glob
 from pytesseract import Output
 import cv2
 import shutil
@@ -30,7 +31,7 @@ df_cap = pd.read_excel('Correspondance_Capture-Echographe.xlsx', sheet_name = 1,
 df = df[df.cap_id != "?"]
 df = df[df.name_file != "na"]
 
-print(f"Nombre de poissons différents : {len(df['cap_id'].value_counts())}")
+print(f"Nombre de poissons : {len(df['cap_id'].value_counts())}")
 print(f"Nombre d'échographies totales : {len(df)}")
 print(f"Nombre d'échographies de gonades : {len(df[df.type_image != 'œufs'])}")
 print(f"Nombre d'échographies d'œufs : {len(df[df.type_image == 'œufs'])}")
@@ -123,6 +124,57 @@ rename("../data/images/oeufs/", "jpg")
 rename("../data/labels/YOLO/cavite/", "txt")
 rename("../data/labels/YOLO/oeufs/", "txt")
 
+# Prépare les noms finaux avant le crop afin de lire l'échelle sur les images
+# d'origine, dont la zone OCR est supprimée par le recadrage.
+df["new_name_file"] = ""
+for index, row in df.iterrows():
+    heures = row["name_file"].split("_")[0].replace("-", ".").split(" ")[0]
+    df.at[index, "new_name_file"] = (
+        f"{row['image_id']}_{heures}_{row['cap_id']}_{row['annee']}"
+    )
+
+
+# -------- 4.3 Récupère l'échelle de l'échographie avant le crop --------
+def OCR(image_path):
+    """Lit l'échelle dans une image d'œufs non recadrée."""
+    image = cv2.imread(image_path)
+    if image is None:
+        raise ValueError(f"Image OCR illisible : {image_path}")
+
+    image_height, image_width = image.shape[:2]
+    if (image_width, image_height) != (640, 480): # Si image non conforme, on ne fait pas d'OCR
+        return None
+
+    x, y, w, h = 530, 350, 250, 200
+    cropped_img = image[y:y+h, x:x+w]
+    resized_img = cv2.resize(cropped_img, (280, 300))
+    return pytesseract.image_to_string(resized_img, lang='eng').strip()
+
+
+echelles_par_poisson = {}
+for poisson, echos in df.groupby("cap_id"):
+    echelle = 0
+    image_oeufs_trouvee = False
+    for file_name in echos["new_name_file"]:
+        image_path = f"../data/images/oeufs/{file_name}.jpg"
+        if not os.path.exists(image_path):
+            continue
+
+        ocr = OCR(image_path)
+        if ocr is None:
+            continue
+
+        image_oeufs_trouvee = True
+        if ocr == "3,8":
+            echelle = 3.8
+        elif ocr == "4.7":
+            echelle = 4.7
+        elif echelle not in (3.8, 4.7):
+            echelle = 3.1
+
+    if image_oeufs_trouvee:
+        echelles_par_poisson[poisson] = echelle
+
 # Les noms renommés suivent le format : image_id_heure_cap_id_annee.jpg
 poissons_importes = {
     fichier.stem.split("_")[2]
@@ -130,7 +182,7 @@ poissons_importes = {
     for fichier in dossier.iterdir()
     if fichier.is_file() and len(fichier.stem.split("_")) >= 4
 }
-print(f"Nombre de poissons différents importés : {len(poissons_importes)}")
+print(f"Nombre de poissons importés : {len(poissons_importes)}")
 print("---------------------------------")
 
 
@@ -185,7 +237,150 @@ def rename_json(json_path, output_json_path):
 rename_json("../data/labels/COCO/cavite/_annotations.coco.json", "../data/labels/COCO/cavite/annotations.json")
 rename_json("../data/labels/COCO/oeufs/_annotations.coco.json", "../data/labels/COCO/oeufs/annotations.oeufs_2_classes.json")
 
-# -------- 4.4 Suppression de classes COCO --------
+# -------- 4.4 Cropping des images et des masques YOLO --------
+def crop(image_paths, yolo_paths, coco_path=None):
+    """Croppe les paires image/masque YOLO et leurs annotations COCO associées."""
+    x, y, w, h = 85, 33, 510, 380
+
+    # Vérifie que les images et les masques ont des noms uniques et correspondent
+    def paths_by_stem(paths, file_type):
+        files = {}
+        duplicates = []
+        for path in map(Path, paths):
+            if path.stem in files:
+                duplicates.append(path.stem)
+            files[path.stem] = path
+        if duplicates:
+            raise ValueError(
+                f"Plusieurs {file_type} portent le même nom : {sorted(set(duplicates))}"
+            )
+        return files
+
+    image_files = paths_by_stem(image_paths, "images")
+    yolo_files = paths_by_stem(yolo_paths, "fichiers YOLO")
+    missing_yolo = sorted(image_files.keys() - yolo_files.keys())
+    missing_images = sorted(yolo_files.keys() - image_files.keys())
+    if missing_yolo or missing_images:
+        raise ValueError(
+            f"Paires image/masque incomplètes. Images sans masque : {missing_yolo}; "
+            f"masques sans image : {missing_images}."
+        )
+
+    coco_data = None
+    coco_images_by_filename = {}
+    if coco_path is not None:
+        coco_path = Path(coco_path)
+        with coco_path.open('r', encoding='utf-8') as coco_file:
+            coco_data = json.load(coco_file)
+
+        for coco_image in coco_data['images']:
+            filename = Path(coco_image['file_name']).name
+            if filename in coco_images_by_filename:
+                raise ValueError(f"Plusieurs images COCO portent le nom : {filename}")
+            coco_images_by_filename[filename] = coco_image
+
+        missing_coco_images = sorted(
+            image_file.name
+            for image_file in image_files.values()
+            if image_file.name not in coco_images_by_filename
+        )
+        if missing_coco_images:
+            raise ValueError(
+                f"Images sans annotation COCO : {missing_coco_images}."
+            )
+
+        coco_image_ids = {image['id'] for image in coco_data['images']}
+        orphan_annotations = [
+            annotation['id']
+            for annotation in coco_data['annotations']
+            if annotation['image_id'] not in coco_image_ids
+        ]
+        if orphan_annotations:
+            raise ValueError(
+                f"Annotations COCO orphelines : {orphan_annotations}."
+            )
+
+    for stem, image_file in image_files.items():
+        image = cv2.imread(str(image_file))
+        image_height, image_width = image.shape[:2]
+
+        # Si l'image est déjà à la bonne taille, on ne fait rien
+        if (image_width, image_height) == (w, h):
+            continue
+        # Si l'image est plus petite que la taille de crop, on ne fait rien
+        if x + w > image_width or y + h > image_height:
+            raise ValueError(
+                f"Le crop ({x}, {y}, {w}, {h}) dépasse les dimensions "
+                f"de l'image {image_file} ({image_width}, {image_height})."
+            )
+
+        yolo_file = yolo_files[stem]
+        lines = []
+        # On lit le fichier YOLO et on recalcule les coordonnées des polygones
+        with yolo_file.open('r', encoding='utf-8') as yolo:
+            for line in yolo:
+                parts = line.split()
+                if not parts:
+                    continue
+
+                class_id = int(parts[0])
+                points = list(map(float, parts[1:]))
+                if len(points) % 2:
+                    raise ValueError(f"Nombre impair de coordonnées dans : {yolo_file}")
+
+                normalized_points = []
+                for index in range(0, len(points), 2):
+                    point_x = points[index] * image_width - x
+                    point_y = points[index + 1] * image_height - y
+                    if 0 <= point_x <= w and 0 <= point_y <= h:
+                        normalized_points.extend([point_x / w, point_y / h])
+
+                lines.append(
+                    f"{class_id} " + " ".join(map(str, normalized_points)) + '\n'
+                )
+
+        cropped_image = image[y:y+h, x:x+w]
+        if not cv2.imwrite(str(image_file), cropped_image):
+            raise OSError(f"Impossible d'écrire l'image cropée : {image_file}")
+        with yolo_file.open('w', encoding='utf-8') as yolo:
+            yolo.writelines(lines)
+
+    # --- Mise à jour des annotations COCO ---
+    if coco_data is not None:
+        cropped_image_ids = {
+            coco_images_by_filename[image_file.name]['id']
+            for image_file in image_files.values()
+            if (
+                coco_images_by_filename[image_file.name]['width'],
+                coco_images_by_filename[image_file.name]['height'],
+            ) != (w, h)
+        }
+
+        for coco_image in coco_images_by_filename.values():
+            if coco_image['id'] in cropped_image_ids:
+                coco_image['width'] = w
+                coco_image['height'] = h
+
+        for annotation in coco_data['annotations']:
+            if annotation['image_id'] not in cropped_image_ids:
+                continue
+
+            for polygon in annotation['segmentation']:
+                for index in range(0, len(polygon), 2):
+                    polygon[index] -= x
+                    polygon[index + 1] -= y
+            annotation['bbox'][0] -= x
+            annotation['bbox'][1] -= y
+
+        with coco_path.open('w', encoding='utf-8') as coco_file:
+            json.dump(coco_data, coco_file, indent=4)
+
+crop(image_paths=glob.glob("../data/images/cavite/*.jpg"), yolo_paths=glob.glob("../data/labels/YOLO/cavite/*.txt"), coco_path="../data/labels/COCO/cavite/annotations.json")
+
+crop(image_paths=glob.glob("../data/images/oeufs/*.jpg"), yolo_paths=glob.glob("../data/labels/YOLO/oeufs/*.txt"), coco_path="../data/labels/COCO/oeufs/annotations.oeufs_2_classes.json")
+
+
+# -------- 4.5 Suppression de classes COCO --------
 def delete_classes_COCO(input_path, output_path, excluded_categories):
     with open(input_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
@@ -205,7 +400,7 @@ delete_classes_COCO(input_path = "../data/labels/COCO/cavite/annotations.json", 
 # Suppression de la gonade
 delete_classes_COCO(input_path = "../data/labels/COCO/oeufs/annotations.oeufs_2_classes.json", output_path = "../data/labels/COCO/oeufs/annotations.oeufs.json", excluded_categories=["Gonade"])
 
-# -------- 4.5 Suppression de classes YOLO --------
+# -------- 4.6 Suppression de classes YOLO --------
 def delete_classes_YOLO(input_dir, output_dir, excluded_classes):
     for file_name in os.listdir(input_dir):
         if file_name.endswith(".txt"):
@@ -257,26 +452,9 @@ for item in os.listdir(source_dir):
 delete_classes_YOLO(input_dir = "../data/labels/YOLO/oeufs/", output_dir = "../data/labels/YOLO/oeufs/", excluded_classes=[0]) # Suppression la gonade (classe 0)
 
 
-# ================== 5. Enrichissement du fichier metadata ==================
-# -------- 5.1 Ajout des nouveau nom dans le jeu de données --------
-df["new_name_file"] = ""
 
-for index, row in df.iterrows():
-    file_name = row["name_file"]
-    image_id = row["image_id"]
-
-    split_name = file_name.split("_")
-    heures = split_name[0]
-    heures = heures.replace("-", ".")
-    heures = heures.split(" ")[0]
-
-    annee = str(row['annee'])  # Récupère l'année depuis la ligne actuelle
-    poisson = str(row['cap_id'])  # Récupère l'identifiant du poisson depuis la ligne actuelle
-
-    new_name_file = f"{image_id}_{heures}_{poisson}_{annee}"
-    df.at[index, "new_name_file"] = new_name_file
-
-# -------- 5.2 Création de nouvelles colonne pour obtenir la position de l'échographie --------
+# ================== 6. Enrichissement du fichier metadata ==================
+# -------- 5.1 Création de nouvelles colonne pour obtenir la position de l'échographie --------
 df['position'] = df[df['type_image'] != "œufs"]['type_image'].str.replace('+', '', regex=False).str[2:].astype(float)
 df["position_ratio"] = df.position / df.long_gonade
 
@@ -368,40 +546,9 @@ for id in id_unique:
     df.loc[df.cap_id == id, "age_poisson"] = row["age_referent"].values[0]
 
 
-# -------- 5.5 Récupère l'échelle de l'échographie --------
-def OCR(image_path):
-    # ---- Récupération de l'échelle par OCR ----
-    image = cv2.imread(image_path)
-
-    # Crop et redimensionnement de l'image
-    x, y, w, h = 530, 350, 250, 200  # crop left, crop top, size right, size bottom
-    new_width, new_height = 280, 300
-    cropped_img = image[y:y+h, x:x+w] # crop
-    resized_img = cv2.resize(cropped_img, (new_width, new_height)) # Redimensionne
-
-    text = pytesseract.image_to_string(resized_img,lang='eng').strip()
-
-    return text
-
+# -------- 5.4 Ajoute les échelles lues avant le crop --------
 for id in id_unique :
-    echos = df[df.cap_id.isin([id])]
-    echelle = 0
-
-    for index,row in echos.iterrows():
-        file_path = row["new_name_file"]
-        image_path = f"../data/images/oeufs/{file_path}.jpg" # "../data/images/cavite/{file_path}.jpg" ou "../data/images/oeufs/{file_path}.jpg"
-
-        if os.path.exists(image_path):
-            # --- Récupération de l'échelle par OCR ---
-            ocr = OCR(image_path)
-            if ocr == "3,8":
-                echelle = float(ocr.replace(",",".").split()[0])
-                continue
-            elif ocr == "4.7":
-                echelle = float(ocr.replace(",",".").split()[0])
-                continue
-            elif echelle != 3.8 and echelle != 4.7:
-                echelle = 3.1
+    echelle = echelles_par_poisson.get(id)
 
     if echelle == 3.8:
         df.loc[df.cap_id == id, "echelle"] = 3.8
