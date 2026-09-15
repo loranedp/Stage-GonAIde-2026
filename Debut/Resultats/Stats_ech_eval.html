@@ -74,29 +74,36 @@ ul.task-list li input[type="checkbox"] {
 
 <section id="rappels-échantillon-de-validation" class="level3">
 <h3 class="anchored" data-anchor-id="rappels-échantillon-de-validation">Rappels échantillon de validation</h3>
+<section id="global" class="level4">
+<h4 class="anchored" data-anchor-id="global">Global</h4>
+<div id="70bb69b6" class="cell" data-execution_count="8">
+<div class="cell-output cell-output-stdout">
+<pre><code>Nombre de poissons : 40
+Nombre d'échographies transversales : 139
+Nombre d'écho transversales moyennes par poisson : 3.48
+Nombre d'échographies longitudinales : 58</code></pre>
+</div>
+</div>
+</section>
 <div class="columns">
 <div class="column" style="width:50%;">
 <section id="vrai-annotations" class="level4">
 <h4 class="anchored" data-anchor-id="vrai-annotations">Vrai annotations</h4>
-<div id="4eb54981" class="cell" data-execution_count="8">
+<div id="0013f23f" class="cell" data-execution_count="9">
 <div class="cell-output cell-output-stdout">
-<pre><code>Nombre de poissons : 19
-Nombre d'échographies transversales : 70
-Nombre d'écho transversales moyennes par poisson : 3.68
-Nombre d'échographies longitudinales : 58 (dont 49 non vides)
-Nombre d'oeufs : 331</code></pre>
+<pre><code>Nombre d'échographies transversales non vides : 132
+Nombre d'échographies longitudinales non vides : 49
+Nombre d'oeufs : 330</code></pre>
 </div>
 </div>
 </section>
 </div><div class="column" style="width:50%;">
 <section id="prédictions" class="level4">
 <h4 class="anchored" data-anchor-id="prédictions">Prédictions</h4>
-<div id="99ea4344" class="cell" data-execution_count="9">
+<div id="4a930f76" class="cell" data-execution_count="10">
 <div class="cell-output cell-output-stdout">
-<pre><code>Nombre de poissons : 19
-Nombre d'échographies transversales : 70
-Nombre d'écho transversales moyennes par poisson : 3.68
-Nombre d'échographies longitudinales : 58 (dont 54 non vides)
+<pre><code>Nombre d'échographies transversales non vides : 138
+Nombre d'échographies longitudinales non vides : 54
 Nombre d'oeufs : 570</code></pre>
 </div>
 </div>
@@ -106,8 +113,8 @@ Nombre d'oeufs : 570</code></pre>
 </section>
 <section id="volumes-et-fécondité-par-poisson" class="level3">
 <h3 class="anchored" data-anchor-id="volumes-et-fécondité-par-poisson">Volumes et fécondité par poisson</h3>
-<div id="50bc1c62" class="cell" data-execution_count="10">
-<div class="cell-output cell-output-display" data-execution_count="10">
+<div id="a8888e54" class="cell" data-execution_count="11">
+<div class="cell-output cell-output-display" data-execution_count="11">
 <div>
 
 
@@ -120,13 +127,13 @@ Nombre d'oeufs : 570</code></pre>
 <th data-quarto-table-cell-role="th">echelle</th>
 <th data-quarto-table-cell-role="th">volume_cavite_pred</th>
 <th data-quarto-table-cell-role="th">volume_gonade_pred</th>
-<th data-quarto-table-cell-role="th">volume_moyen_oeufs_mm3_pred</th>
 <th data-quarto-table-cell-role="th">volume_cavite_true</th>
 <th data-quarto-table-cell-role="th">volume_gonade_true</th>
-<th data-quarto-table-cell-role="th">volume_moyen_oeufs_mm3_true</th>
 <th data-quarto-table-cell-role="th">poids_poisson</th>
 <th data-quarto-table-cell-role="th">long_poisson</th>
 <th data-quarto-table-cell-role="th">age_poisson</th>
+<th data-quarto-table-cell-role="th">volume_median_oeufs_mm3_true</th>
+<th data-quarto-table-cell-role="th">volume_median_oeufs_mm3_pred</th>
 <th data-quarto-table-cell-role="th">fecondite_pred</th>
 <th data-quarto-table-cell-role="th">fecondite_true</th>
 </tr>
@@ -137,323 +144,680 @@ Nombre d'oeufs : 570</code></pre>
 <td>356302</td>
 <td>0004575</td>
 <td>3.1</td>
-<td>4.375127</td>
-<td>2.388818</td>
-<td>2.515523</td>
-<td>4.269466</td>
-<td>1.585980</td>
-<td>3.186957</td>
+<td>7.097496</td>
+<td>3.949021</td>
+<td>6.812223</td>
+<td>2.530539</td>
 <td>65.6</td>
 <td>176</td>
 <td>None</td>
-<td>949.630665</td>
-<td>497.647185</td>
+<td>7.578333</td>
+<td>4.345598</td>
+<td>908.740579</td>
+<td>333.917572</td>
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">1</th>
 <td>356418</td>
 <td>0004585</td>
 <td>3.8</td>
-<td>8.735208</td>
-<td>5.476695</td>
-<td>8.524825</td>
-<td>8.699849</td>
-<td>5.726512</td>
-<td>6.398065</td>
+<td>14.070577</td>
+<td>8.732686</td>
+<td>13.881199</td>
+<td>9.137038</td>
 <td>95.7</td>
 <td>205</td>
 <td>2+</td>
-<td>642.440719</td>
-<td>895.038074</td>
+<td>13.491831</td>
+<td>18.892601</td>
+<td>462.227847</td>
+<td>677.227451</td>
 </tr>
 <tr class="odd">
+<th data-quarto-table-cell-role="th">2</th>
+<td>356430</td>
+<td>0004591</td>
+<td>3.8</td>
+<td>18.886865</td>
+<td>8.760796</td>
+<td>18.391844</td>
+<td>11.946569</td>
+<td>128.9</td>
+<td>223</td>
+<td>2+</td>
+<td>18.163414</td>
+<td>9.734851</td>
+<td>899.941492</td>
+<td>657.727060</td>
+</tr>
+<tr class="even">
 <th data-quarto-table-cell-role="th">3</th>
 <td>356434</td>
 <td>0004596</td>
 <td>3.8</td>
-<td>10.971012</td>
-<td>6.327233</td>
-<td>6.869977</td>
-<td>11.473188</td>
-<td>7.174567</td>
-<td>4.791737</td>
+<td>17.785003</td>
+<td>9.597349</td>
+<td>18.306250</td>
+<td>11.447509</td>
 <td>116.3</td>
 <td>212</td>
 <td>None</td>
-<td>920.997744</td>
-<td>1497.279032</td>
+<td>10.905562</td>
+<td>13.827730</td>
+<td>694.065396</td>
+<td>1049.694506</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <th data-quarto-table-cell-role="th">4</th>
 <td>356859</td>
 <td>0004646</td>
 <td>3.8</td>
-<td>6.623089</td>
-<td>2.780308</td>
-<td>7.952728</td>
-<td>6.613133</td>
-<td>3.677799</td>
-<td>6.654446</td>
+<td>11.513660</td>
+<td>6.807566</td>
+<td>10.551703</td>
+<td>5.868178</td>
 <td>126.0</td>
 <td>230</td>
 <td>2+</td>
-<td>349.604270</td>
-<td>552.682956</td>
+<td>11.982479</td>
+<td>13.961853</td>
+<td>487.583242</td>
+<td>489.729869</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <th data-quarto-table-cell-role="th">5</th>
 <td>356868</td>
 <td>0004650</td>
 <td>3.8</td>
-<td>9.416856</td>
-<td>4.638421</td>
-<td>7.528736</td>
-<td>8.886835</td>
-<td>5.234275</td>
-<td>6.550246</td>
+<td>15.131671</td>
+<td>6.930863</td>
+<td>14.179548</td>
+<td>8.351642</td>
 <td>85.8</td>
 <td>202</td>
 <td>2+</td>
-<td>616.095615</td>
-<td>799.095942</td>
+<td>13.250699</td>
+<td>13.731120</td>
+<td>504.755853</td>
+<td>630.279324</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <th data-quarto-table-cell-role="th">6</th>
 <td>356877</td>
 <td>0004656</td>
 <td>3.8</td>
-<td>2.204476</td>
-<td>1.015248</td>
-<td>0.000000</td>
-<td>2.116932</td>
-<td>1.112477</td>
-<td>2.024897</td>
+<td>3.515767</td>
+<td>1.473417</td>
+<td>3.377708</td>
+<td>1.775032</td>
 <td>39.1</td>
 <td>147</td>
 <td>1+</td>
+<td>3.963647</td>
 <td>NaN</td>
-<td>549.399227</td>
+<td>NaN</td>
+<td>447.828070</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <th data-quarto-table-cell-role="th">7</th>
 <td>356918</td>
 <td>0004663</td>
 <td>3.8</td>
-<td>5.864199</td>
-<td>1.213763</td>
-<td>8.738142</td>
-<td>6.104026</td>
-<td>1.017180</td>
-<td>2.200672</td>
+<td>9.918366</td>
+<td>4.136086</td>
+<td>9.739387</td>
+<td>1.622979</td>
 <td>62.1</td>
 <td>163</td>
 <td>1+</td>
-<td>138.904047</td>
-<td>462.213206</td>
+<td>4.629828</td>
+<td>16.206889</td>
+<td>255.205452</td>
+<td>350.548528</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <th data-quarto-table-cell-role="th">8</th>
 <td>356948</td>
 <td>0004671</td>
 <td>3.8</td>
-<td>10.461441</td>
-<td>5.749345</td>
-<td>6.173627</td>
-<td>10.477818</td>
-<td>5.458090</td>
-<td>6.277946</td>
+<td>16.686524</td>
+<td>8.042162</td>
+<td>16.718070</td>
+<td>8.708754</td>
 <td>116.5</td>
 <td>225</td>
 <td>2+</td>
-<td>931.275124</td>
-<td>869.407031</td>
+<td>12.902081</td>
+<td>15.435568</td>
+<td>521.014930</td>
+<td>674.988295</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">9</th>
+<td>356970</td>
+<td>0004678</td>
+<td>3.8</td>
+<td>9.170055</td>
+<td>4.656454</td>
+<td>8.912900</td>
+<td>3.047417</td>
+<td>68.7</td>
+<td>188</td>
+<td>1+</td>
+<td>6.465735</td>
+<td>10.669065</td>
+<td>436.444475</td>
+<td>471.317909</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">10</th>
 <td>357291</td>
 <td>0004723</td>
 <td>3.8</td>
-<td>11.613659</td>
-<td>6.587136</td>
-<td>9.650259</td>
-<td>11.737027</td>
-<td>6.566575</td>
-<td>9.131143</td>
+<td>19.916259</td>
+<td>11.701216</td>
+<td>18.727223</td>
+<td>10.526511</td>
 <td>155.4</td>
 <td>242</td>
 <td>3+3</td>
-<td>682.586418</td>
-<td>719.140496</td>
+<td>16.324145</td>
+<td>17.647624</td>
+<td>663.047686</td>
+<td>644.843016</td>
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">11</th>
 <td>357302</td>
 <td>0004729</td>
 <td>3.8</td>
-<td>1.688735</td>
-<td>0.540846</td>
-<td>4.638206</td>
-<td>1.671312</td>
-<td>0.546105</td>
-<td>0.000000</td>
+<td>2.696958</td>
+<td>0.679203</td>
+<td>2.666691</td>
+<td>0.871347</td>
 <td>31.2</td>
 <td>137</td>
 <td>1+</td>
-<td>116.606730</td>
-<td>NaN</td>
+<td>8.127562</td>
+<td>9.411306</td>
+<td>72.168862</td>
+<td>107.208903</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">12</th>
 <td>357305</td>
 <td>0004733</td>
 <td>3.8</td>
-<td>5.360587</td>
-<td>2.485370</td>
-<td>0.000000</td>
-<td>5.428373</td>
-<td>2.406470</td>
-<td>7.262599</td>
+<td>9.010366</td>
+<td>4.204187</td>
+<td>8.661337</td>
+<td>3.839687</td>
 <td>74.7</td>
 <td>185</td>
 <td>1+</td>
-<td>NaN</td>
-<td>331.351128</td>
+<td>14.243595</td>
+<td>10.766834</td>
+<td>390.475684</td>
+<td>269.572873</td>
 </tr>
 <tr class="even">
-<th data-quarto-table-cell-role="th">33</th>
-<td>426729</td>
-<td>0006938</td>
+<th data-quarto-table-cell-role="th">13</th>
+<td>362702</td>
+<td>0004863</td>
 <td>3.8</td>
-<td>6.894202</td>
-<td>3.221319</td>
-<td>5.999250</td>
-<td>7.200584</td>
-<td>3.744806</td>
-<td>5.118055</td>
-<td>97.1</td>
-<td>203</td>
+<td>15.723270</td>
+<td>7.957760</td>
+<td>15.291433</td>
+<td>5.715391</td>
+<td>115.7</td>
+<td>210</td>
+<td>2+</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">14</th>
+<td>362725</td>
+<td>0004866</td>
+<td>3.8</td>
+<td>6.101915</td>
+<td>3.003823</td>
+<td>6.465153</td>
+<td>1.946295</td>
+<td>55.3</td>
+<td>166</td>
+<td>1+</td>
+<td>NaN</td>
+<td>16.214363</td>
+<td>185.256902</td>
+<td>NaN</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">15</th>
+<td>362728</td>
+<td>0004871</td>
+<td>3.8</td>
+<td>19.858677</td>
+<td>13.188271</td>
+<td>19.410791</td>
+<td>10.894448</td>
+<td>128.1</td>
+<td>226</td>
+<td>2+</td>
+<td>13.480608</td>
+<td>16.798783</td>
+<td>785.073041</td>
+<td>808.156990</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">16</th>
+<td>362791</td>
+<td>0004877</td>
+<td>3.8</td>
+<td>3.578385</td>
+<td>2.009328</td>
+<td>3.782462</td>
+<td>1.859213</td>
+<td>44.6</td>
+<td>156</td>
+<td>1+</td>
+<td>3.062197</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>607.149825</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">18</th>
+<td>363066</td>
+<td>0004898</td>
+<td>3.8</td>
+<td>9.409182</td>
+<td>4.949973</td>
+<td>9.876945</td>
+<td>5.170205</td>
+<td>67.3</td>
+<td>178</td>
+<td>1+</td>
+<td>8.997912</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>574.600481</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">20</th>
+<td>363492</td>
+<td>0005017</td>
+<td>3.8</td>
+<td>5.366892</td>
+<td>2.308893</td>
+<td>5.733504</td>
+<td>2.734430</td>
+<td>43.8</td>
+<td>150</td>
+<td>1+</td>
+<td>8.805562</td>
+<td>15.296715</td>
+<td>150.940475</td>
+<td>310.534356</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">21</th>
+<td>363529</td>
+<td>0005021</td>
+<td>3.8</td>
+<td>2.122365</td>
+<td>1.269456</td>
+<td>1.923085</td>
+<td>0.313213</td>
+<td>32.8</td>
+<td>137</td>
+<td>1+</td>
+<td>NaN</td>
+<td>10.358646</td>
+<td>122.550410</td>
+<td>NaN</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">23</th>
+<td>363778</td>
+<td>0005116</td>
+<td>3.8</td>
+<td>32.604190</td>
+<td>16.746029</td>
+<td>35.789174</td>
+<td>11.628596</td>
+<td>208.3</td>
+<td>266</td>
 <td>None</td>
-<td>536.953697</td>
-<td>731.685255</td>
+<td>13.915082</td>
+<td>18.143876</td>
+<td>922.957613</td>
+<td>835.682907</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">24</th>
+<td>405826</td>
+<td>0005931</td>
+<td>3.8</td>
+<td>18.625369</td>
+<td>10.379742</td>
+<td>18.256124</td>
+<td>8.252625</td>
+<td>145.0</td>
+<td>236</td>
+<td>2+</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">25</th>
+<td>405924</td>
+<td>0005961</td>
+<td>3.8</td>
+<td>15.808347</td>
+<td>7.581281</td>
+<td>15.163139</td>
+<td>8.005104</td>
+<td>110.8</td>
+<td>216</td>
+<td>2+</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">26</th>
+<td>406037</td>
+<td>0005988</td>
+<td>3.8</td>
+<td>21.139328</td>
+<td>9.670629</td>
+<td>21.730160</td>
+<td>6.605936</td>
+<td>209.9</td>
+<td>281</td>
+<td>3+3</td>
+<td>14.262559</td>
+<td>15.359332</td>
+<td>629.625582</td>
+<td>463.166281</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">27</th>
+<td>406070</td>
+<td>0006010</td>
+<td>3.8</td>
+<td>8.172483</td>
+<td>4.286714</td>
+<td>8.209837</td>
+<td>4.423296</td>
+<td>89.4</td>
+<td>198</td>
+<td>1+</td>
+<td>10.454494</td>
+<td>13.119138</td>
+<td>326.752741</td>
+<td>423.099927</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">28</th>
+<td>406320</td>
+<td>0006119</td>
+<td>3.8</td>
+<td>5.598544</td>
+<td>2.399995</td>
+<td>5.379995</td>
+<td>2.788671</td>
+<td>80.5</td>
+<td>188</td>
+<td>1+</td>
+<td>NaN</td>
+<td>15.237704</td>
+<td>157.503695</td>
+<td>NaN</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">29</th>
+<td>406377</td>
+<td>0006152</td>
+<td>3.8</td>
+<td>10.069991</td>
+<td>5.392816</td>
+<td>10.055765</td>
+<td>6.363198</td>
+<td>92.2</td>
+<td>210</td>
+<td>1+</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">30</th>
+<td>406648</td>
+<td>0006193</td>
+<td>3.8</td>
+<td>30.494610</td>
+<td>8.490891</td>
+<td>29.582635</td>
+<td>3.126106</td>
+<td>124.6</td>
+<td>215</td>
+<td>2+</td>
+<td>13.405610</td>
+<td>15.761101</td>
+<td>538.724504</td>
+<td>233.193836</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">31</th>
+<td>406703</td>
+<td>0006221</td>
+<td>3.8</td>
+<td>5.863761</td>
+<td>2.246711</td>
+<td>5.985427</td>
+<td>1.693049</td>
+<td>57.5</td>
+<td>174</td>
+<td>1+</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">32</th>
+<td>406707</td>
+<td>0006222</td>
+<td>3.8</td>
+<td>12.186802</td>
+<td>5.513779</td>
+<td>12.422471</td>
+<td>5.364627</td>
+<td>81.9</td>
+<td>192</td>
+<td>1+</td>
+<td>14.579701</td>
+<td>14.982459</td>
+<td>368.015643</td>
+<td>367.951757</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">34</th>
-<td>426735</td>
-<td>0006946</td>
-<td>3.1</td>
-<td>4.173492</td>
-<td>2.224554</td>
-<td>NaN</td>
-<td>4.214518</td>
-<td>1.831105</td>
-<td>NaN</td>
-<td>81.8</td>
-<td>191</td>
-<td>None</td>
-<td>NaN</td>
-<td>NaN</td>
+<td>406915</td>
+<td>0006262</td>
+<td>3.8</td>
+<td>16.157163</td>
+<td>6.964693</td>
+<td>16.780261</td>
+<td>5.057009</td>
+<td>120.4</td>
+<td>222</td>
+<td>3+</td>
+<td>23.931485</td>
+<td>15.014088</td>
+<td>463.877170</td>
+<td>211.311955</td>
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">35</th>
+<td>406931</td>
+<td>0006273</td>
+<td>3.8</td>
+<td>6.938223</td>
+<td>3.942525</td>
+<td>6.989457</td>
+<td>3.658971</td>
+<td>83.8</td>
+<td>204</td>
+<td>1+</td>
+<td>7.602857</td>
+<td>10.390009</td>
+<td>379.453445</td>
+<td>481.262586</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">37</th>
+<td>426711</td>
+<td>0006931</td>
+<td>3.8</td>
+<td>19.109961</td>
+<td>9.885694</td>
+<td>18.518862</td>
+<td>10.103980</td>
+<td>136.4</td>
+<td>231</td>
+<td>None</td>
+<td>21.783879</td>
+<td>14.097196</td>
+<td>701.252506</td>
+<td>463.828329</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">38</th>
+<td>426729</td>
+<td>0006938</td>
+<td>3.8</td>
+<td>11.658862</td>
+<td>4.950417</td>
+<td>11.489020</td>
+<td>5.975091</td>
+<td>97.1</td>
+<td>203</td>
+<td>None</td>
+<td>7.505258</td>
+<td>11.683449</td>
+<td>423.711952</td>
+<td>796.120691</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">39</th>
 <td>426770</td>
 <td>0006953</td>
 <td>3.8</td>
-<td>8.576319</td>
-<td>5.175670</td>
-<td>6.014836</td>
-<td>8.870822</td>
-<td>4.447284</td>
-<td>7.426516</td>
+<td>14.514278</td>
+<td>7.499252</td>
+<td>14.153998</td>
+<td>7.095944</td>
 <td>120.0</td>
 <td>221</td>
 <td>None</td>
-<td>860.483917</td>
-<td>598.838635</td>
+<td>15.040883</td>
+<td>10.467146</td>
+<td>716.456224</td>
+<td>471.777111</td>
 </tr>
-<tr class="odd">
-<th data-quarto-table-cell-role="th">36</th>
+<tr class="even">
+<th data-quarto-table-cell-role="th">40</th>
 <td>427181</td>
 <td>0007099</td>
 <td>3.8</td>
-<td>21.359009</td>
-<td>12.103506</td>
-<td>10.060788</td>
-<td>22.676348</td>
-<td>13.759359</td>
-<td>7.456386</td>
+<td>36.378385</td>
+<td>18.767835</td>
+<td>36.181652</td>
+<td>21.953990</td>
 <td>284.5</td>
 <td>295</td>
 <td>None</td>
-<td>1203.037521</td>
-<td>1845.312120</td>
-</tr>
-<tr class="even">
-<th data-quarto-table-cell-role="th">37</th>
-<td>427184</td>
-<td>0007106</td>
-<td>3.1</td>
-<td>11.511032</td>
-<td>5.448925</td>
-<td>3.670812</td>
-<td>12.120825</td>
-<td>5.789347</td>
-<td>4.575807</td>
-<td>245.4</td>
-<td>288</td>
-<td>2+</td>
-<td>1484.392489</td>
-<td>1265.207859</td>
+<td>14.074853</td>
+<td>20.378607</td>
+<td>920.957677</td>
+<td>1559.802516</td>
 </tr>
 <tr class="odd">
-<th data-quarto-table-cell-role="th">41</th>
+<th data-quarto-table-cell-role="th">43</th>
+<td>427202</td>
+<td>0007120</td>
+<td>3.8</td>
+<td>4.138417</td>
+<td>1.801617</td>
+<td>4.231566</td>
+<td>1.701786</td>
+<td>48.3</td>
+<td>163</td>
+<td>2+</td>
+<td>NaN</td>
+<td>14.291647</td>
+<td>126.060806</td>
+<td>NaN</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">45</th>
 <td>427266</td>
 <td>0007139</td>
 <td>3.8</td>
-<td>6.905204</td>
-<td>4.279069</td>
-<td>7.671395</td>
-<td>6.939388</td>
-<td>4.305429</td>
-<td>3.563555</td>
+<td>11.169334</td>
+<td>6.796038</td>
+<td>11.072265</td>
+<td>6.869604</td>
 <td>94.1</td>
 <td>208</td>
 <td>1+</td>
-<td>557.795378</td>
-<td>1208.183679</td>
+<td>7.073498</td>
+<td>15.610019</td>
+<td>435.363832</td>
+<td>971.174944</td>
 </tr>
-<tr class="even">
-<th data-quarto-table-cell-role="th">42</th>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">46</th>
 <td>427276</td>
 <td>0007150</td>
 <td>3.8</td>
-<td>11.735312</td>
-<td>5.479144</td>
-<td>NaN</td>
-<td>11.408657</td>
-<td>4.243235</td>
-<td>NaN</td>
+<td>18.452932</td>
+<td>9.284886</td>
+<td>18.203287</td>
+<td>6.770369</td>
 <td>188.4</td>
 <td>258</td>
 <td>None</td>
 <td>NaN</td>
 <td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
 </tr>
-<tr class="odd">
-<th data-quarto-table-cell-role="th">43</th>
+<tr class="even">
+<th data-quarto-table-cell-role="th">47</th>
 <td>427305</td>
 <td>0007156</td>
 <td>3.8</td>
-<td>4.018180</td>
-<td>0.000000</td>
-<td>7.073153</td>
-<td>4.839770</td>
-<td>3.782932</td>
-<td>15.695720</td>
+<td>6.606987</td>
+<td>0.199000</td>
+<td>7.722182</td>
+<td>6.035924</td>
 <td>82.0</td>
 <td>213</td>
 <td>2+2</td>
-<td>0.000000</td>
-<td>241.016766</td>
+<td>31.422877</td>
+<td>17.181377</td>
+<td>11.582316</td>
+<td>192.086935</td>
 </tr>
 </tbody>
 </table>
@@ -464,18 +828,18 @@ Nombre d'oeufs : 570</code></pre>
 </section>
 <section id="vérification-des-surfaces-des-gonades-et-de-la-cavité---annotations" class="level2">
 <h2 class="anchored" data-anchor-id="vérification-des-surfaces-des-gonades-et-de-la-cavité---annotations">Vérification des surfaces des gonades et de la cavité - Annotations</h2>
-<div id="66834e2f" class="cell" data-execution_count="11">
+<div id="7d0dc6bf" class="cell" data-execution_count="12">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-12-output-1.png" width="953" height="470" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-13-output-1.png" width="942" height="723" class="figure-img"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-12-output-2.png" width="953" height="470" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-13-output-2.png" width="953" height="723" class="figure-img"></p>
 </figure>
 </div>
 </div>
@@ -483,18 +847,18 @@ Nombre d'oeufs : 570</code></pre>
 </section>
 <section id="vérification-des-surfaces-des-gonades-et-de-la-cavité---prédictions" class="level2">
 <h2 class="anchored" data-anchor-id="vérification-des-surfaces-des-gonades-et-de-la-cavité---prédictions">Vérification des surfaces des gonades et de la cavité - Prédictions</h2>
-<div id="815cd624" class="cell" data-execution_count="12">
+<div id="e401b772" class="cell" data-execution_count="13">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-13-output-1.png" width="953" height="470" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-14-output-1.png" width="953" height="723" class="figure-img"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-13-output-2.png" width="953" height="470" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-14-output-2.png" width="953" height="723" class="figure-img"></p>
 </figure>
 </div>
 </div>
@@ -502,64 +866,54 @@ Nombre d'oeufs : 570</code></pre>
 </section>
 <section id="détection-des-anomalies-selon-laugmentation-de-la-surface" class="level2">
 <h2 class="anchored" data-anchor-id="détection-des-anomalies-selon-laugmentation-de-la-surface">Détection des anomalies selon l’augmentation de la surface</h2>
-<div id="2ff919ff" class="cell" data-execution_count="13">
+<div id="8f484e10" class="cell" data-execution_count="14">
 <div class="cell-output cell-output-stdout">
-<pre><code>Pred - Poisson : 356918 - Problèmes : [0, 1, 1]
-Pred - Poisson : 356918 - Problème sur l'écho à la position 2.0 (diminution surface gonade : -62.0%)
-True - Poisson : 356918 - Problèmes : [0, 1, 1]
-True - Poisson : 356918 - Problème sur l'écho à la position 2.0 (diminution surface gonade : -75.0%)
-Pred - Poisson : 427181 - Problèmes : [0, 0, 1, 1, 0, 0]
-Pred - Poisson : 427181 - Problème sur l'écho à la position 4.0 (diminution surface gonade : 12.0%)</code></pre>
+<pre><code>Pred - Poisson : 356434 - [0, 1, 1, 0] - Problème sur l'écho à la position 2.0 (diminution surface gonade : -19.0%)
+True - Poisson : 356918 - [0, 1, 1] - Problème sur l'écho à la position 2.0 (diminution surface gonade : -75.0%)
+True - Poisson : 356970 - [0, 1, 1] - Problème sur l'écho à la position 2.0 (diminution surface gonade : -65.0%)
+True - Poisson : 362725 - [0, 1, 0] -Problème sur l'écho à la position 0.0 (diminution surface gonade : 0.0%)
+True - Poisson : 363778 - [0, 1, 0, 0, 0] -Problème sur l'écho à la position 0.0 (diminution surface gonade : 0.0%)
+True - Poisson : 406037 - [0, 1, 1, 0] - Problème sur l'écho à la position 2.0 (diminution surface gonade : -53.0%)
+pred - Poisson : 406070 - [0, 1, 0] - Problème sur l'écho à la position 0.0 (diminution surface gonade : 0.0%)
+True - Poisson : 406070 - [0, 1, 0] -Problème sur l'écho à la position 0.0 (diminution surface gonade : 0.0%)</code></pre>
 </div>
 </div>
 </section>
 <section id="relations-entre-surfaces-des-gonades-et-de-la-cavité---annotations" class="level2">
 <h2 class="anchored" data-anchor-id="relations-entre-surfaces-des-gonades-et-de-la-cavité---annotations">Relations entre surfaces des gonades et de la cavité - Annotations</h2>
-<div id="4f1194de" class="cell" data-execution_count="14">
+<div id="2be33902" class="cell" data-execution_count="15">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-15-output-1.png" width="1133" height="470" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-16-output-1.png" width="1131" height="470" class="figure-img"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Corrélation : 0.61
-Corrélation (pour position echo &gt;= 2) : 0.82</code></pre>
+<pre><code>Corrélation : 0.52
+Corrélation (pour position echo &gt;= 2) : 0.60</code></pre>
 </div>
 </div>
 </section>
 <section id="relations-entre-surfaces-des-gonades-et-de-la-cavité---prédictions" class="level2">
 <h2 class="anchored" data-anchor-id="relations-entre-surfaces-des-gonades-et-de-la-cavité---prédictions">Relations entre surfaces des gonades et de la cavité - Prédictions</h2>
-<div id="cdc89fe0" class="cell" data-execution_count="15">
+<div id="78233aa9" class="cell" data-execution_count="16">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-16-output-1.png" width="1133" height="470" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-17-output-1.png" width="1131" height="470" class="figure-img"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Corrélation : 0.64
-Corrélation (pour position echo &gt;= 2) : 0.82</code></pre>
+Corrélation (pour position echo &gt;= 2) : 0.76</code></pre>
 </div>
 </div>
 </section>
 <section id="distribution-du-volume-des-gonades" class="level2">
 <h2 class="anchored" data-anchor-id="distribution-du-volume-des-gonades">Distribution du volume des gonades</h2>
-<div id="8b0de8a5" class="cell" data-execution_count="16">
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-17-output-1.png" width="952" height="374" class="figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="relations-entre-le-volume-des-gonades-et-le-poids-des-poissons" class="level2">
-<h2 class="anchored" data-anchor-id="relations-entre-le-volume-des-gonades-et-le-poids-des-poissons">Relations entre le volume des gonades et le poids des poissons</h2>
-<div id="f8d232c6" class="cell" data-execution_count="17">
+<div id="2d42ab89" class="cell" data-execution_count="17">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -567,15 +921,11 @@ Corrélation (pour position echo &gt;= 2) : 0.82</code></pre>
 </figure>
 </div>
 </div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Corrélation annotations : 0.82
-Corrélation prédictions : 0.83</code></pre>
-</div>
 </div>
 </section>
-<section id="relations-entre-le-volume-des-cavités-et-le-poids-des-poissons" class="level2">
-<h2 class="anchored" data-anchor-id="relations-entre-le-volume-des-cavités-et-le-poids-des-poissons">Relations entre le volume des cavités et le poids des poissons</h2>
-<div id="277ebaee" class="cell" data-execution_count="18">
+<section id="relations-entre-le-volume-des-gonades-et-le-poids-des-poissons" class="level2">
+<h2 class="anchored" data-anchor-id="relations-entre-le-volume-des-gonades-et-le-poids-des-poissons">Relations entre le volume des gonades et le poids des poissons</h2>
+<div id="798e7e96" class="cell" data-execution_count="18">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -584,18 +934,34 @@ Corrélation prédictions : 0.83</code></pre>
 </div>
 </div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Corrélation Annotations : 0.90
+<pre><code>Corrélation annotations : 0.82
+Corrélation prédictions : 0.91</code></pre>
+</div>
+</div>
+</section>
+<section id="relations-entre-le-volume-des-cavités-et-le-poids-des-poissons" class="level2">
+<h2 class="anchored" data-anchor-id="relations-entre-le-volume-des-cavités-et-le-poids-des-poissons">Relations entre le volume des cavités et le poids des poissons</h2>
+<div id="4ba2be6f" class="cell" data-execution_count="19">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_eval_files/figure-html/cell-20-output-1.png" width="951" height="374" class="figure-img"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Corrélation Annotations : 0.89
 Corrélation prédictions : 0.89</code></pre>
 </div>
 </div>
 </section>
 <section id="distribution-du-volume-des-oeufs" class="level2">
 <h2 class="anchored" data-anchor-id="distribution-du-volume-des-oeufs">Distribution du volume des oeufs</h2>
-<div id="d9d1e22c" class="cell" data-execution_count="20">
+<div id="4258809f" class="cell" data-execution_count="21">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-21-output-1.png" width="1048" height="374" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-22-output-1.png" width="1048" height="374" class="figure-img"></p>
 </figure>
 </div>
 </div>
@@ -603,11 +969,11 @@ Corrélation prédictions : 0.89</code></pre>
 </section>
 <section id="volume-du-i-ème-plus-gros-œuf-par-poisson---annotations" class="level2">
 <h2 class="anchored" data-anchor-id="volume-du-i-ème-plus-gros-œuf-par-poisson---annotations">Volume du i-ème plus gros œuf par poisson - Annotations</h2>
-<div id="8acf6023" class="cell" data-execution_count="21">
+<div id="3a993356" class="cell" data-execution_count="22">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-22-output-1.png" width="1147" height="1179" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-23-output-1.png" width="1148" height="1179" class="figure-img"></p>
 </figure>
 </div>
 </div>
@@ -615,11 +981,11 @@ Corrélation prédictions : 0.89</code></pre>
 </section>
 <section id="distribution-du-nombre-dœufs-par-échographie" class="level2">
 <h2 class="anchored" data-anchor-id="distribution-du-nombre-dœufs-par-échographie">Distribution du nombre d’œufs par échographie</h2>
-<div id="7b32110a" class="cell" data-execution_count="22">
+<div id="584d9878" class="cell" data-execution_count="23">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-23-output-1.png" width="1047" height="374" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-24-output-1.png" width="1047" height="374" class="figure-img"></p>
 </figure>
 </div>
 </div>
@@ -630,19 +996,7 @@ Corrélation prédictions : 0.89</code></pre>
 </section>
 <section id="annotations" class="level2">
 <h2 class="anchored" data-anchor-id="annotations">Annotations</h2>
-<div id="a8c1ca5e" class="cell" data-execution_count="23">
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-24-output-1.png" width="1317" height="557" class="figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="prédictions-1" class="level2">
-<h2 class="anchored" data-anchor-id="prédictions-1">Prédictions</h2>
-<div id="0a9cb063" class="cell" data-execution_count="24">
+<div id="01b3bfb9" class="cell" data-execution_count="24">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -652,64 +1006,64 @@ Corrélation prédictions : 0.89</code></pre>
 </div>
 </div>
 </section>
-<section id="comparaison-du-volume-des-œufs-par-poisson-annotations-vs-prédictions" class="level2">
-<h2 class="anchored" data-anchor-id="comparaison-du-volume-des-œufs-par-poisson-annotations-vs-prédictions">Comparaison du volume des œufs par poisson : annotations vs prédictions</h2>
-<div id="9a6f2e67" class="cell" data-execution_count="25">
+<section id="prédictions-1" class="level2">
+<h2 class="anchored" data-anchor-id="prédictions-1">Prédictions</h2>
+<div id="e32962a3" class="cell" data-execution_count="25">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-26-output-1.png" width="1782" height="683" class="figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="92cc93de" class="cell" data-execution_count="26">
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-27-output-1.png" width="1163" height="779" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-26-output-1.png" width="1317" height="557" class="figure-img"></p>
 </figure>
 </div>
 </div>
 </div>
 </section>
-<section id="relation-entre-le-volume-des-oeufs-moyens-et-des-gonades" class="level2">
-<h2 class="anchored" data-anchor-id="relation-entre-le-volume-des-oeufs-moyens-et-des-gonades">Relation entre le volume des oeufs moyens et des gonades</h2>
-<div id="848d3a7f" class="cell" data-execution_count="27">
+<section id="comparaison-du-volume-des-œufs-par-poisson-annotations-vs-prédictions" class="level2">
+<h2 class="anchored" data-anchor-id="comparaison-du-volume-des-œufs-par-poisson-annotations-vs-prédictions">Comparaison du volume des œufs par poisson : annotations vs prédictions</h2>
+<div id="e1e83aa5" class="cell" data-execution_count="26">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-28-output-1.png" width="1143" height="374" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-27-output-1.png" width="1782" height="683" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="1cce6bd7" class="cell" data-execution_count="27">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_eval_files/figure-html/cell-28-output-1.png" width="1163" height="779" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="relation-entre-le-volume-médian-des-oeufs-et-des-gonades" class="level2">
+<h2 class="anchored" data-anchor-id="relation-entre-le-volume-médian-des-oeufs-et-des-gonades">Relation entre le volume médian des oeufs et des gonades</h2>
+<div id="65353cb2" class="cell" data-execution_count="28">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_eval_files/figure-html/cell-29-output-1.png" width="1143" height="374" class="figure-img"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Corrélation annotations : 0.3771492020347228
-Corrélation prédictions : 0.4883359314105008</code></pre>
+<pre><code>Corrélation annotations : 0.394630129738925
+Corrélation prédictions : 0.49632052852352604</code></pre>
 </div>
 </div>
 </section>
 <section id="distribution-de-la-fécondité" class="level2">
 <h2 class="anchored" data-anchor-id="distribution-de-la-fécondité">Distribution de la fécondité</h2>
-<div id="93e0ff99" class="cell" data-execution_count="28">
+<div id="4e593657" class="cell" data-execution_count="29">
 <div class="cell-output cell-output-stdout">
-<pre><code>Nombre de poissons avec une fécondité calculable : 16 sur 19 (Annotations)
-Nombre de poissons avec une fécondité calculable : 15 sur 19 (Predictions)</code></pre>
+<pre><code>Nombre de poissons avec une fécondité calculable : 30 sur 40 (Annotations)
+Nombre de poissons avec une fécondité calculable : 31 sur 40 (Predictions)</code></pre>
 </div>
 </div>
-<div id="5dd7ee0c" class="cell" data-execution_count="29">
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-30-output-1.png" width="1049" height="374" class="figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="relations-entre-la-fécondité-et-les-caractéristiques-des-poissons---annotations" class="level2">
-<h2 class="anchored" data-anchor-id="relations-entre-la-fécondité-et-les-caractéristiques-des-poissons---annotations">Relations entre la fécondité et les caractéristiques des poissons - Annotations</h2>
-<div id="bff8195e" class="cell" data-execution_count="30">
+<div id="13cb813b" class="cell" data-execution_count="30">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -717,15 +1071,11 @@ Nombre de poissons avec une fécondité calculable : 15 sur 19 (Predictions)</co
 </figure>
 </div>
 </div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Corrélation fécondité / longueur : 0.6525496270415827
-Corrélation fécondité / poids : 0.72978905832158</code></pre>
-</div>
 </div>
 </section>
-<section id="relations-entre-la-fécondité-et-les-caractéristiques-des-poissons---prédictions" class="level2">
-<h2 class="anchored" data-anchor-id="relations-entre-la-fécondité-et-les-caractéristiques-des-poissons---prédictions">Relations entre la fécondité et les caractéristiques des poissons - Prédictions</h2>
-<div id="01c4767b" class="cell" data-execution_count="31">
+<section id="relations-entre-la-fécondité-et-les-caractéristiques-des-poissons---annotations" class="level2">
+<h2 class="anchored" data-anchor-id="relations-entre-la-fécondité-et-les-caractéristiques-des-poissons---annotations">Relations entre la fécondité et les caractéristiques des poissons - Annotations</h2>
+<div id="7bb64d20" class="cell" data-execution_count="31">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -734,8 +1084,24 @@ Corrélation fécondité / poids : 0.72978905832158</code></pre>
 </div>
 </div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Corrélation fécondité / longueur : 0.69890295793537
-Corrélation fécondité / poids : 0.7400521171847946</code></pre>
+<pre><code>Corrélation fécondité / longueur : 0.5399322466219614
+Corrélation fécondité / poids : 0.6141626226119484</code></pre>
+</div>
+</div>
+</section>
+<section id="relations-entre-la-fécondité-et-les-caractéristiques-des-poissons---prédictions" class="level2">
+<h2 class="anchored" data-anchor-id="relations-entre-la-fécondité-et-les-caractéristiques-des-poissons---prédictions">Relations entre la fécondité et les caractéristiques des poissons - Prédictions</h2>
+<div id="169133c6" class="cell" data-execution_count="32">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_eval_files/figure-html/cell-33-output-1.png" width="1048" height="374" class="figure-img"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Corrélation fécondité / longueur : 0.7152179051337659
+Corrélation fécondité / poids : 0.7298671313158651</code></pre>
 </div>
 </div>
 </section>

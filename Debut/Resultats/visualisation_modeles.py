@@ -31,9 +31,9 @@ TASKS = {
 }
 
 # ============================ 3. Visualisation des résultats ============================
-# Forme de la grille de visualisation et coordonnées du crop à afficher
+# Forme de la grille de visualisation. Les images et labels ont déjà été cropés.
 COLS = 3
-CROP = (85, 33, 510, 380)
+IMAGE_SIZE = (510, 380)
 
 def image_id_from_prediction(mask_path):
     match = re.fullmatch(r'pred_fold_\d+_(.+)\.txt', mask_path.name)
@@ -83,13 +83,12 @@ def mask_from_yolo_file(mask_path, num_classes, width, height,
             )
     return torch.from_numpy(mask)
 
-def mask_from_source_label(label_path, num_classes, original_size, crop,
+def mask_from_source_label(label_path, num_classes, image_size,
                            preserve_instances=False):
-    """Charge un label YOLO original et le reprojette dans le crop affiché."""
-    original_width, original_height = original_size
-    crop_x, crop_y, crop_width, crop_height = crop
-    mask_shape = (crop_height, crop_width) if preserve_instances else (
-        num_classes, crop_height, crop_width
+    """Charge un label YOLO déjà exprimé dans le repère de l'image cropée."""
+    width, height = image_size
+    mask_shape = (height, width) if preserve_instances else (
+        num_classes, height, width
     )
     mask_dtype = np.int32 if preserve_instances else np.float32
     mask = np.zeros(mask_shape, dtype=mask_dtype)
@@ -111,8 +110,8 @@ def mask_from_source_label(label_path, num_classes, original_size, crop,
                 continue
 
             coords = np.asarray(parts[1:], dtype=np.float32).reshape(-1, 2)
-            coords[:, 0] = coords[:, 0] * original_width - crop_x
-            coords[:, 1] = coords[:, 1] * original_height - crop_y
+            coords[:, 0] *= width
+            coords[:, 1] *= height
             if preserve_instances:
                 instance_id += 1
                 cv2.fillPoly(
@@ -178,14 +177,16 @@ for task_name, task_config in TASKS.items():
             print(f'Image source absente, visualisation ignorée : {image_path}')
             continue
 
-        x, y, width, height = CROP
-        original_image = Image.open(image_path).convert('RGB')
-        image = original_image.crop((x, y, x + width, y + height))
+        image = Image.open(image_path).convert('RGB')
+        if image.size != IMAGE_SIZE:
+            print(f'Image hors format cropé, visualisation ignorée : {image_path}')
+            continue
+        width, height = image.size
         image_tensor = TF.to_tensor(image)
 
         label_path = LABEL_ROOT / task_config['image_dir'] / f'{image_id}.txt'
         true_mask_tensor = mask_from_source_label(
-            label_path, num_classes, original_image.size, CROP,
+            label_path, num_classes, image.size,
             preserve_instances=preserve_instances
         )
         if label_path.exists():
@@ -232,7 +233,7 @@ for task_name, task_config in TASKS.items():
         if true_display is not None:
             axes_flat[1].imshow(true_display)
             axes_flat[1].set_title(
-                f'{image_id}_verite_terrain', fontsize=11,
+                f'verite_terrain', fontsize=11,
                 fontweight='bold', pad=8
             )
             axes_flat[1].axis('off')
@@ -243,7 +244,7 @@ for task_name, task_config in TASKS.items():
         ):
             axes_flat[index].imshow(display_image)
             axes_flat[index].set_title(
-                f'{image_id}_{model_name}', fontsize=11,
+                f'{model_name}', fontsize=11,
                 fontweight='bold', pad=8
             )
             axes_flat[index].axis('off')

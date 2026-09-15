@@ -42,9 +42,8 @@ cavite_true_root = "data/labels/YOLO/cavite"
 cavite_pred_root = "UNet/masks/eval/UNet/3classes"
 eggs_true_root = "data/labels/YOLO/oeufs"
 eggs_pred_root = "YOLO26/masks/eval/instance/oeufs"
-# Les exports YOLO et UNet sont normalisés sur le crop (85, 33, 510, 380).
-# L'échelle physique reste référencée à la hauteur de l'image originale.
-prediction_mask_size = (510, 380)
+
+prediction_mask_size = (510, 380) # Correspond à la taille après crop de l'image originale
 
 resultats_cavite_true = []
 resultats_cavite_pred = []
@@ -56,6 +55,7 @@ for id in unique_id:
     # On récupère les échographies associées au poisson
     echos_poisson = df[df.cap_id == id]
 
+    # On calcule les volumes de cavité et d'œufs pour les annotations et les prédictions
     res_cavite_pred = calculate_volumes(
         echos_poisson, id, f"{cavite_pred_root}/pred_", mask_size=prediction_mask_size
     )
@@ -82,9 +82,10 @@ df_res_true = df_res_true.sort_values(by=['id poisson', 'position echo'])
 ```
 
 ```{python}
+# Fusion des résultats prédits et annotés
 df_res = pd.merge(df_res_pred, df_res_true, on=["id poisson", "image_id", "position echo", "echelle"], suffixes=("_pred", "_true"), how = "left")
-
-df_res.to_csv("volumes_ech_evaluation.csv", index=False) # Sauvegarde du DataFrame en CSV
+# Sauvegarde du DataFrame en CSV
+df_res.to_csv("volumes_ech_evaluation.csv", index=False)
 ```
 
 
@@ -102,6 +103,7 @@ for _, echo in df_echos_oeufs.iterrows():
     if not mask_pred_path.exists() or not mask_true_path.exists() or not image_path.exists() or pd.isna(echo["echelle"]):
         continue
 
+        # Calcul des surfaces des œufs à partir des masques prédits et annotés
     _, surfaces_oeufs_mm2_pred = calculate_eggs_areas(
         str(mask_pred_path), str(image_path), echo["echelle"], mask_size=prediction_mask_size
     )
@@ -109,6 +111,7 @@ for _, echo in df_echos_oeufs.iterrows():
         str(mask_true_path), str(image_path), echo["echelle"]
     )
 
+    # Calcul du volume de chaque oeuf
     for surface_oeuf_mm2 in surfaces_oeufs_mm2_pred:
         if surface_oeuf_mm2 <= 0:
             continue
@@ -131,8 +134,13 @@ for _, echo in df_echos_oeufs.iterrows():
             "volume_oeuf_mm3": volume_oeuf_mm3,
         })
 
-df_oeufs_individuels_true = pd.DataFrame(oeufs_individuels_true)
-df_oeufs_individuels_pred = pd.DataFrame(oeufs_individuels_pred)
+colonnes_oeufs_individuels = ["id poisson", "image_id", "volume_oeuf_mm3"]
+df_oeufs_individuels_true = pd.DataFrame(
+    oeufs_individuels_true, columns=colonnes_oeufs_individuels
+)
+df_oeufs_individuels_pred = pd.DataFrame(
+    oeufs_individuels_pred, columns=colonnes_oeufs_individuels
+)
 ```
 
 ```{python}
@@ -141,8 +149,7 @@ df_oeufs_individuels_pred = pd.DataFrame(oeufs_individuels_pred)
 df_res["id poisson"] = df_res["id poisson"].astype(str)
 df_res = pd.merge(df_res, df[[ "image_id", "poids_poisson", "long_poisson", "age_poisson" ]], on="image_id", how="left")
 
-
-# ----- 5.2. Divise les données entre les cavités et les œufs ----
+# ----- 5.2. Divise les données entre la cavité et les œufs ----
 df_cavite = df_res[df_res["position echo"] != "œufs"]
 df_oeufs = df_res[df_res["position echo"] == "œufs"]
 
@@ -150,17 +157,31 @@ df_oeufs = df_res[df_res["position echo"] == "œufs"]
 df_debut = df_cavite[df_cavite['position echo'] < 2]
 df_fin = df_cavite[df_cavite['position echo'] >= 2]
 
-# ----- 5.4. Jeu de données final avec uniquement les volumes  -----
-df_final = df_res[["id poisson", "image_id" , "echelle", "volume_cavite_pred", "volume_gonade_pred", "volume_moyen_oeufs_mm3_pred", "volume_cavite_true", "volume_gonade_true","volume_moyen_oeufs_mm3_true", "poids_poisson", "long_poisson", "age_poisson"]].groupby('id poisson', as_index=False).last()
+# ----- 5.4. Médiane du volume de tous les œufs individuels par poisson -----
+volumes_medians_oeufs_true = (
+    df_oeufs_individuels_true.groupby("id poisson", as_index=False)["volume_oeuf_mm3"]
+    .median()
+    .rename(columns={"volume_oeuf_mm3": "volume_median_oeufs_mm3_true"})
+)
+volumes_medians_oeufs_pred = (
+    df_oeufs_individuels_pred.groupby("id poisson", as_index=False)["volume_oeuf_mm3"]
+    .median()
+    .rename(columns={"volume_oeuf_mm3": "volume_median_oeufs_mm3_pred"})
+)
+
+# ----- 5.5. Jeu de données final par poissonavec uniquement les volumes  -----
+df_final = df_res[["id poisson", "image_id", "echelle", "volume_cavite_pred", "volume_gonade_pred", "volume_cavite_true", "volume_gonade_true", "poids_poisson", "long_poisson", "age_poisson"]].groupby('id poisson', as_index=False).last()
+df_final = df_final.merge(volumes_medians_oeufs_true, on="id poisson", how="left")
+df_final = df_final.merge(volumes_medians_oeufs_pred, on="id poisson", how="left")
 df_final = df_final.dropna(subset=["volume_cavite_pred"])
 
-#------ 5.5. Calcul et ajout de la fécondité -------
-df_final["fecondite_pred"] = np.where(df_final["volume_moyen_oeufs_mm3_pred"] != 0,
-    (df_final["volume_gonade_pred"] * 1000) / df_final["volume_moyen_oeufs_mm3_pred"], 
+#------ 5.6. Calcul et ajout de la fécondité -------
+df_final["fecondite_pred"] = np.where(df_final["volume_median_oeufs_mm3_pred"] != 0,
+    (df_final["volume_gonade_pred"] * 1000) / df_final["volume_median_oeufs_mm3_pred"],
     np.nan
 )
-df_final["fecondite_true"] = np.where(df_final["volume_moyen_oeufs_mm3_true"] != 0,
-    (df_final["volume_gonade_true"] * 1000) / df_final["volume_moyen_oeufs_mm3_true"], 
+df_final["fecondite_true"] = np.where(df_final["volume_median_oeufs_mm3_true"] != 0,
+    (df_final["volume_gonade_true"] * 1000) / df_final["volume_median_oeufs_mm3_true"],
     np.nan
 )
 ```
@@ -176,16 +197,23 @@ df_other = df_cavite[df_cavite['id poisson'].isin(poissons_other)]
 
 ### Rappels échantillon de validation
 
+#### Global
+
+```{python}
+print(f"Nombre de poissons : {len(df_final)}")
+print(f"Nombre d'échographies transversales : {len(df_cavite)}")
+print(f"Nombre d'écho transversales moyennes par poisson : {len(df_cavite)/len(df_final):.2f}")
+print(f"Nombre d'échographies longitudinales : {len(df_oeufs)}")
+```
+
 :::: {.columns}
 
 ::: {.column width="50%"}
 #### Vrai annotations
 
 ```{python}
-print(f"Nombre de poissons : {len(df_final)}")
-print(f"Nombre d'échographies transversales : {len(df_cavite)}")
-print(f"Nombre d'écho transversales moyennes par poisson : {len(df_cavite)/len(df_final):.2f}")
-print(f"Nombre d'échographies longitudinales : {len(df_oeufs)} (dont {df_oeufs_individuels_true['image_id'].nunique()} non vides)")
+print(f"Nombre d'échographies transversales non vides : {(df_cavite["surface_gonade_true"] != 0).sum()}")
+print(f"Nombre d'échographies longitudinales non vides : {df_oeufs_individuels_true['image_id'].nunique()}")
 print(f"Nombre d'oeufs : {len(df_oeufs_individuels_true)}")
 ```
 :::
@@ -194,10 +222,8 @@ print(f"Nombre d'oeufs : {len(df_oeufs_individuels_true)}")
 #### Prédictions
 
 ```{python}
-print(f"Nombre de poissons : {len(df_final)}")
-print(f"Nombre d'échographies transversales : {len(df_cavite)}")
-print(f"Nombre d'écho transversales moyennes par poisson : {len(df_cavite)/len(df_final):.2f}")
-print(f"Nombre d'échographies longitudinales : {len(df_oeufs)} (dont {df_oeufs_individuels_pred['image_id'].nunique()} non vides)")
+print(f"Nombre d'échographies transversales non vides : {(df_cavite["surface_gonade_pred"] != 0).sum()}")
+print(f"Nombre d'échographies longitudinales non vides : {df_oeufs_individuels_pred['image_id'].nunique()}")
 print(f"Nombre d'oeufs : {len(df_oeufs_individuels_pred)}")
 ```
 :::
@@ -269,20 +295,16 @@ for id in df_cavite['id poisson'].unique():
         for i in range(len(pb_list_pred)-1):
             # Si il y a deux "1" à la suite, alors l'erreur est sur la première échographie où il y a un "1"
             if pb_list_pred[i] == 1 and pb_list_pred[i+1] == 1:
-                print(f"Pred - Poisson : {id} - Problèmes : {pb_list_pred}")
-                print(f"Pred - Poisson : {id} - Problème sur l'écho à la position {rows.iloc[i]['position echo']} (diminution surface gonade : {rows.iloc[i]['augmentation_surface_gonade_pred']}%)")
+                print(f"Pred - Poisson : {id} - {pb_list_pred} - Problème sur l'écho à la position {rows.iloc[i]['position echo']} (diminution surface gonade : {rows.iloc[i]['augmentation_surface_gonade_pred']}%)")
 
             if pb_list_true[i] == 1 and pb_list_true[i+1] == 1:
-                print(f"True - Poisson : {id} - Problèmes : {pb_list_true}")
-                print(f"True - Poisson : {id} - Problème sur l'écho à la position {rows.iloc[i]['position echo']} (diminution surface gonade : {rows.iloc[i]['augmentation_surface_gonade_true']}%)")
+                print(f"True - Poisson : {id} - {pb_list_true} - Problème sur l'écho à la position {rows.iloc[i]['position echo']} (diminution surface gonade : {rows.iloc[i]['augmentation_surface_gonade_true']}%)")
         # Si il y a un "1" seul à la deuxième position, alors l'erreur est sur la première échographie
         if pb_list_pred[1] == 1 and pb_list_pred[0] == 0 and pb_list_pred[2] == 0:
-            print(f"Pred - Poisson : {id} - Problèmes : {pb_list_pred}")
-            print(f"pred - Poisson : {id} - Problème sur l'écho à la position {rows.iloc[0]['position echo']} (diminution surface gonade : {rows.iloc[0]['augmentation_surface_gonade_pred']}%)")
+            print(f"pred - Poisson : {id} - {pb_list_pred} - Problème sur l'écho à la position {rows.iloc[0]['position echo']} (diminution surface gonade : {rows.iloc[0]['augmentation_surface_gonade_pred']}%)")
 
         if pb_list_true[1] == 1 and pb_list_true[0] == 0 and pb_list_true[2] == 0:
-            print(f"True - Poisson : {id} - Problèmes : {pb_list_true}")
-            print(f"True - Poisson : {id} - Problème sur l'écho à la position {rows.iloc[0]['position echo']} (diminution surface gonade : {rows.iloc[0]['augmentation_surface_gonade_true']}%)")
+            print(f"True - Poisson : {id} - {pb_list_true} -Problème sur l'écho à la position {rows.iloc[0]['position echo']} (diminution surface gonade : {rows.iloc[0]['augmentation_surface_gonade_true']}%)")
 ```
 
 ## Relations entre surfaces des gonades et de la cavité - Annotations
@@ -799,7 +821,7 @@ plt.show()
 ```
 
 
-## Relation entre le volume des oeufs moyens et des gonades
+## Relation entre le volume médian des oeufs et des gonades
 
 
 ```{python}
@@ -807,20 +829,20 @@ fig, axes = plt.subplots(1, 2, figsize=(12, 4))
 
 nuage_points(
     x=df_final.volume_gonade_true, # long_poisson ou poids_poisson
-    y=df_final.volume_moyen_oeufs_mm3_true,
+    y=df_final.volume_median_oeufs_mm3_true,
     titre="Annotations", 
     xlabel="Volume de la gonade", 
-    ylabel="Volume des oeufs (mm³)",
+    ylabel="Volume médian des oeufs (mm³)",
     couleur='teal',
     ax = axes[0]
     )
 
 nuage_points(
     x=df_final.volume_gonade_pred, # long_poisson ou poids_poisson
-    y=df_final.volume_moyen_oeufs_mm3_pred,
+    y=df_final.volume_median_oeufs_mm3_pred,
     titre="Prédictions", 
     xlabel="Volume de la gonade", 
-    ylabel="Volume des oeufs (mm³)",
+    ylabel="Volume médian des oeufs (mm³)",
     couleur='teal',
     ax = axes[1]
     )
@@ -828,8 +850,8 @@ nuage_points(
 plt.tight_layout()
 plt.show()
 
-print(f"Corrélation annotations : {df_final.volume_moyen_oeufs_mm3_true.corr(df_final.volume_gonade_true)}") # Corrélation
-print(f"Corrélation prédictions : {df_final.volume_moyen_oeufs_mm3_pred.corr(df_final.volume_gonade_pred)}") # Corrélation
+print(f"Corrélation annotations : {df_final.volume_median_oeufs_mm3_true.corr(df_final.volume_gonade_true)}") # Corrélation
+print(f"Corrélation prédictions : {df_final.volume_median_oeufs_mm3_pred.corr(df_final.volume_gonade_pred)}") # Corrélation
 ```
 
 ## Distribution de la fécondité
