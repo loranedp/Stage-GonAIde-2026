@@ -5,7 +5,7 @@ import statsmodels.api as sm
 import seaborn as sns
 import cv2
 from PIL import Image
-from matplotlib.colors import BoundaryNorm, ListedColormap
+from matplotlib.colors import BoundaryNorm, ListedColormap, hsv_to_rgb
 from matplotlib.patches import Patch
 from matplotlib.ticker import MaxNLocator
 
@@ -393,7 +393,7 @@ def overlay_colored_mask(image, mask, alpha=0.45, dataset_name=None,
 
     Pour ``dataset_name == "oeufs"``, ``mask`` est une carte 2D d'identifiants
     d'instances (ou un masque ``(1, H, W)``). Chaque identifiant positif reçoit
-    une couleur déterministe, avec une palette cyclique. Pour les autres
+    une couleur déterministe, prolongée au-delà de la palette initiale. Pour les autres
     datasets, ``mask`` est un masque multi-canaux ``(C, H, W)`` et chaque canal
     présent reçoit la couleur fixe de sa classe.
     """
@@ -443,7 +443,11 @@ def overlay_colored_mask(image, mask, alpha=0.45, dataset_name=None,
     for label_id in np.unique(labels):
         if label_id <= 0:
             continue
-        color = colors[(int(label_id) - 1) % len(colors)]
+        if dataset_name == "oeufs" and label_id > len(colors):
+            hue = (int(label_id) * 0.618033988749895) % 1.0
+            color = np.rint(hsv_to_rgb([hue, 0.75, 0.95]) * 255).astype(np.uint8)
+        else:
+            color = colors[(int(label_id) - 1) % len(colors)]
         pixels = labels == label_id
         output[pixels] = (
             output[pixels].astype(np.float32) * (1 - alpha)
