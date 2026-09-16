@@ -190,12 +190,30 @@ def _median_instance_area_px(instance_labels):
     return torch.stack(median_areas)
 
 
+def _median_areas_px(areas_by_image, reference):
+    """Médiane des surfaces indépendantes ; zéro pour une image sans instance."""
+    if len(areas_by_image) != reference.shape[0]:
+        raise ValueError("Une liste de surfaces est requise par image.")
+    medians = []
+    for areas in areas_by_image:
+        if areas is None:
+            raise ValueError("Les surfaces individuelles ne sont pas disponibles.")
+        areas = torch.as_tensor(areas, device=reference.device, dtype=torch.float32)
+        if areas.ndim != 1 or not torch.isfinite(areas).all() or (areas < 0).any():
+            raise ValueError("Les surfaces doivent être un vecteur de valeurs finies positives ou nulles.")
+        areas = areas[areas > 0]
+        medians.append(torch.quantile(areas, 0.5) if areas.numel() else reference.new_zeros((), dtype=torch.float32))
+    return torch.stack(medians)
+
+
 # Calcul des métriques par image et par classe avec prise en compte de l'échelle et du dataset
 def metrics_by_class(true, preds, echelle, dataset_name, egg_instance_labels=None,
-                     egg_annotation_areas_px=None, image_height_px=None):
+                     egg_annotation_areas_px=None, image_height_px=None,
+                     egg_prediction_areas_px=None):
     """Les surfaces annotées sont des listes par image, avant fusion des instances.
 
     Pour les œufs paddés UNet, fournir la hauteur originale (hors padding).
+    Les listes de surfaces prédites préservent aussi les instances superposées.
     Sans ces paramètres, le calcul historique reste disponible.
     """
     intersection = (preds & true).float().sum((2, 3))
@@ -241,30 +259,22 @@ def metrics_by_class(true, preds, echelle, dataset_name, egg_instance_labels=Non
             )
             true_median_area = _median_instance_area_px(true_instance_labels)
         else:
-            if len(egg_annotation_areas_px) != true.shape[0]:
-                raise ValueError("Une liste de surfaces annotées est requise par image.")
-            medians = []
-            for areas in egg_annotation_areas_px:
-                if areas is None:
-                    raise ValueError("Les surfaces annotées ne sont pas disponibles après augmentation.")
-                areas = torch.as_tensor(areas, device=true.device, dtype=torch.float32)
-                if areas.ndim != 1 or not torch.isfinite(areas).all() or (areas < 0).any():
-                    raise ValueError("Les surfaces doivent être un vecteur de valeurs finies positives ou nulles.")
-                areas = areas[areas > 0]
-                medians.append(torch.quantile(areas, 0.5) if areas.numel() else true.new_zeros((), dtype=torch.float32))
-            true_median_area = torch.stack(medians)
-        prediction_mask = preds
-        if image_height_px is not None and preds.shape[-2:] == MODEL_IMAGE_SIZE[::-1]:
-            prediction_mask = unpad_array(preds)
-        if egg_instance_labels is None:
-            egg_instance_labels = split_eggs(
-                prediction_mask, min_distance=8, min_area=100, ouverture_size=3, ouverture_iterations=1
-            )
+            true_median_area = _median_areas_px(egg_annotation_areas_px, true)
+        if egg_prediction_areas_px is not None:
+            predicted_median_area = _median_areas_px(egg_prediction_areas_px, true)
         else:
-            egg_instance_labels = torch.as_tensor(egg_instance_labels, device=true.device)
-            if image_height_px is not None and egg_instance_labels.shape[-2:] == MODEL_IMAGE_SIZE[::-1]:
-                egg_instance_labels = unpad_array(egg_instance_labels)
-        predicted_median_area = _median_instance_area_px(egg_instance_labels)
+            prediction_mask = preds
+            if image_height_px is not None and preds.shape[-2:] == MODEL_IMAGE_SIZE[::-1]:
+                prediction_mask = unpad_array(preds)
+            if egg_instance_labels is None:
+                egg_instance_labels = split_eggs(
+                    prediction_mask, min_distance=8, min_area=100, ouverture_size=3, ouverture_iterations=1
+                )
+            else:
+                egg_instance_labels = torch.as_tensor(egg_instance_labels, device=true.device)
+                if image_height_px is not None and egg_instance_labels.shape[-2:] == MODEL_IMAGE_SIZE[::-1]:
+                    egg_instance_labels = unpad_array(egg_instance_labels)
+            predicted_median_area = _median_instance_area_px(egg_instance_labels)
         if predicted_median_area.shape != true_median_area.shape:
             raise ValueError("Une carte d'instances prédites est requise par image.")
         height_px = torch.as_tensor(

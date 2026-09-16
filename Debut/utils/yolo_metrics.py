@@ -45,6 +45,19 @@ def _read_polygons(label_path: str | Path, image_shape: tuple[int, int]):
     return polygons
 
 
+def load_yolo_polygon_areas(
+    label_path: str | Path,
+    image_shape: tuple[int, int],
+    *,
+    class_ids: Iterable[int] = (0,),
+    ignore_class_ids: Iterable[int] = (3,),
+) -> list[int]:
+    """Une surface rasterisée par ligne, sans fusion ni filtre de taille."""
+    selected = set(class_ids) - set(ignore_class_ids)
+    return [area for class_id, _, area in _read_polygons(label_path, image_shape)
+            if class_id in selected]
+
+
 def load_yolo_polygon_masks(
     label_path: str | Path,
     image_shape: tuple[int, int],
@@ -169,6 +182,16 @@ def result_to_instance_masks(
         instances.append((target_index, instance_mask))
 
     return instances
+
+
+def result_to_instance_areas(
+    result, class_names: Iterable[str], *, class_ids: Iterable[int] = (0,),
+) -> list[int]:
+    """Mesure chaque détection indépendamment, y compris ses chevauchements."""
+    selected = set(class_ids)
+    return [int(np.count_nonzero(mask))
+            for class_id, mask in result_to_instance_masks(result, class_names)
+            if class_id in selected]
 
 
 def result_to_masks(result, class_names: Iterable[str], num_classes: int, *, semantic: bool) -> np.ndarray:
