@@ -613,3 +613,28 @@ sauvegarder_visualisations(
 
 #-------- 5.7 Sauvegarde des jeux de données finaux --------
 df.to_excel("correspondance_echo_final.xlsx", index=False)
+
+
+# ================== 7. Division des données de test ==================
+# Recalculé à chaque prétraitement : ajouter des poissons peut changer le test.
+utils_dir = Path(__file__).resolve().parent
+images_dir = utils_dir.parent / "data" / "images"
+fish_by_dataset = [
+    {
+        path.name.split("_")[2]
+        for path in (images_dir / dataset).iterdir()
+        if path.is_file() and path.suffix.lower() in {".jpg", ".jpeg", ".png"}
+    }
+    for dataset in ("cavite", "oeufs")
+]
+common_fish = sorted(fish_by_dataset[0] & fish_by_dataset[1])
+if not common_fish:
+    raise ValueError("Aucun poisson commun aux datasets cavité et œufs pour créer le test.")
+
+test_fish = sorted(np.random.default_rng(42).choice(
+    common_fish, size=(len(common_fish) + 5) // 6, replace=False
+).tolist())
+test_json_path = utils_dir / "common_test_fish.json"
+test_json_path.write_text(json.dumps(test_fish, indent=2) + "\n", encoding="utf-8")
+print(f"Division du test : {len(test_fish)} poissons sélectionnés parmi {len(common_fish)} poissons communs.")
+print(f"Liste enregistrée dans {test_json_path}")

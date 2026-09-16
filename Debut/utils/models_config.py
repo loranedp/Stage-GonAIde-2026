@@ -11,7 +11,6 @@ import json
 sys.path.append(str(Path.cwd().parent)) # Ajoute le dossier parent au chemin de recherche de Python
 
 # Importation des datasets personnalisés pour U-Net : 2D et 2,5D
-from utils.global_split import load_common_test_fish
 from utils.dataset_unet import RoboflowUNetDataset
 from utils.unet_spatial import unpad_array
 from utils.dataset_2_5D import SliceSequenceUNetDataset
@@ -151,8 +150,8 @@ def split_dataset(all_samples):
     y = np.array(categories_all) # Les classes
     groups = np.array([sample["image_info"]["file_name"].split("_")[2] for sample in all_samples]) # L'ID du poisson pour chaque image
 
-    # Test commun stratifié par quantiles de longueur de gonade, au niveau du poisson.
-    common_test_fish = load_common_test_fish()
+    # Liste figée après un tirage simple de ~1/6 des poissons communs cavité/œufs (graine 42).
+    common_test_fish = json.loads((Path(__file__).resolve().parent / "common_test_fish.json").read_text())
     test_mask = np.isin(groups, list(common_test_fish))
     test_idx = np.flatnonzero(test_mask)
     if test_idx.size == 0:
