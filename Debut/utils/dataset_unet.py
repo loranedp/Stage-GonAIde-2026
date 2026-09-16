@@ -78,6 +78,7 @@ class RoboflowUNetDataset(torch.utils.data.Dataset):
         # -------- 2. Création d'un masque --------
         # Initialiser un masque multi-canal vide
         mask_np = np.zeros((self.num_classes, h_orig, w_orig), dtype=np.uint8)
+        annotation_areas = []
 
         # --- Transformer les annotations en masques binaires pour chaque classe ---
         for ann in sample['annotations']:
@@ -89,6 +90,8 @@ class RoboflowUNetDataset(torch.utils.data.Dataset):
 
             # Transformation de la segmentation en masque binaire (RLE ou polygone)
             ann_mask = decode_segmentation(seg, h_orig, w_orig)
+            if self.num_classes == 1 and not self.is_train:
+                annotation_areas.append(int(np.count_nonzero(ann_mask)))
 
             # Fusion des masques qui ont la même classe
             mask_np[class_idx] = np.maximum(mask_np[class_idx], ann_mask)
@@ -157,6 +160,7 @@ class RoboflowUNetDataset(torch.utils.data.Dataset):
             'image': image_torch,
             'mask': mask_torch,
             'original_size': original_size,
+            'egg_annotation_areas_px': annotation_areas if not self.is_train and self.num_classes == 1 else None,
             'image_path': sample['image_path']
         }
 
@@ -221,4 +225,11 @@ class EggHVDataset(torch.utils.data.Dataset):
             )
             torch.random.set_rng_state(rng_state)
 
-        return {'image': image_tensor, 'mask': targets_tensor, 'image_path': sample['image_path'], 'original_size': (width, height)}
+        return {
+            'image': image_tensor, 'mask': targets_tensor,
+            'image_path': sample['image_path'], 'original_size': (width, height),
+            'egg_annotation_areas_px': (
+                [int(np.count_nonzero(instance)) for instance in instances]
+                if not self.is_train else None
+            ),
+        }
