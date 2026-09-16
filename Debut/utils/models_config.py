@@ -7,11 +7,11 @@ from PIL import Image
 import sys
 import cv2
 import json
-from sklearn.model_selection import GroupKFold, StratifiedGroupKFold
 
 sys.path.append(str(Path.cwd().parent)) # Ajoute le dossier parent au chemin de recherche de Python
 
 # Importation des datasets personnalisés pour U-Net : 2D et 2,5D
+from utils.global_split import load_common_test_fish
 from utils.dataset_unet import RoboflowUNetDataset
 from utils.unet_spatial import unpad_array
 from utils.dataset_2_5D import SliceSequenceUNetDataset
@@ -151,34 +151,16 @@ def split_dataset(all_samples):
     y = np.array(categories_all) # Les classes
     groups = np.array([sample["image_info"]["file_name"].split("_")[2] for sample in all_samples]) # L'ID du poisson pour chaque image
 
-    # Les données sont divisées par StratifiedGroupKFold (par groupe et par poisson) excepté pour les oeufs, uniquement divisés par groupes
-    metadata_available = all(value is not None and not (isinstance(value, float) and np.isnan(value))
-                             for value in categories_all)
-    if metadata_available and len(np.unique(y)) > 1:
-        kf = StratifiedGroupKFold(n_splits=6, shuffle=True, random_state=42)
-        split_iterator = kf.split(X, y, groups) # Divise selon la distribution des classes et les groupes (poissons)
-    else:
-        kf = GroupKFold(n_splits=6, shuffle=True, random_state=42)
-        split_iterator = kf.split(X, groups=groups) # Divise uniquement selon les groupes (poissons)
-
-    # --- Division commune du test : poissons présents dans les deux datasets ---
-    common_test_path = Path(__file__).resolve().parent / "common_test_fish.json"
-    if common_test_path.exists():
-        common_test_fish = {str(value) for value in json.loads(common_test_path.read_text())}
-        test_idx = np.flatnonzero(np.isin(groups, list(common_test_fish)))
-        if test_idx.size == 0:
-            raise ValueError("Aucun poisson de common_test_fish.json n'est présent dans ce dataset.")
-        cv_idx = np.flatnonzero(~np.isin(groups, list(common_test_fish)))
-        cv_samples, test_samples = X[cv_idx], X[test_idx]
-        cv_categories, test_categories = y[cv_idx], y[test_idx]
-        groups_train, groups_test = groups[cv_idx], groups[test_idx]
-    else:
-        # --- Division des données en ensembles d'entraînement/validation et de test ---
-        for cv_idx, test_idx in split_iterator:
-            cv_samples, test_samples = X[cv_idx], X[test_idx]
-            cv_categories, test_categories = y[cv_idx], y[test_idx]
-            groups_train, groups_test = groups[cv_idx], groups[test_idx]
-            break # On ne garde que le premier split
+    # Test commun stratifié par quantiles de longueur de gonade, au niveau du poisson.
+    common_test_fish = load_common_test_fish()
+    test_mask = np.isin(groups, list(common_test_fish))
+    test_idx = np.flatnonzero(test_mask)
+    if test_idx.size == 0:
+        raise ValueError("Aucun poisson de common_test_fish.json n'est présent dans ce dataset.")
+    cv_idx = np.flatnonzero(~test_mask)
+    cv_samples, test_samples = X[cv_idx], X[test_idx]
+    cv_categories, test_categories = y[cv_idx], y[test_idx]
+    groups_train, groups_test = groups[cv_idx], groups[test_idx]
 
     print(f"Nombre total d'images valides : {len(all_samples)}")
     print(f"Échantillons train/val        : {len(cv_samples)}")
