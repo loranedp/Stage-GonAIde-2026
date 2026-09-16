@@ -175,29 +175,24 @@ def split_dataset(all_samples):
     return cv_samples, test_samples, cv_categories, test_categories, groups_train, groups_test
 
 
-def _mean_interquartile_instance_area_px(instance_labels):
-    """Surface moyenne en pixels des instances entre Q1 et Q3, par image."""
+def _median_instance_area_px(instance_labels):
+    """Surface médiane en pixels des instances d'œufs, par image."""
     if instance_labels.ndim == 2:
         instance_labels = instance_labels.unsqueeze(0)
     if instance_labels.ndim != 3:
         raise ValueError("Les labels d'instances d'œufs doivent avoir la forme (B, H, W).")
 
-    mean_areas = []
+    median_areas = []
     for labels in instance_labels:
         label_ids, counts = torch.unique(labels, return_counts=True)
         areas = counts[label_ids > 0].to(dtype=torch.float32)
         if areas.numel() == 0:
-            mean_areas.append(torch.zeros((), device=labels.device))
+            median_areas.append(torch.zeros((), device=labels.device))
             continue
-        q1 = torch.quantile(areas, 0.25)
-        q3 = torch.quantile(areas, 0.75)
-        interquartile_areas = areas[(areas >= q1) & (areas <= q3)]
-        mean_areas.append(
-            interquartile_areas.mean()
-            if interquartile_areas.numel() > 0
-            else torch.zeros((), device=labels.device)
-        )
-    return torch.stack(mean_areas)
+        # ``quantile(..., 0.5)`` donne la médiane statistique pour un effectif
+        # pair (moyenne des deux valeurs centrales), comme ``np.median``.
+        median_areas.append(torch.quantile(areas, 0.5))
+    return torch.stack(median_areas)
 
 
 # Calcul des métriques par image et par classe avec prise en compte de l'échelle et du dataset
@@ -248,14 +243,14 @@ def metrics_by_class(true, preds, echelle, dataset_name, egg_instance_labels=Non
             )
         else:
             egg_instance_labels = torch.as_tensor(egg_instance_labels, device=true.device)
-        predicted_mean_area = _mean_interquartile_instance_area_px(egg_instance_labels)
-        true_mean_area = _mean_interquartile_instance_area_px(true_instance_labels)
+        predicted_median_area = _median_instance_area_px(egg_instance_labels)
+        true_median_area = _median_instance_area_px(true_instance_labels)
         echelle = echelle.to(device=true.device, dtype=torch.float32).reshape(-1)
 
         # ``echelle`` est exprimée en cm ; conversion finale en mm².
-        diff_surface = (true_mean_area - predicted_mean_area).abs().unsqueeze(1)
+        diff_surface = (true_median_area - predicted_median_area).abs().unsqueeze(1)
         diff_surface *= ((echelle * 10) / true.shape[2]).unsqueeze(1) ** 2
-        missing_surface = (true_mean_area == 0) | (predicted_mean_area == 0)
+        missing_surface = (true_median_area == 0) | (predicted_median_area == 0)
         diff_surface[missing_surface.unsqueeze(1)] = torch.nan
 
     return intersection, union,iou_per_img, dice_per_img, precision_per_img, recall_per_img, diff_surface
