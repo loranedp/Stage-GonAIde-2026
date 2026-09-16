@@ -161,12 +161,24 @@ def split_dataset(all_samples):
         kf = GroupKFold(n_splits=6, shuffle=True, random_state=42)
         split_iterator = kf.split(X, groups=groups) # Divise uniquement selon les groupes (poissons)
 
-    # --- Division des données en ensembles d'entraînement/validation et de test ---
-    for cv_idx, test_idx in split_iterator:
+    # --- Division commune du test : poissons présents dans les deux datasets ---
+    common_test_path = Path(__file__).resolve().parent / "common_test_fish.json"
+    if common_test_path.exists():
+        common_test_fish = {str(value) for value in json.loads(common_test_path.read_text())}
+        test_idx = np.flatnonzero(np.isin(groups, list(common_test_fish)))
+        if test_idx.size == 0:
+            raise ValueError("Aucun poisson de common_test_fish.json n'est présent dans ce dataset.")
+        cv_idx = np.flatnonzero(~np.isin(groups, list(common_test_fish)))
         cv_samples, test_samples = X[cv_idx], X[test_idx]
         cv_categories, test_categories = y[cv_idx], y[test_idx]
         groups_train, groups_test = groups[cv_idx], groups[test_idx]
-        break # On ne garde que le premier split
+    else:
+        # --- Division des données en ensembles d'entraînement/validation et de test ---
+        for cv_idx, test_idx in split_iterator:
+            cv_samples, test_samples = X[cv_idx], X[test_idx]
+            cv_categories, test_categories = y[cv_idx], y[test_idx]
+            groups_train, groups_test = groups[cv_idx], groups[test_idx]
+            break # On ne garde que le premier split
 
     print(f"Nombre total d'images valides : {len(all_samples)}")
     print(f"Échantillons train/val        : {len(cv_samples)}")
