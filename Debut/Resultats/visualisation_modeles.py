@@ -21,8 +21,8 @@ from utils.stats_fct import overlay_colored_mask, overlay_mask
 # ============================ 2. Définition des chemins et paramètres ============================
 UNET_ROOT = PROJECT_ROOT / 'UNet' / 'masks' / 'eval'
 YOLO_ROOT = PROJECT_ROOT / 'YOLO26' / 'masks' / 'eval'
-OPENUS_ROOT = (PROJECT_ROOT / 'OpenUS-multiclass' / 'OpenUS' / 'output'
-               / 'custom_seg_new' / 'predicted_masks_teacher')
+OPENUS_CV_ROOT = (PROJECT_ROOT / 'Ex1' / 'OpenUS-multiclass' / 'OpenUS'
+                  / 'output' / 'custom_seg_cv5')
 IMAGE_ROOT = PROJECT_ROOT / 'data' / 'images'
 LABEL_ROOT = PROJECT_ROOT / 'data' / 'labels' / 'YOLO'
 OUTPUT_ROOT = PROJECT_ROOT / 'Resultats' / 'visualisation'
@@ -153,8 +153,15 @@ def prediction_sources(task_name):
         if task_dir.is_dir():
             sources.append((f'YOLO_{yolo_type}', task_dir))
 
-    if task_name == '3classes' and OPENUS_ROOT.is_dir():
-        sources.append(('OpenUS', OPENUS_ROOT))
+    if task_name == '3classes':
+        # Les prédictions OpenUS à visualiser sont celles des validations
+        # croisées, et non les prédictions de test de custom_seg_new.
+        for fold_dir in sorted(OPENUS_CV_ROOT.glob('fold_*')):
+            prediction_dir = (
+                fold_dir / 'attempt_1' / 'eval' / 'predicted_masks_teacher'
+            )
+            if prediction_dir.is_dir():
+                sources.append(('OpenUS', prediction_dir))
 
     return sources
 
