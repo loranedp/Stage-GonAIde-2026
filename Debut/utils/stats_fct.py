@@ -19,8 +19,14 @@ def distribution(
     nombre_graduations_x=None,
     nombre_barres=None,
     ax=None,
-    axe_x_fixe=None
+    axe_x_fixe=None,
+    afficher_courbe=True
 ):
+    """Trace un histogramme avec une courbe de densité facultative.
+
+    afficher_courbe=False masque la courbe de densité.
+    couleur accepte les couleurs Matplotlib, notamment "#63A5BF".
+    """
     if axe_x_fixe is not None:
         try:
             minimum_x, maximum_x, pas_x = axe_x_fixe
@@ -83,7 +89,7 @@ def distribution(
 
     sns.histplot(
         donnees,
-        kde=True,
+        kde=afficher_courbe,
         color=couleur,
         bins=bins,
         edgecolor='black',
