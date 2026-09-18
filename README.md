@@ -30,5 +30,5 @@ L'application est alors accessible à l'adresse http://localhost:8501.
 ## Résultats
 Les résultats du calcul des volumes et de la fécondité sont disponibles dans 'Debut/Résultats/volumes_poissons.csv'.
 
-## UltraSam
+## OpenUS
 Pour relancer le modèle, suivre le .README présent dans le dossier.
