@@ -349,7 +349,7 @@ def overlay_mask(image_tensor, mask_tensor, alpha=0.4, target_size=None):
     # Conversion de l'image en 0-255
     image = (image * 255).astype(np.uint8)
     
-    mask = mask_tensor.cpu().numpy().astype(np.float32)
+    mask = (mask_tensor.detach().cpu().numpy() if hasattr(mask_tensor, "detach") else np.asarray(mask_tensor)).astype(np.float32)
 
     if target_size is not None:
         image = cv2.resize(image, target_size) # Redimensionnement

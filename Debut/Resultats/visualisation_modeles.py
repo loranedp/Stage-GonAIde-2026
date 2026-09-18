@@ -2,20 +2,19 @@
 
 # =========================== 1. Importation des bibliothèques ============================
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import pandas as pd
+import argparse
 from pathlib import Path
 import cv2
 import sys
 from PIL import Image
-import torch
 import re
 from collections import defaultdict
-import torchvision.transforms.functional as TF
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
-from utils.stats_fct import overlay_colored_mask, overlay_mask
 
 
 # ============================ 2. Définition des chemins et paramètres ============================
@@ -83,7 +82,7 @@ def mask_from_yolo_file(mask_path, num_classes, width, height,
             cv2.fillPoly(
                 mask[class_id], [np.rint(coords).astype(np.int32)], 1.0
             )
-    return torch.from_numpy(mask)
+    return mask
 
 def mask_from_source_label(label_path, num_classes, image_size,
                            preserve_instances=False):
@@ -97,7 +96,7 @@ def mask_from_source_label(label_path, num_classes, image_size,
     instance_id = 0
 
     if not label_path.exists():
-        return torch.from_numpy(mask)
+        return mask
 
     with label_path.open('r') as file:
         for line in file:
@@ -122,7 +121,7 @@ def mask_from_source_label(label_path, num_classes, image_size,
                 continue
             cv2.fillPoly(mask[class_id], [np.rint(coords).astype(np.int32)], 1.0)
 
-    return torch.from_numpy(mask)
+    return mask
 
 
 def overlay_egg_instances(image_tensor, instance_mask, alpha=0.4,
@@ -165,7 +164,10 @@ def prediction_sources(task_name):
 
     return sources
 
-for task_name, task_config in TASKS.items():
+def run(task_names, dpi=150):
+  from utils.stats_fct import overlay_colored_mask, overlay_mask
+  for task_name in task_names:
+    task_config = TASKS[task_name]
     num_classes = task_config['num_classes']
     preserve_instances = task_name == 'oeufs'
     image_dir = IMAGE_ROOT / task_config['image_dir']
@@ -176,9 +178,11 @@ for task_name, task_config in TASKS.items():
     predictions_by_image = defaultdict(dict)
     sources = prediction_sources(task_name)
     for source_name, source_dir in sources:
-        for mask_path in sorted(source_dir.glob('pred_*.txt')):
-            image_id = image_id_from_prediction(mask_path)
-            predictions_by_image[image_id][source_name] = mask_path
+        source_dirs = source_dir if isinstance(source_dir, list) else [source_dir]
+        for source_dir in source_dirs:
+            for mask_path in sorted(source_dir.glob('pred_*.txt')):
+                image_id = image_id_from_prediction(mask_path)
+                predictions_by_image[image_id][source_name] = mask_path
 
     print(f'Sauvegarde des résultats pour {task_name}: {len(sources)} modèles, '
           f'{len(predictions_by_image)} images')
@@ -194,7 +198,7 @@ for task_name, task_config in TASKS.items():
             print(f'Image hors format cropé, visualisation ignorée : {image_path}')
             continue
         width, height = image.size
-        image_tensor = TF.to_tensor(image)
+        image_tensor = np.asarray(image)
 
         label_path = LABEL_ROOT / task_config['image_dir'] / f'{image_id}.txt'
         true_mask_tensor = mask_from_source_label(
@@ -266,5 +270,18 @@ for task_name, task_config in TASKS.items():
 
         fig.tight_layout()
         fig.savefig(output_dir / f'combined_{image_id}.png',
-                    bbox_inches='tight', dpi=300)
+                    bbox_inches='tight', dpi=dpi)
         plt.close(fig)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--task', choices=('oeufs', 'cavite', 'both'), default='both')
+    parser.add_argument('--dpi', type=int, default=150)
+    args = parser.parse_args(argv)
+    if args.dpi <= 0: parser.error('--dpi doit être strictement positif')
+    selected = ('oeufs', '3classes') if args.task == 'both' else (('3classes',) if args.task == 'cavite' else ('oeufs',))
+    run(selected, args.dpi)
+
+if __name__ == '__main__':
+    main()
