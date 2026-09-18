@@ -1,0 +1,56 @@
+[project]
+name = "openus-dev"
+version = "0.1.0"
+description = "OpenUS: self-adaptive masked contrastive learning for ultrasound foundation models"
+requires-python = "==3.10.*"
+dependencies = [
+    "torch==2.2.0",
+    "torchvision==0.17.0",
+    "torchaudio==2.2.0",
+    "triton",
+    "pytest",
+    "chardet",
+    "yacs",
+    "termcolor",
+    "fvcore",
+    "seaborn",
+    "packaging",
+    "ninja",
+    "einops",
+    "numpy==1.24.4",
+    "timm==0.4.12",
+    # main_openus.py imports this unconditionally at module level, so it's
+    # required just to run the script even if you never log to a W&B account.
+    "wandb",
+    # Extra downstream-task utilities (README "Extra downstream-task utilities")
+    "pyiqa",
+    "clean-fid",
+    "pandas",
+    "openpyxl",
+    "scikit-image",
+]
+
+[project.optional-dependencies]
+# Only needed for the vmamba_small backbone. Kept optional: it's a prebuilt
+# CUDA extension pinned to one exact GPU/CUDA/torch/python combo, and on a
+# 6GB GTX 1660 Ti you likely won't run vmamba_small anyway (see README notes).
+vmamba = [
+    "mamba-ssm",
+]
+# Only needed by eval_logistic_regression.py / eval_linear.py's sklearn-based
+# baselines — not required to pre-train or run the core model.
+eval-linear = [
+    "scikit-learn",
+    "cyanure",
+]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu121" }
+torchvision = { index = "pytorch-cu121" }
+torchaudio = { index = "pytorch-cu121" }
+mamba-ssm = { url = "https://github.com/state-spaces/mamba/releases/download/v2.2.4/mamba_ssm-2.2.4+cu12torch2.2cxx11abiTRUE-cp310-cp310-linux_x86_64.whl" }
+
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
