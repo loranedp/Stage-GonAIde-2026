@@ -21,6 +21,8 @@ from utils.stats_fct import overlay_colored_mask, overlay_mask
 # ============================ 2. Définition des chemins et paramètres ============================
 UNET_ROOT = PROJECT_ROOT / 'UNet' / 'masks' / 'eval'
 YOLO_ROOT = PROJECT_ROOT / 'YOLO26' / 'masks' / 'eval'
+OPENUS_ROOT = (PROJECT_ROOT / 'OpenUS-multiclass' / 'OpenUS' / 'output'
+               / 'custom_seg_new' / 'predicted_masks_teacher')
 IMAGE_ROOT = PROJECT_ROOT / 'data' / 'images'
 LABEL_ROOT = PROJECT_ROOT / 'data' / 'labels' / 'YOLO'
 OUTPUT_ROOT = PROJECT_ROOT / 'Resultats' / 'visualisation'
@@ -150,6 +152,9 @@ def prediction_sources(task_name):
         task_dir = YOLO_ROOT / yolo_type / task_name
         if task_dir.is_dir():
             sources.append((f'YOLO_{yolo_type}', task_dir))
+
+    if task_name == '3classes' and OPENUS_ROOT.is_dir():
+        sources.append(('OpenUS', OPENUS_ROOT))
 
     return sources
 
