@@ -155,12 +155,13 @@ def prediction_sources(task_name):
     if task_name == '3classes':
         # Les prédictions OpenUS à visualiser sont celles des validations
         # croisées, et non les prédictions de test de custom_seg_new.
+        openus_dirs = []
         for fold_dir in sorted(OPENUS_CV_ROOT.glob('fold_*')):
-            prediction_dir = (
-                fold_dir / 'attempt_1' / 'eval' / 'predicted_masks_teacher'
-            )
-            if prediction_dir.is_dir():
-                sources.append(('OpenUS', prediction_dir))
+            attempts = sorted(fold_dir.glob('attempt_*/eval/predicted_masks_teacher'))
+            if attempts:
+                openus_dirs.append(attempts[-1])
+        if openus_dirs:
+            sources.append(('OpenUS', openus_dirs))
 
     return sources
 
@@ -182,6 +183,12 @@ def run(task_names, dpi=150):
         for source_dir in source_dirs:
             for mask_path in sorted(source_dir.glob('pred_*.txt')):
                 image_id = image_id_from_prediction(mask_path)
+                previous = predictions_by_image[image_id].get(source_name)
+                if previous is not None:
+                    print(
+                        f'Avertissement : doublon {source_name} pour {image_id} '
+                        f'({previous} et {mask_path}); dernière prédiction conservée'
+                    )
                 predictions_by_image[image_id][source_name] = mask_path
 
     print(f'Sauvegarde des résultats pour {task_name}: {len(sources)} modèles, '
