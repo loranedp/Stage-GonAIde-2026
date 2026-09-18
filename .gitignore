@@ -6,6 +6,7 @@ Debut/data
 .vscode
 .codex
 .agents
+.claude
 __pycache__
 __init__.py
 checkpoint
@@ -13,6 +14,7 @@ checkpoints
 
 Debut/UNet/__pycache__
 Debut/UNet/saves
+Debut/UNet/*.pth
 
 Debut/App/__pycache__
 
@@ -24,7 +26,10 @@ Debut/YOLO26/runs
 Debut/utils/__pycache__
 
 Debut/OpenUS
-Debut/OpenUS-multiclass
 Debut/Ex1
 Debut/SAM
 Debut/UltraSam
+
+# OpenUS-multiclass
+CLAUDE.md
+output/
