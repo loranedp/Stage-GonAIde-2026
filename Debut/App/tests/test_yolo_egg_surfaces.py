@@ -42,7 +42,7 @@ class YoloEggSurfaceTests(unittest.TestCase):
         self.result.masks = None
         self.assertEqual(result_to_instance_areas(self.result, ['Oeuf', 'Gonade']), [])
 
-    def notebook_metrics(self, dataset, mode):
+    def notebook_metrics(self, dataset):
         notebook = Path(__file__).resolve().parents[2] / 'YOLO26' / 'YOLO.ipynb'
         cells = json.loads(notebook.read_text())['cells']
         source = next(''.join(c['source']) for c in cells if 'def compute_dataset_metrics(' in ''.join(c.get('source', [])))
@@ -51,7 +51,7 @@ class YoloEggSurfaceTests(unittest.TestCase):
             torch=torch, metrics_by_class=metrics_by_class,
             load_yolo_polygon_areas=load_yolo_polygon_areas,
             result_to_instance_areas=result_to_instance_areas,
-            DATASET_NAME=dataset, MODEL_TYPE=mode,
+            DATASET_NAME=dataset,
             dataset_config={'egg_class_index': 0}, names=['Oeuf', 'Gonade'],
         )
         exec(compile(ast.Module(body=[function], type_ignores=[]), str(notebook), 'exec'), environment)
@@ -61,23 +61,12 @@ class YoloEggSurfaceTests(unittest.TestCase):
         for dataset, classes in [('oeufs', 1), ('oeufsclasses', 2)]:
             masks = torch.zeros((1, classes, 100, 100), dtype=torch.bool)
             with self.subTest(dataset=dataset), patch('utils.models_config.split_eggs', side_effect=AssertionError('Must not split instances')):
-                *_, difference = self.notebook_metrics(dataset, 'instance')(
+                *_, difference = self.notebook_metrics(dataset)(
                     masks, masks, torch.tensor([[1.0]]), self.path, self.result,
                 )
                 self.assertAlmostEqual(difference[0, 0].item(), 3.2, places=5)
                 if classes == 2:
                     self.assertTrue(torch.isnan(difference[0, 1]))
-
-    def test_semantic_mode_splits_only_predictions(self):
-        masks = torch.zeros((1, 1, 100, 100), dtype=torch.bool)
-        labels = torch.zeros((1, 100, 100), dtype=torch.int32)
-        labels[0, 10:30, 10:30] = 1
-        with patch('utils.models_config.split_eggs', return_value=labels) as split:
-            *_, difference = self.notebook_metrics('oeufs', 'semantique')(
-                masks, masks, torch.tensor([[1.0]]), self.path, self.result,
-            )
-        split.assert_called_once()
-        self.assertAlmostEqual(difference.item(), 2.79, places=5)
 
     def test_empty_surface_lists_produce_nan(self):
         masks = torch.zeros((2, 1, 100, 100), dtype=torch.bool)
