@@ -12,6 +12,7 @@ from pathlib import Path
 from prepare_cross_validation import prepare_splits, save_splits, write_json
 
 ROOT = Path(__file__).resolve().parent
+DEBUT_DATA_ROOT = ROOT.parents[1] / 'data'
 
 
 def read_metrics(path, key):
@@ -97,10 +98,12 @@ def run_command(command, log_path):
 
 def parser():
     p = argparse.ArgumentParser(description=__doc__)
-    for name, default in [('split_file', 'data/splits.json'), ('coco_json', 'data/_annotations.coco.json'),
-                          ('images_root', 'data/images'), ('pretrained_weights', 'checkpoint/openus_cpt0150.pth'),
+    for name, default in [('split_file', ROOT / 'data/splits.json'),
+                          ('coco_json', DEBUT_DATA_ROOT / 'COCO/labels/cavite/annotations.json'),
+                          ('images_root', DEBUT_DATA_ROOT / 'COCO/images/cavite'),
+                          ('pretrained_weights', ROOT / 'checkpoint/openus_cpt0150.pth'),
                           ('output_dir', 'output/custom_seg_cv5')]:
-        p.add_argument('--' + name, type=Path, default=ROOT / default)
+        p.add_argument('--' + name, type=Path, default=ROOT / default if isinstance(default, str) else default)
     for name, default in [('epochs', 100), ('batch_size_per_gpu', 4), ('num_workers', 4),
                           ('img_size', 512), ('val_freq', 1), ('seed', 42)]:
         p.add_argument('--' + name, type=int, default=default)

@@ -1,11 +1,9 @@
-"""Synchronize local OpenUS data with Debut/data and the common test fish."""
+"""Validate Debut/data and write OpenUS split files without copying the dataset."""
 
 import argparse
 import json
 from pathlib import Path
 import random
-import shutil
-import tempfile
 
 
 def prepare(debut_root):
@@ -58,27 +56,15 @@ def synchronize(debut_root, destination, dry_run=False):
     if dry_run:
         return
     destination.mkdir(parents=True, exist_ok=True)
-    # Stage all copies before touching the existing image directory.
-    with tempfile.TemporaryDirectory(prefix='.sync-', dir=destination) as temporary:
-        stage = Path(temporary)
-        (stage / 'images').mkdir()
-        for image in coco['images']:
-            name = image['file_name']
-            shutil.copy2(source / name, stage / 'images' / name)
-        payloads = {
-            '_annotations.coco.json': coco,
-            'splits.json': splits,
-            'splits_smoke.json': {key: values[:1] for key, values in splits.items()},
-        }
-        for name, payload in payloads.items():
-            (stage / name).write_text(json.dumps(payload, indent=2) + '\n')
-        previous = destination / 'images'
-        if previous.exists() or previous.is_symlink():
-            previous.rename(stage / 'previous_images')
-        (stage / 'images').rename(previous)
-        for name in payloads:
-            (stage / name).replace(destination / name)
-    print(f'Synchronized {destination}')
+    payloads = {
+        'splits.json': splits,
+        'splits_smoke.json': {key: values[:1] for key, values in splits.items()},
+    }
+    for name, payload in payloads.items():
+        temporary = destination / f'.{name}.tmp'
+        temporary.write_text(json.dumps(payload, indent=2) + '\n')
+        temporary.replace(destination / name)
+    print(f'Wrote split files to {destination}; images and annotations remain in Debut/data')
 
 
 if __name__ == '__main__':

@@ -85,10 +85,13 @@ def save_splits(destination, folds, manifest):
 
 if __name__ == '__main__':
     root = Path(__file__).resolve().parent
+    debut_data = root.parents[1] / 'data'
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--split_file', type=Path, default=root / 'data/splits.json')
-    parser.add_argument('--coco_json', type=Path, default=root / 'data/_annotations.coco.json')
-    parser.add_argument('--images_root', type=Path, default=root / 'data/images')
+    parser.add_argument('--coco_json', type=Path,
+                        default=debut_data / 'COCO/labels/cavite/annotations.json')
+    parser.add_argument('--images_root', type=Path,
+                        default=debut_data / 'COCO/images/cavite')
     parser.add_argument('--output_dir', type=Path, default=root / 'output/custom_seg_cv5/splits')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--dry-run', action='store_true')

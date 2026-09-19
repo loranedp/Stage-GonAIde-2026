@@ -99,8 +99,8 @@ Mon dataset :
 
  python3 eval_segmentation.py \
     --arch vmamba_small --dataset_name CUSTOM --multilabel True \
-    --coco_json data/_annotations.coco.json \
-    --images_root data/images --split_file data/splits.json \
+    --coco_json ../../data/COCO/labels/cavite/annotations.json \
+    --images_root ../../data/COCO/images/cavite --split_file data/splits.json \
     --pretrained_vmamba True \
     --pretrained_weights checkpoint/openus_cpt0150.pth \
     --checkpoint_key teacher --num_classes 3 \
@@ -112,8 +112,8 @@ python3 test_segmentation.py \
       --arch vmamba_small \
       --dataset_name CUSTOM \
       --multilabel True \
-      --coco_json data/_annotations.coco.json \
-      --images_root data/images \
+      --coco_json ../../data/COCO/labels/cavite/annotations.json \
+      --images_root ../../data/COCO/images/cavite \
       --split_file data/splits.json \
       --pretrained_vmamba True \
       --pretrained_weights checkpoint/openus_cpt0150.pth \

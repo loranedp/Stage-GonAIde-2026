@@ -28,6 +28,13 @@ from dataset.dataset_custom_coco import CocoMultiLabelDataset
 from dataset.transforms import get_transforms, get_transforms_multilabel
 
 
+OPENUS_ROOT = Path(__file__).resolve().parent
+DEBUT_DATA_ROOT = OPENUS_ROOT.parents[1] / 'data'
+CUSTOM_COCO_JSON = DEBUT_DATA_ROOT / 'COCO/labels/cavite/annotations.json'
+CUSTOM_IMAGES_ROOT = DEBUT_DATA_ROOT / 'COCO/images/cavite'
+CUSTOM_SPLIT_FILE = OPENUS_ROOT / 'data/splits.json'
+
+
 class MambaDecoderHead(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
@@ -527,9 +534,12 @@ def main():
     parser.add_argument('--data_root', default='./BUSBRA/BUSBRA/Images/', type=str)
     parser.add_argument('--data_root2', default='./BUSBRA/BUSBRA/Masks/', type=str)
     parser.add_argument('--dataset_name', default='BUSBRA', type=str, choices=['BUSBRA', 'TN3K', 'CUSTOM'])
-    parser.add_argument('--coco_json', default='', type=str, help='COCO annotation file (dataset_name=CUSTOM)')
-    parser.add_argument('--images_root', default='', type=str, help='Image directory (dataset_name=CUSTOM)')
-    parser.add_argument('--split_file', default='', type=str, help='train/val/test split json (dataset_name=CUSTOM)')
+    parser.add_argument('--coco_json', default=str(CUSTOM_COCO_JSON), type=str,
+                        help='COCO annotation file (dataset_name=CUSTOM)')
+    parser.add_argument('--images_root', default=str(CUSTOM_IMAGES_ROOT), type=str,
+                        help='Image directory (dataset_name=CUSTOM)')
+    parser.add_argument('--split_file', default=str(CUSTOM_SPLIT_FILE), type=str,
+                        help='train/val/test split json (dataset_name=CUSTOM)')
     parser.add_argument('--eval_split', choices=['test', 'val'], default='test', help='CUSTOM split to evaluate')
     parser.add_argument('--results_dir', default='', help='Output directory separate from checkpoint directory')
     parser.add_argument('--multilabel', default=False, type=utils.bool_flag,

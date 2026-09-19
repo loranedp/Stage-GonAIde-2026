@@ -8,7 +8,7 @@ belong to several classes). Only the MambaDecoder head trains; the OpenUS backbo
 
 - This repository **including the local modifications** (`dataset/dataset_custom_coco.py`,
   `dataset/transforms.py`, `eval_segmentation.py`, `test_segmentation.py`) — commit or rsync the tree.
-- `data/` — `images/`, `_annotations.coco.json`, and `splits.json` (generated from the shared dataset and common test fish, see step 2).
+- `data/` — `splits.json` (generated from the shared dataset and common test fish, see step 2).
 - `checkpoint/openus_cpt0150.pth` — the pre-trained OpenUS-S weights.
 
 ## 1. Environment (Debian/Ubuntu server or any standard Linux + NVIDIA GPU)
@@ -90,9 +90,9 @@ python sync_custom_data.py --dry-run  # validate sources without writing
 python sync_custom_data.py
 ```
 
-The command copies `Debut/data/COCO/images/cavite` and
-`Debut/data/COCO/labels/cavite/annotations.json` into local `data/`, replacing the
-previous image set. Sources are validated and copies staged before replacement.
+The command reads `Debut/data/COCO/images/cavite` and
+`Debut/data/COCO/labels/cavite/annotations.json` directly. It validates the sources and
+writes only the split files into local `data/`; no images or annotations are copied.
 Use `--debut-root /path/to/Debut` if the shared inputs are elsewhere.
 
 Test images are exactly those belonging to the fish listed in
@@ -129,7 +129,8 @@ cd ~/OpenUS
 ```bash
 python eval_segmentation.py \
   --arch vmamba_small --dataset_name CUSTOM --multilabel True \
-  --coco_json data/_annotations.coco.json --images_root data/images \
+  --coco_json ../../data/COCO/labels/cavite/annotations.json \
+  --images_root ../../data/COCO/images/cavite \
   --split_file data/splits.json \
   --pretrained_vmamba True --pretrained_weights checkpoint/openus_cpt0150.pth \
   --checkpoint_key teacher --num_classes 3 \
@@ -172,7 +173,8 @@ Run after training, from the same `--output_dir` (it picks up `checkpoint_teache
 ```bash
 python test_segmentation.py \
   --arch vmamba_small --dataset_name CUSTOM --multilabel True \
-  --coco_json data/_annotations.coco.json --images_root data/images \
+  --coco_json ../../data/COCO/labels/cavite/annotations.json \
+  --images_root ../../data/COCO/images/cavite \
   --split_file data/splits.json \
   --pretrained_vmamba True --pretrained_weights checkpoint/openus_cpt0150.pth \
   --checkpoint_key teacher --num_classes 3 \
