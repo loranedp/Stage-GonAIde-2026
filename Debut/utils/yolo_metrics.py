@@ -1,16 +1,9 @@
-"""Helpers used to evaluate the polygon-based YOLO26 segmentations.
-
-The semantic YOLO dataset has one important property which is easy to miss when
-rebuilding masks manually: polygons are rasterised into one class map.  Smaller
-polygons overwrite larger polygons, so a gonade or an intestine hides the
-underlying cavity in the semantic target.  The functions in this module mirror
-that behaviour and keep the displayed target identical to the evaluated target.
-"""
+"""Helpers used to evaluate polygon-based YOLO26 instance segmentations."""
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable, Mapping
+from typing import Iterable
 
 import cv2
 import numpy as np
@@ -63,39 +56,18 @@ def load_yolo_polygon_masks(
     image_shape: tuple[int, int],
     num_classes: int,
     *,
-    semantic: bool,
     ignore_class_ids: Iterable[int] = (3,),
 ) -> np.ndarray:
-    """Return class masks matching YOLO's polygon dataset behaviour.
-
-    In semantic mode, the returned shape is ``(num_classes, H, W)`` and the
-    polygons are assigned from largest to smallest.  Consequently, a smaller
-    polygon overwrites a larger one, exactly as ``PolygonSemanticDataset``
-    does.  Ignore polygons are assigned to background and therefore erase any
-    larger polygon underneath them.
-
-    In instance mode, polygons are unioned independently for each foreground
-    class; overlaps between classes are intentionally preserved.
-    """
+    """Return independent per-class masks for YOLO polygon instances."""
 
     height, width = image_shape
     masks = np.zeros((num_classes, height, width), dtype=np.uint8)
     polygons = _read_polygons(label_path, image_shape)
     ignored = set(int(class_id) for class_id in ignore_class_ids)
 
-    if not semantic:
-        for class_id, mask, _ in polygons:
-            if 0 <= class_id < num_classes and class_id not in ignored:
-                masks[class_id] = np.maximum(masks[class_id], mask)
-        return masks
-
-    background = np.full((height, width), num_classes, dtype=np.int32)
-    for class_id, mask, _ in sorted(polygons, key=lambda item: item[2], reverse=True):
-        target_class = class_id if 0 <= class_id < num_classes and class_id not in ignored else num_classes
-        background[mask > 0] = target_class
-
-    for class_id in range(num_classes):
-        masks[class_id] = (background == class_id).astype(np.uint8)
+    for class_id, mask, _ in polygons:
+        if 0 <= class_id < num_classes and class_id not in ignored:
+            masks[class_id] = np.maximum(masks[class_id], mask)
     return masks
 
 
@@ -121,28 +93,6 @@ def load_yolo_polygon_instances(
         next_instance_id += 1
 
     return instance_map
-
-
-def semantic_result_to_masks(
-    semantic_map: np.ndarray,
-    result_names: Mapping[int, str],
-    class_names: Iterable[str],
-) -> np.ndarray:
-    """Convert a YOLO semantic class map to channels ordered by ``class_names``."""
-
-    semantic_map = np.asarray(semantic_map)
-    if semantic_map.ndim != 2:
-        raise ValueError(f"Une carte sémantique 2D est attendue, reçu {semantic_map.shape}")
-
-    ids_by_name = {name: int(class_id) for class_id, name in result_names.items()}
-    missing = [name for name in class_names if name not in ids_by_name]
-    if missing:
-        raise ValueError(f"Classes absentes de la prédiction YOLO : {missing}")
-
-    return np.stack(
-        [(semantic_map == ids_by_name[name]).astype(np.uint8) for name in class_names],
-        axis=0,
-    )
 
 
 def result_to_instance_masks(
@@ -194,14 +144,10 @@ def result_to_instance_areas(
             if class_id in selected]
 
 
-def result_to_masks(result, class_names: Iterable[str], num_classes: int, *, semantic: bool) -> np.ndarray:
-    """Convert one Ultralytics result to channels ordered by ``class_names``."""
+def result_to_masks(result, class_names: Iterable[str], num_classes: int) -> np.ndarray:
+    """Convert one Ultralytics instance result to class-ordered masks."""
 
     class_names = tuple(class_names)
-    if semantic:
-        semantic_map = result.semantic_mask.data.detach().cpu().numpy()
-        return semantic_result_to_masks(semantic_map, result.names, class_names)
-
     height, width = result.orig_shape
     masks = np.zeros((num_classes, height, width), dtype=np.uint8)
     for target_index, instance_mask in result_to_instance_masks(result, class_names):

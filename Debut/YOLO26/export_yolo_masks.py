@@ -42,13 +42,12 @@ def validation_paths(fold_index: int) -> list[Path]:
     return paths
 
 
-def checkpoint_path(dataset: str, model_type: str, fold_index: int) -> Path:
-    task_dir = "segment" if model_type == "instance" else "semantic"
+def checkpoint_path(dataset: str, fold_index: int) -> Path:
     return (
         YOLO_ROOT
         / "runs"
-        / task_dir
-        / f"train_{dataset}_{model_type}_fold_{fold_index}"
+        / "segment"
+        / f"train_{dataset}_instance_fold_{fold_index}"
         / "weights"
         / "best.pt"
     )
@@ -56,7 +55,6 @@ def checkpoint_path(dataset: str, model_type: str, fold_index: int) -> Path:
 
 def export_fold(
     dataset: str,
-    model_type: str,
     fold_index: int,
     confidence: float,
     device: str,
@@ -64,7 +62,7 @@ def export_fold(
     """Prédit et exporte un fold sans relancer l'entraînement."""
     names = DATASETS[dataset]
     image_paths = validation_paths(fold_index)
-    checkpoint = checkpoint_path(dataset, model_type, fold_index)
+    checkpoint = checkpoint_path(dataset, fold_index)
     if not checkpoint.exists():
         raise FileNotFoundError(f"Checkpoint introuvable : {checkpoint}")
 
@@ -85,7 +83,7 @@ def export_fold(
             f"mais YOLO a retourné {len(predictions)} prédictions."
         )
 
-    output_dir = YOLO_ROOT / "masks" / "eval" / model_type / dataset
+    output_dir = YOLO_ROOT / "masks" / "eval" / "instance" / dataset
     output_dir.mkdir(parents=True, exist_ok=True)
     crop_x, crop_y, crop_width, crop_height = CROP
 
@@ -94,7 +92,6 @@ def export_fold(
             prediction,
             names,
             len(names),
-            semantic=model_type == "semantique",
         )
         if masks.shape[1] < crop_y + crop_height or masks.shape[2] < crop_x + crop_width:
             raise ValueError(
@@ -104,34 +101,20 @@ def export_fold(
 
         output_path = output_dir / f"pred_{image_path.stem}.txt"
         lines = []
-        if model_type == "instance":
-            instance_masks = result_to_instance_masks(prediction, names)
-            for class_index, instance_mask in instance_masks:
-                cropped_mask = instance_mask[
-                    crop_y:crop_y + crop_height,
-                    crop_x:crop_x + crop_width,
-                ]
-                lines.extend(
-                    mask_to_yolo_polygons(
-                        torch.from_numpy(cropped_mask),
-                        class_index,
-                        target_size=(crop_width, crop_height),
-                        largest_only=True,
-                    )
+        instance_masks = result_to_instance_masks(prediction, names)
+        for class_index, instance_mask in instance_masks:
+            cropped_mask = instance_mask[
+                crop_y:crop_y + crop_height,
+                crop_x:crop_x + crop_width,
+            ]
+            lines.extend(
+                mask_to_yolo_polygons(
+                    torch.from_numpy(cropped_mask),
+                    class_index,
+                    target_size=(crop_width, crop_height),
+                    largest_only=True,
                 )
-        else:
-            for class_index, class_mask in enumerate(masks):
-                cropped_mask = class_mask[
-                    crop_y:crop_y + crop_height,
-                    crop_x:crop_x + crop_width,
-                ]
-                lines.extend(
-                    mask_to_yolo_polygons(
-                        torch.from_numpy(cropped_mask),
-                        class_index,
-                        target_size=(crop_width, crop_height),
-                    )
-                )
+            )
         output_path.write_text("\n".join(lines) + ("\n" if lines else ""))
 
     return len(image_paths)
@@ -140,9 +123,6 @@ def export_fold(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", choices=DATASETS, required=True)
-    parser.add_argument(
-        "--model-type", choices=("instance", "semantique"), required=True
-    )
     parser.add_argument("--confidence", type=float, default=0.3)
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--fold", type=int, action="append", dest="folds")
@@ -157,7 +137,6 @@ def main() -> None:
             parser.error("--fold doit être compris entre 1 et 5")
         count = export_fold(
             args.dataset,
-            args.model_type,
             fold_index,
             args.confidence,
             args.device,

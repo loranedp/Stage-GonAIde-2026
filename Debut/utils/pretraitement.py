@@ -631,7 +631,6 @@ def sauvegarder_visualisations(images_dir, labels_dir, output_dir, num_classes):
             label_path,
             (height, width),
             num_classes=num_classes,
-            semantic=True,
         )
         visualisation = overlay_colored_mask(
             image_array,
