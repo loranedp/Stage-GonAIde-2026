@@ -8,23 +8,23 @@ import cv2
 import numpy as np
 
 
-def load_crop_images_yolo():
+def load_crop():
     source_path = Path(__file__).resolve().parents[2] / "utils" / "pretraitement.py"
     tree = ast.parse(source_path.read_text(encoding="utf-8"))
     function = next(
         node
         for node in tree.body
-        if isinstance(node, ast.FunctionDef) and node.name == "crop_images_YOLO"
+        if isinstance(node, ast.FunctionDef) and node.name == "crop"
     )
     module = ast.Module(body=[function], type_ignores=[])
     namespace = {"Path": Path, "cv2": cv2, "json": json}
     exec(compile(ast.fix_missing_locations(module), str(source_path), "exec"), namespace)
-    return namespace["crop_images_YOLO"]
+    return namespace["crop"]
 
 
 class CropImagesYoloTests(unittest.TestCase):
     def test_pairs_are_matched_by_stem_and_second_run_is_unchanged(self):
-        crop_images_yolo = load_crop_images_yolo()
+        crop_images_yolo = load_crop()
         with tempfile.TemporaryDirectory() as directory:
             directory = Path(directory)
             first_image = directory / "first.jpg"
@@ -53,7 +53,7 @@ class CropImagesYoloTests(unittest.TestCase):
             self.assertEqual(first_mask.read_text(encoding="utf-8"), mask_content)
 
     def test_missing_mask_stops_before_image_is_modified(self):
-        crop_images_yolo = load_crop_images_yolo()
+        crop_images_yolo = load_crop()
         with tempfile.TemporaryDirectory() as directory:
             image_path = Path(directory) / "image.jpg"
             image = np.zeros((480, 640, 3), dtype=np.uint8)
@@ -66,14 +66,17 @@ class CropImagesYoloTests(unittest.TestCase):
             self.assertEqual(image_path.read_bytes(), original_image)
 
     def test_coco_annotations_are_translated_once_with_the_image(self):
-        crop_images_yolo = load_crop_images_yolo()
+        crop_images_yolo = load_crop()
         with tempfile.TemporaryDirectory() as directory:
             directory = Path(directory)
             image_path = directory / "image.jpg"
+            coco_image_path = directory / "coco" / "image.jpg"
+            coco_image_path.parent.mkdir()
             mask_path = directory / "image.txt"
             coco_path = directory / "annotations.json"
             image = np.zeros((480, 640, 3), dtype=np.uint8)
             self.assertTrue(cv2.imwrite(str(image_path), image))
+            self.assertTrue(cv2.imwrite(str(coco_image_path), image))
             mask_path.write_text("0 0.5 0.5\n", encoding="utf-8")
             coco_path.write_text(
                 json.dumps(
@@ -94,7 +97,10 @@ class CropImagesYoloTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            crop_images_yolo([str(image_path)], [str(mask_path)], coco_path)
+            crop_images_yolo(
+                [str(image_path)], [str(mask_path)], coco_path,
+                [str(coco_image_path)],
+            )
 
             cropped = json.loads(coco_path.read_text(encoding="utf-8"))
             self.assertEqual(cropped["images"][0]["width"], 510)
@@ -103,7 +109,12 @@ class CropImagesYoloTests(unittest.TestCase):
             self.assertEqual(annotation["bbox"], [15, 17, 20, 30])
             self.assertEqual(annotation["segmentation"], [[15, 17, 35, 17, 35, 47, 15, 47]])
             first_content = coco_path.read_text(encoding="utf-8")
+            self.assertEqual(cv2.imread(str(image_path)).shape, (380, 510, 3))
+            self.assertEqual(cv2.imread(str(coco_image_path)).shape, (380, 510, 3))
 
-            crop_images_yolo([str(image_path)], [str(mask_path)], coco_path)
+            crop_images_yolo(
+                [str(image_path)], [str(mask_path)], coco_path,
+                [str(coco_image_path)],
+            )
 
             self.assertEqual(coco_path.read_text(encoding="utf-8"), first_content)

@@ -1,6 +1,6 @@
 """Dataset multi-classes + CME pour le ré-entraînement.
 
-Combine toutes les images de data/images/cavite (via les annotations COCO) et
+Combine toutes les images de data/COCO/images/cavite (via les annotations COCO) et
 les images validées "bonne" ajoutées via l'application (data/train_added/).
 Les images sans correspondance dans les métadonnées (pour les canaux CME)
 sont ignorées."""

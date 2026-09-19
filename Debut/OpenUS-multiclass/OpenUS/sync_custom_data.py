@@ -9,8 +9,8 @@ import tempfile
 
 
 def prepare(debut_root):
-    source = debut_root / 'data/images/cavite'
-    coco = json.loads((debut_root / 'data/labels/COCO/cavite/annotations.json').read_text())
+    source = debut_root / 'data/COCO/images/cavite'
+    coco = json.loads((debut_root / 'data/COCO/labels/cavite/annotations.json').read_text())
     test_fish = set(json.loads((debut_root / 'utils/common_test_fish.json').read_text()))
     categories = {c['id']: c['name'] for c in coco['categories']}
     if any(categories.get(cid) != name for cid, name in

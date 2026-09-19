@@ -71,7 +71,7 @@ class PolygonVolumeCoordinatesTests(unittest.TestCase):
 
     def test_volume_wrappers_propagate_coordinate_frame(self):
         for task in ('oeufs', 'cavite'):
-            image_dir = self.root / 'data' / 'images' / task
+            image_dir = self.root / 'data' / 'COCO' / 'images' / task
             image_dir.mkdir(parents=True)
             Image.open(self.image).save(image_dir / 'echo.jpg')
         report_dir = self.root / 'Resultats'

@@ -73,15 +73,19 @@ def sort_classes(label_dir):
             with open(file_path, "w") as f:
                 f.writelines(lines)
 
-sort_classes("../data/labels/YOLO/oeufs")
-sort_classes("../data/labels/YOLO/cavite")
+sort_classes("../data/YOLO/labels/oeufs")
+sort_classes("../data/YOLO/labels/cavite")
 
-print(f"Nombre d'images importées de la cavite : {len(os.listdir('../data/images/cavite/'))}")
-print(f"Nombre d'images importées des oeufs : {len(os.listdir('../data/images/oeufs/'))}")
+print(f"Nombre d'images COCO importées de la cavite : {len(os.listdir('../data/COCO/images/cavite/'))}")
+print(f"Nombre d'images COCO importées des oeufs : {len(os.listdir('../data/COCO/images/oeufs/'))}")
+print(f"Nombre d'images YOLO importées de la cavite : {len(os.listdir('../data/YOLO/images/cavite/'))}")
+print(f"Nombre d'images YOLO importées des oeufs : {len(os.listdir('../data/YOLO/images/oeufs/'))}")
 
 # -------- 4.2 Renomage des images et des masques YOLO --------
 def rename(path, format):
     for file_name in os.listdir(path):
+        if Path(file_name).suffix.lower() != f".{format.lower()}":
+            continue
         if "-" in file_name : # Vérifie si l'image n'a pas déjà été renomée
             split_name = file_name.split("_")
 
@@ -117,12 +121,14 @@ def rename(path, format):
     return True
 
 # Renommages des images
-rename("../data/images/cavite/", "jpg")
-rename("../data/images/oeufs/", "jpg")
+rename("../data/COCO/images/cavite/", "jpg")
+rename("../data/COCO/images/oeufs/", "jpg")
+rename("../data/YOLO/images/cavite/", "jpg")
+rename("../data/YOLO/images/oeufs/", "jpg")
 
 # Renommages des labels YOLO
-rename("../data/labels/YOLO/cavite/", "txt")
-rename("../data/labels/YOLO/oeufs/", "txt")
+rename("../data/YOLO/labels/cavite/", "txt")
+rename("../data/YOLO/labels/oeufs/", "txt")
 
 # Prépare les noms finaux avant le crop afin de lire l'échelle sur les images
 # d'origine, dont la zone OCR est supprimée par le recadrage.
@@ -156,7 +162,7 @@ for poisson, echos in df.groupby("cap_id"):
     echelle = 0
     image_oeufs_trouvee = False
     for file_name in echos["new_name_file"]:
-        image_path = f"../data/images/oeufs/{file_name}.jpg"
+        image_path = f"../data/COCO/images/oeufs/{file_name}.jpg"
         if not os.path.exists(image_path):
             continue
 
@@ -178,7 +184,7 @@ for poisson, echos in df.groupby("cap_id"):
 # Les noms renommés suivent le format : image_id_heure_cap_id_annee.jpg
 poissons_importes = {
     fichier.stem.split("_")[2]
-    for dossier in (Path("../data/images/cavite"), Path("../data/images/oeufs"))
+    for dossier in (Path("../data/COCO/images/cavite"), Path("../data/COCO/images/oeufs"))
     for fichier in dossier.iterdir()
     if fichier.is_file() and len(fichier.stem.split("_")) >= 4
 }
@@ -234,11 +240,11 @@ def rename_json(json_path, output_json_path):
 
     return True
 
-rename_json("../data/labels/COCO/cavite/_annotations.coco.json", "../data/labels/COCO/cavite/annotations.json")
-rename_json("../data/labels/COCO/oeufs/_annotations.coco.json", "../data/labels/COCO/oeufs/annotations.oeufs_2_classes.json")
+rename_json("../data/COCO/labels/cavite/_annotations.coco.json", "../data/COCO/labels/cavite/annotations.json")
+rename_json("../data/COCO/labels/oeufs/_annotations.coco.json", "../data/COCO/labels/oeufs/annotations.oeufs_2_classes.json")
 
 # -------- 4.4 Cropping des images et des masques YOLO --------
-def crop(image_paths, yolo_paths, coco_path=None):
+def crop(image_paths, yolo_paths, coco_path=None, coco_image_paths=None):
     """Croppe les paires image/masque YOLO et leurs annotations COCO associées."""
     x, y, w, h = 85, 33, 510, 380
 
@@ -258,6 +264,7 @@ def crop(image_paths, yolo_paths, coco_path=None):
 
     image_files = paths_by_stem(image_paths, "images")
     yolo_files = paths_by_stem(yolo_paths, "fichiers YOLO")
+    coco_image_files = paths_by_stem(coco_image_paths or [], "images COCO")
     missing_yolo = sorted(image_files.keys() - yolo_files.keys())
     missing_images = sorted(yolo_files.keys() - image_files.keys())
     if missing_yolo or missing_images:
@@ -265,6 +272,14 @@ def crop(image_paths, yolo_paths, coco_path=None):
             f"Paires image/masque incomplètes. Images sans masque : {missing_yolo}; "
             f"masques sans image : {missing_images}."
         )
+    if coco_image_paths is not None:
+        missing_coco = sorted(image_files.keys() - coco_image_files.keys())
+        missing_yolo_images = sorted(coco_image_files.keys() - image_files.keys())
+        if missing_coco or missing_yolo_images:
+            raise ValueError(
+                f"Copies COCO/YOLO incomplètes. Images COCO manquantes : {missing_coco}; "
+                f"images YOLO manquantes : {missing_yolo_images}."
+            )
 
     coco_data = None
     coco_images_by_filename = {}
@@ -302,7 +317,20 @@ def crop(image_paths, yolo_paths, coco_path=None):
 
     for stem, image_file in image_files.items():
         image = cv2.imread(str(image_file))
+        if image is None:
+            raise ValueError(f"Image YOLO illisible : {image_file}")
         image_height, image_width = image.shape[:2]
+        coco_image_file = coco_image_files.get(stem)
+        coco_image = None
+        if coco_image_file is not None:
+            coco_image = cv2.imread(str(coco_image_file))
+            if coco_image is None:
+                raise ValueError(f"Image COCO illisible : {coco_image_file}")
+            if coco_image.shape[:2] != image.shape[:2]:
+                raise ValueError(
+                    f"Dimensions COCO/YOLO différentes pour {stem} : "
+                    f"{coco_image.shape[:2]} contre {image.shape[:2]}."
+                )
 
         # Si l'image est déjà à la bonne taille, on ne fait rien
         if (image_width, image_height) == (w, h):
@@ -342,6 +370,10 @@ def crop(image_paths, yolo_paths, coco_path=None):
         cropped_image = image[y:y+h, x:x+w]
         if not cv2.imwrite(str(image_file), cropped_image):
             raise OSError(f"Impossible d'écrire l'image cropée : {image_file}")
+        if coco_image_file is not None:
+            cropped_coco_image = coco_image[y:y+h, x:x+w]
+            if not cv2.imwrite(str(coco_image_file), cropped_coco_image):
+                raise OSError(f"Impossible d'écrire l'image COCO cropée : {coco_image_file}")
         with yolo_file.open('w', encoding='utf-8') as yolo:
             yolo.writelines(lines)
 
@@ -375,9 +407,19 @@ def crop(image_paths, yolo_paths, coco_path=None):
         with coco_path.open('w', encoding='utf-8') as coco_file:
             json.dump(coco_data, coco_file, indent=4)
 
-crop(image_paths=glob.glob("../data/images/cavite/*.jpg"), yolo_paths=glob.glob("../data/labels/YOLO/cavite/*.txt"), coco_path="../data/labels/COCO/cavite/annotations.json")
+crop(
+    image_paths=glob.glob("../data/YOLO/images/cavite/*.jpg"),
+    yolo_paths=glob.glob("../data/YOLO/labels/cavite/*.txt"),
+    coco_path="../data/COCO/labels/cavite/annotations.json",
+    coco_image_paths=glob.glob("../data/COCO/images/cavite/*.jpg"),
+)
 
-crop(image_paths=glob.glob("../data/images/oeufs/*.jpg"), yolo_paths=glob.glob("../data/labels/YOLO/oeufs/*.txt"), coco_path="../data/labels/COCO/oeufs/annotations.oeufs_2_classes.json")
+crop(
+    image_paths=glob.glob("../data/YOLO/images/oeufs/*.jpg"),
+    yolo_paths=glob.glob("../data/YOLO/labels/oeufs/*.txt"),
+    coco_path="../data/COCO/labels/oeufs/annotations.oeufs_2_classes.json",
+    coco_image_paths=glob.glob("../data/COCO/images/oeufs/*.jpg"),
+)
 
 
 # -------- 4.5 Suppression de classes COCO --------
@@ -396,9 +438,9 @@ def delete_classes_COCO(input_path, output_path, excluded_categories):
     return True
 
 # Suppression de l'intestin
-delete_classes_COCO(input_path = "../data/labels/COCO/cavite/annotations.json", output_path = "../data/labels/COCO/cavite/annotations_2_classes.json", excluded_categories=["Intestin"])
+delete_classes_COCO(input_path = "../data/COCO/labels/cavite/annotations.json", output_path = "../data/COCO/labels/cavite/annotations_2_classes.json", excluded_categories=["Intestin"])
 # Suppression de la gonade
-delete_classes_COCO(input_path = "../data/labels/COCO/oeufs/annotations.oeufs_2_classes.json", output_path = "../data/labels/COCO/oeufs/annotations.oeufs.json", excluded_categories=["Gonade"])
+delete_classes_COCO(input_path = "../data/COCO/labels/oeufs/annotations.oeufs_2_classes.json", output_path = "../data/COCO/labels/oeufs/annotations.oeufs.json", excluded_categories=["Gonade"])
 
 # -------- 4.6 Suppression de classes YOLO --------
 def delete_classes_YOLO(input_dir, output_dir, excluded_classes):
@@ -428,17 +470,18 @@ def delete_classes_YOLO(input_dir, output_dir, excluded_classes):
     return True
 
 # Copie les labels avec toutes les classes dans un sous-dossier dédié
-source_dir = "../data/labels/YOLO/oeufs"
-backup_dir = os.path.join(source_dir, "oeufs2classes")
+source_dir = "../data/YOLO/labels/oeufs"
+backup_dir = "../data/YOLO/labels/oeufsclasses"
 
-# Remplace entièrement la copie précédente si elle existe
-if os.path.exists(backup_dir):
-    shutil.rmtree(backup_dir)
-os.makedirs(backup_dir)
+# Remplace uniquement les labels polygonaux précédents. Les masques PNG utilisés
+# par YOLO sémantique sont fournis séparément dans le même dossier.
+os.makedirs(backup_dir, exist_ok=True)
+for previous_label in Path(backup_dir).glob("*.txt"):
+    previous_label.unlink()
 
 # Copie le contenu source sans recopier le sous-dossier de destination
 for item in os.listdir(source_dir):
-    if item == "oeufs2classes":
+    if item == "oeufs2classes" or not item.endswith(".txt"):
         continue
 
     source_item = os.path.join(source_dir, item)
@@ -449,7 +492,14 @@ for item in os.listdir(source_dir):
         shutil.copy2(source_item, destination_item)
 
 
-delete_classes_YOLO(input_dir = "../data/labels/YOLO/oeufs/", output_dir = "../data/labels/YOLO/oeufs/", excluded_classes=[0]) # Suppression la gonade (classe 0)
+# Copie les images de la variante à deux classes dans le dossier parallèle attendu par YOLO.
+source_images_dir = "../data/YOLO/images/oeufs"
+backup_images_dir = "../data/YOLO/images/oeufsclasses"
+if os.path.exists(backup_images_dir):
+    shutil.rmtree(backup_images_dir)
+shutil.copytree(source_images_dir, backup_images_dir)
+
+delete_classes_YOLO(input_dir = "../data/YOLO/labels/oeufs/", output_dir = "../data/YOLO/labels/oeufs/", excluded_classes=[0]) # Suppression la gonade (classe 0)
 
 
 
@@ -599,14 +649,14 @@ def sauvegarder_visualisations(images_dir, labels_dir, output_dir, num_classes):
 # Sauvegarde des visualisations avec toutes les classes
 visualisation_dir = Path("../data/visualisation")
 sauvegarder_visualisations(
-    images_dir="../data/images/cavite",
-    labels_dir="../data/labels/YOLO/cavite",
+    images_dir="../data/YOLO/images/cavite",
+    labels_dir="../data/YOLO/labels/cavite",
     output_dir=visualisation_dir / "images",
     num_classes=3,
 )
 sauvegarder_visualisations(
-    images_dir="../data/images/oeufs",
-    labels_dir="../data/labels/YOLO/oeufs/oeufs2classes",
+    images_dir="../data/YOLO/images/oeufsclasses",
+    labels_dir="../data/YOLO/labels/oeufsclasses",
     output_dir=visualisation_dir / "oeufs",
     num_classes=2,
 )
@@ -618,7 +668,7 @@ df.to_excel("correspondance_echo_final.xlsx", index=False)
 # ================== 7. Division des données de test ==================
 # Recalculé à chaque prétraitement : ajouter des poissons peut changer le test.
 utils_dir = Path(__file__).resolve().parent
-images_dir = utils_dir.parent / "data" / "images"
+images_dir = utils_dir.parent / "data" / "COCO" / "images"
 fish_by_dataset = [
     {
         path.name.split("_")[2]

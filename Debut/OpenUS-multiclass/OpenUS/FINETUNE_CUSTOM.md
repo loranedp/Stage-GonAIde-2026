@@ -90,8 +90,8 @@ python sync_custom_data.py --dry-run  # validate sources without writing
 python sync_custom_data.py
 ```
 
-The command copies `Debut/data/images/cavite` and
-`Debut/data/labels/COCO/cavite/annotations.json` into local `data/`, replacing the
+The command copies `Debut/data/COCO/images/cavite` and
+`Debut/data/COCO/labels/cavite/annotations.json` into local `data/`, replacing the
 previous image set. Sources are validated and copies staged before replacement.
 Use `--debut-root /path/to/Debut` if the shared inputs are elsewhere.
 

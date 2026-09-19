@@ -544,7 +544,7 @@ with tab_prediction:
                             pred["masks"], gt_masks, class_names
                         )
                         st.caption(
-                            "Image présente dans data/labels/COCO/cavite — IoU par classe (vs vérité terrain) :"
+                            "Image présente dans data/COCO/labels/cavite — IoU par classe (vs vérité terrain) :"
                         )
                         iou_cols = st.columns(len(class_names))
                         for iou_col, class_name in zip(iou_cols, class_names):
