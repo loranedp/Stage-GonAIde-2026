@@ -1,10 +1,15 @@
-import os
-import json
-import random
 from PIL import Image
 import torchvision.transforms.functional as F
 from torchvision import transforms
-from torch.utils.data import Dataset, DataLoader
+
+
+# Keep the custom OpenUS pipeline aligned with the augmentations used by UNet
+# and YOLO. Geometry is applied to image and mask with the same parameters;
+# only the image receives the photometric transform.
+ROTATION_DEGREES = (-20.0, 20.0)
+TRANSLATION_RATIO = (0.2, 0.2)
+SCALE_RANGE = (0.8, 1.2)
+BRIGHTNESS = 0.4
 
 
 def get_transforms(img_size):
@@ -28,28 +33,40 @@ def get_transforms_multilabel(img_size):
 
 def _get_transforms(img_size, mask_to_tensor):
     def resize(im, msk):
-        im = F.resize(im, [img_size, img_size])
+        im = F.resize(im, [img_size, img_size], interpolation=transforms.InterpolationMode.BILINEAR)
         msk = F.resize(msk, [img_size, img_size], interpolation=Image.NEAREST)
         return im, msk
 
-    def random_rot90(im, msk, p=0.5):
-        if random.random() < p:
-            k = random.randint(1, 3)
-            im = im.rotate(90 * k, expand=True)
-            msk = msk.rotate(90 * k, expand=True)
-            im, msk = F.center_crop(im, (img_size, img_size)), F.center_crop(msk, (img_size, img_size))
-        return im, msk
+    def random_geometry(im, msk):
+        rotation = transforms.RandomRotation.get_params(ROTATION_DEGREES)
+        affine_rotation, translations, scale, shear = transforms.RandomAffine.get_params(
+            degrees=[0.0, 0.0],
+            translate=list(TRANSLATION_RATIO),
+            scale_ranges=SCALE_RANGE,
+            shears=None,
+            img_size=[img_size, img_size],
+        )
 
-    def random_hflip(im, msk, p=0.5):
-        if random.random() < p:
-            im = F.hflip(im)
-            msk = F.hflip(msk)
-        return im, msk
-
-    def random_vflip(im, msk, p=0.5):
-        if random.random() < p:
-            im = F.vflip(im)
-            msk = F.vflip(msk)
+        im = F.rotate(
+            im, rotation,
+            interpolation=transforms.InterpolationMode.BILINEAR,
+            fill=0,
+        )
+        msk = F.rotate(
+            msk, rotation,
+            interpolation=Image.NEAREST,
+            fill=0,
+        )
+        im = F.affine(
+            im, affine_rotation, translations, scale, shear,
+            interpolation=transforms.InterpolationMode.BILINEAR,
+            fill=0,
+        )
+        msk = F.affine(
+            msk, affine_rotation, translations, scale, shear,
+            interpolation=Image.NEAREST,
+            fill=0,
+        )
         return im, msk
 
     # ToTensor and Normalize only apply to image
@@ -61,9 +78,8 @@ def _get_transforms(img_size, mask_to_tensor):
 
     def train_transform(image, mask):
         image, mask = resize(image, mask)
-        image, mask = random_rot90(image, mask)
-        image, mask = random_hflip(image, mask)
-        image, mask = random_vflip(image, mask)
+        image, mask = random_geometry(image, mask)
+        image = transforms.ColorJitter(brightness=BRIGHTNESS)(image)
         image = image_to_tensor(image)
         mask = mask_to_tensor(mask)
         return image, mask
