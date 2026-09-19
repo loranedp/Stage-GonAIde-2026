@@ -22,8 +22,8 @@ UNET_ROOT = PROJECT_ROOT / 'UNet' / 'masks' / 'eval'
 YOLO_ROOT = PROJECT_ROOT / 'YOLO26' / 'masks' / 'eval'
 OPENUS_CV_ROOT = (PROJECT_ROOT / 'Ex1' / 'OpenUS-multiclass' / 'OpenUS'
                   / 'output' / 'custom_seg_cv5')
-IMAGE_ROOT = PROJECT_ROOT / 'data' / 'images'
-LABEL_ROOT = PROJECT_ROOT / 'data' / 'labels' / 'YOLO'
+IMAGE_ROOT = PROJECT_ROOT / 'data' / 'YOLO' / 'images'
+LABEL_ROOT = PROJECT_ROOT / 'data' / 'YOLO' / 'labels'
 OUTPUT_ROOT = PROJECT_ROOT / 'Resultats' / 'visualisation'
 
 TASKS = {
@@ -254,15 +254,16 @@ def run(task_names, dpi=150):
         axes_flat = np.asarray(axes).reshape(-1)
 
         axes_flat[0].imshow(image)
-        axes_flat[0].set_title(f'{image_id}_original',
-                              fontsize=11, fontweight='bold', pad=8)
+        axes_flat[0].set_title(
+            'original', fontsize=14, fontweight='bold', pad=8
+        )
         axes_flat[0].axis('off')
 
         first_model_index = 1
         if true_display is not None:
             axes_flat[1].imshow(true_display)
             axes_flat[1].set_title(
-                f'verite_terrain', fontsize=11,
+                'verite_terrain', fontsize=14,
                 fontweight='bold', pad=8
             )
             axes_flat[1].axis('off')
@@ -273,7 +274,7 @@ def run(task_names, dpi=150):
         ):
             axes_flat[index].imshow(display_image)
             axes_flat[index].set_title(
-                f'{model_name}', fontsize=11,
+                model_name, fontsize=14,
                 fontweight='bold', pad=8
             )
             axes_flat[index].axis('off')
@@ -281,9 +282,11 @@ def run(task_names, dpi=150):
         for axis in axes_flat[num_panels:]:
             axis.axis('off')
 
-        fig.tight_layout()
+        # Réduit l'espace blanc entre les panneaux et autour de la figure,
+        # tout en gardant une marge suffisante pour les titres.
+        fig.tight_layout(pad=0.2, w_pad=0.02, h_pad=0.2)
         fig.savefig(output_dir / f'combined_{image_id}.png',
-                    bbox_inches='tight', dpi=dpi)
+                    bbox_inches='tight', pad_inches=0.02, dpi=dpi)
         plt.close(fig)
 
 
