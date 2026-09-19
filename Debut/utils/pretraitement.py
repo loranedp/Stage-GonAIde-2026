@@ -469,6 +469,15 @@ def delete_classes_YOLO(input_dir, output_dir, excluded_classes):
                 f.writelines(filtered_lines)
     return True
 
+# Crée les labels cavité à deux classes en supprimant l'intestin (classe 2).
+cavite_2classes_dir = "../data/YOLO/labels/cavite2classes"
+os.makedirs(cavite_2classes_dir, exist_ok=True)
+delete_classes_YOLO(
+    input_dir="../data/YOLO/labels/cavite",
+    output_dir=cavite_2classes_dir,
+    excluded_classes=[2],
+)
+
 # Copie les labels avec toutes les classes dans un sous-dossier dédié
 source_dir = "../data/YOLO/labels/oeufs"
 backup_dir = "../data/YOLO/labels/oeufsclasses"
