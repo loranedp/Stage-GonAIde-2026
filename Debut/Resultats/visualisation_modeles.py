@@ -32,8 +32,7 @@ TASKS = {
 }
 
 # ============================ 3. Visualisation des résultats ============================
-# Forme de la grille de visualisation. Les images et labels ont déjà été cropés.
-COLS = 3
+# Format des images visualisées. Les images et labels ont déjà été cropés.
 IMAGE_SIZE = (510, 380)
 
 def image_id_from_prediction(mask_path):
@@ -242,9 +241,16 @@ def run(task_names, dpi=150):
             )
             model_names.append(source_name)
 
+        # Tous les panneaux sont affichés sur une seule ligne. La hauteur de
+        # la figure est calculée à partir du ratio des images cropées afin de
+        # conserver leur format rectangulaire sans les déformer.
         num_panels = len(displays) + 1 + (true_display is not None)
-        rows = (num_panels + COLS - 1) // COLS
-        fig, axes = plt.subplots(rows, COLS, figsize=(5 * COLS, 5 * rows))
+        panel_width = 5
+        panel_height = panel_width * IMAGE_SIZE[1] / IMAGE_SIZE[0]
+        fig, axes = plt.subplots(
+            1, num_panels,
+            figsize=(panel_width * num_panels, panel_height)
+        )
         axes_flat = np.asarray(axes).reshape(-1)
 
         axes_flat[0].imshow(image)
