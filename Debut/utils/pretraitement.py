@@ -473,8 +473,7 @@ def delete_classes_YOLO(input_dir, output_dir, excluded_classes):
 source_dir = "../data/YOLO/labels/oeufs"
 backup_dir = "../data/YOLO/labels/oeufsclasses"
 
-# Remplace uniquement les labels polygonaux précédents. Les masques PNG utilisés
-# par YOLO sémantique sont fournis séparément dans le même dossier.
+# Remplace uniquement les labels polygonaux précédents.
 os.makedirs(backup_dir, exist_ok=True)
 for previous_label in Path(backup_dir).glob("*.txt"):
     previous_label.unlink()

@@ -21,6 +21,7 @@ from utils.yolo_metrics import result_to_instance_masks, result_to_masks
 CROP = (85, 33, 510, 380)
 DATASETS = {
     "3classes": ("Cavite", "Gonade", "Intestin"),
+    "2classes": ("Cavite", "Gonade"),
     "oeufs": ("Oeuf",),
 }
 
