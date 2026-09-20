@@ -26,13 +26,31 @@ from dataset.dataset_busbra import BUSBRADataset
 from dataset.dataset_tn3k import TN3KDataset, TN3KTestDataset
 from dataset.dataset_custom_coco import CocoMultiLabelDataset
 from dataset.transforms import get_transforms, get_transforms_multilabel
+from segmentation_metrics import METRIC_NAMES, finite_mean, metrics_by_class
 
 
 OPENUS_ROOT = Path(__file__).resolve().parent
-DEBUT_DATA_ROOT = OPENUS_ROOT.parents[1] / 'data'
+DEBUT_ROOT = OPENUS_ROOT.parents[1]
+DEBUT_DATA_ROOT = DEBUT_ROOT / 'data'
 CUSTOM_COCO_JSON = DEBUT_DATA_ROOT / 'COCO/labels/cavite/annotations.json'
 CUSTOM_IMAGES_ROOT = DEBUT_DATA_ROOT / 'COCO/images/cavite'
 CUSTOM_SPLIT_FILE = OPENUS_ROOT / 'data/splits.json'
+CUSTOM_METADATA_FILE = DEBUT_ROOT / 'utils/correspondance_echo_final.xlsx'
+
+
+def configure_custom_classes(args, dataset):
+    detected = len(dataset.class_names)
+    if args.num_classes is not None and args.num_classes != detected:
+        raise ValueError(f'--num_classes={args.num_classes}, but {args.coco_json} defines '
+                         f'{detected} classes: {list(dataset.class_names)}')
+    args.num_classes = detected
+    args.class_names = list(dataset.class_names)
+    print(f"Detected classes ({detected}): {', '.join(dataset.class_names)}")
+
+
+def json_number(value):
+    value = float(value)
+    return value if math.isfinite(value) else None
 
 
 class MambaDecoderHead(nn.Module):
@@ -248,6 +266,7 @@ def test_seg(test_loader, model, head, criterion, args, save_predictions=False):
     total_samples = 0  # Count samples, not batches
     total_iou_per_class = None
     total_dice_per_class = None
+    metric_rows = {name: [] for name in METRIC_NAMES}
     
     all_predictions = []
     all_targets = []
@@ -287,8 +306,30 @@ def test_seg(test_loader, model, head, criterion, args, save_predictions=False):
         batch_size = preds.shape[0]
         for j in range(batch_size):
             if args.multilabel:
-                iou_pc = compute_iou_multilabel(preds[j:j+1], masks[j:j+1])
-                dice_pc = compute_dice_multilabel(preds[j:j+1], masks[j:j+1])
+                if args.dataset_name == 'CUSTOM':
+                    file_name = mask_filenames[j]
+                    height, width = test_loader.dataset.original_size(file_name)
+                    native_pred = F.interpolate(
+                        preds[j:j + 1], size=(height, width), mode='nearest'
+                    )[0].bool().cpu()
+                    native_true = test_loader.dataset.native_mask(file_name)
+                    computed = metrics_by_class(
+                        native_pred, native_true,
+                        test_loader.dataset.scale_cm(file_name), height,
+                    )
+                    for name in METRIC_NAMES:
+                        metric_rows[name].append(computed[name])
+                    iou_pc = computed['iou'].tolist()
+                    dice_pc = computed['dice'].tolist()
+                    precision_pc = computed['precision'].tolist()
+                    recall_pc = computed['recall'].tolist()
+                    diff_surface_pc = computed['diff_surface'].tolist()
+                else:
+                    iou_pc = compute_iou_multilabel(preds[j:j+1], masks[j:j+1])
+                    dice_pc = compute_dice_multilabel(preds[j:j+1], masks[j:j+1])
+                    precision_pc = []
+                    recall_pc = []
+                    diff_surface_pc = []
                 if total_iou_per_class is None:
                     total_iou_per_class = np.zeros(len(iou_pc))
                     total_dice_per_class = np.zeros(len(dice_pc))
@@ -305,6 +346,23 @@ def test_seg(test_loader, model, head, criterion, args, save_predictions=False):
             if args.multilabel:
                 entry['iou_per_class'] = iou_pc
                 entry['dice_per_class'] = dice_pc
+                entry['precision_per_class'] = precision_pc
+                entry['recall_per_class'] = recall_pc
+                entry['diff_surface_per_class'] = [json_number(value) for value in diff_surface_pc]
+                if precision_pc:
+                    entry['precision'] = float(np.mean(precision_pc))
+                    entry['recall'] = float(np.mean(recall_pc))
+                    entry['diff_surface'] = json_number(finite_mean(diff_surface_pc))
+                entry['metrics_by_class'] = {
+                    class_name: {
+                        'iou': json_number(iou_pc[index]),
+                        'dice': json_number(dice_pc[index]),
+                        'precision': json_number(precision_pc[index]),
+                        'recall': json_number(recall_pc[index]),
+                        'diff_surface': json_number(diff_surface_pc[index]),
+                    }
+                    for index, class_name in enumerate(args.class_names)
+                } if precision_pc else {}
             per_image_results.append(entry)
 
             total_iou += sample_iou
@@ -363,6 +421,16 @@ def test_seg(test_loader, model, head, criterion, args, save_predictions=False):
         dice_per_class = (total_dice_per_class / max(total_samples, 1)).tolist()
         print(f"Per-class IoU:  {[f'{v:.4f}' for v in iou_per_class]}")
         print(f"Per-class Dice: {[f'{v:.4f}' for v in dice_per_class]}")
+        if metric_rows['precision']:
+            stacked = {name: torch.stack(values) for name, values in metric_rows.items()}
+            precision_per_class = [finite_mean(stacked['precision'][:, c]) for c in range(args.num_classes)]
+            recall_per_class = [finite_mean(stacked['recall'][:, c]) for c in range(args.num_classes)]
+            diff_surface_per_class = [finite_mean(stacked['diff_surface'][:, c]) for c in range(args.num_classes)]
+            missing_scales = sum(not math.isfinite(test_loader.dataset.scale_cm(entry['file_name']))
+                                 for entry in per_image_results)
+            if missing_scales:
+                print(f"WARNING: {missing_scales} image(s) have no physical scale; "
+                      "their surface differences are unavailable.")
     print(f"Total samples: {total_samples}")
     
     if save_predictions and len(all_predictions) > 0:
@@ -370,7 +438,11 @@ def test_seg(test_loader, model, head, criterion, args, save_predictions=False):
         torch.save({
             'predictions': torch.cat(all_predictions, dim=0),
             'targets': torch.cat(all_targets, dim=0),
-            'metrics': {'loss': avg_loss, 'miou': avg_iou, 'dice': avg_dice}
+            'metrics': {'loss': avg_loss, 'miou': avg_iou, 'dice': avg_dice,
+                        **({'precision': finite_mean(stacked['precision']),
+                            'recall': finite_mean(stacked['recall']),
+                            'diff_surface': finite_mean(stacked['diff_surface'])}
+                           if metric_rows['precision'] else {})}
         }, pred_save_path)
         print(f"Predictions saved to: {pred_save_path}")
     
@@ -381,22 +453,44 @@ def test_seg(test_loader, model, head, criterion, args, save_predictions=False):
 
     # per-image metrics CSV
     csv_path = os.path.join(args.output_dir, f"test_results_per_image_{args.checkpoint_key}_{args.cpk_name}.csv")
-    num_pc = len(per_image_results[0].get('iou_per_class', [])) if per_image_results else 0
+    class_names = getattr(args, 'class_names', [])
     with open(csv_path, 'w', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerow(['file_name', 'iou', 'dice']
-                        + [f'iou_class{c+1}' for c in range(num_pc)]
-                        + [f'dice_class{c+1}' for c in range(num_pc)])
+        fieldnames = ['file_name', 'iou', 'dice', 'precision', 'recall', 'diff_surface_cm2']
+        for class_name in class_names:
+            key = class_name.lower().replace(' ', '_')
+            fieldnames.extend([f'iou_{key}', f'dice_{key}', f'precision_{key}',
+                               f'recall_{key}', f'diff_surface_{key}_cm2'])
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
         for e in per_image_results:
-            writer.writerow([e['file_name'], f"{e['iou']:.6f}", f"{e['dice']:.6f}"]
-                            + [f"{v:.6f}" for v in e.get('iou_per_class', [])]
-                            + [f"{v:.6f}" for v in e.get('dice_per_class', [])])
+            row = {'file_name': e['file_name'], 'iou': f"{e['iou']:.6f}",
+                   'dice': f"{e['dice']:.6f}",
+                   'precision': e.get('precision', ''), 'recall': e.get('recall', ''),
+                   'diff_surface_cm2': ('' if e.get('diff_surface') is None
+                                        else e.get('diff_surface', ''))}
+            for index, class_name in enumerate(class_names):
+                key = class_name.lower().replace(' ', '_')
+                for metric, suffix in [('iou', ''), ('dice', ''), ('precision', ''),
+                                       ('recall', ''), ('diff_surface', '_cm2')]:
+                    values = e.get(f'{metric}_per_class', [])
+                    value = values[index] if index < len(values) else None
+                    row[f'{metric}_{key}{suffix}'] = (f'{value:.6f}' if value is not None
+                                                       and math.isfinite(value) else '')
+            writer.writerow(row)
     print(f"Per-image results saved to: {csv_path}")
 
     metrics = {'loss': avg_loss, 'miou': avg_iou, 'dice': avg_dice}
     if args.multilabel and total_iou_per_class is not None:
         metrics['iou_per_class'] = iou_per_class
         metrics['dice_per_class'] = dice_per_class
+        metrics['class_names'] = args.class_names
+        if metric_rows['precision']:
+            metrics['precision_per_class'] = precision_per_class
+            metrics['recall_per_class'] = recall_per_class
+            metrics['diff_surface_per_class'] = [json_number(value) for value in diff_surface_per_class]
+            metrics['precision'] = finite_mean(stacked['precision'])
+            metrics['recall'] = finite_mean(stacked['recall'])
+            metrics['diff_surface'] = json_number(finite_mean(stacked['diff_surface']))
     metrics['per_image'] = per_image_results
     return metrics
 
@@ -515,9 +609,12 @@ def load_test_data(args):
         test_ds = TN3KTestDataset(test_image_dir=args.data_root, test_mask_dir=args.data_root2, transform=test_transform)
     elif args.dataset_name == 'CUSTOM':
         _, test_transform = get_transforms_multilabel(img_size=args.img_size)
-        test_ds = CocoMultiLabelDataset(coco_json=args.coco_json, images_dir=args.images_root, split_file=args.split_file, split=args.eval_split, transform=test_transform)
+        test_ds = CocoMultiLabelDataset(coco_json=args.coco_json, images_dir=args.images_root, split_file=args.split_file, split=args.eval_split, transform=test_transform, metadata_file=args.metadata_file)
+        configure_custom_classes(args, test_ds)
     else:
         raise ValueError(f"Unsupported dataset: {args.dataset_name}")
+    if args.num_classes is None:
+        args.num_classes = 2
     
     test_loader = DataLoader(test_ds, batch_size=args.batch_size_per_gpu, shuffle=False,
                             num_workers=args.num_workers, pin_memory=True)
@@ -540,6 +637,8 @@ def main():
                         help='Image directory (dataset_name=CUSTOM)')
     parser.add_argument('--split_file', default=str(CUSTOM_SPLIT_FILE), type=str,
                         help='train/val/test split json (dataset_name=CUSTOM)')
+    parser.add_argument('--metadata_file', default=str(CUSTOM_METADATA_FILE), type=str,
+                        help='Spreadsheet containing image_id and physical echelle')
     parser.add_argument('--eval_split', choices=['test', 'val'], default='test', help='CUSTOM split to evaluate')
     parser.add_argument('--results_dir', default='', help='Output directory separate from checkpoint directory')
     parser.add_argument('--multilabel', default=False, type=utils.bool_flag,
@@ -565,7 +664,8 @@ def main():
     parser.add_argument('--output_dir', default='.', type=str, help='Directory containing the trained checkpoint')
     parser.add_argument('--batch_size_per_gpu', default=16, type=int)
     parser.add_argument('--num_workers', default=8, type=int)
-    parser.add_argument('--num_classes', default=2, type=int)
+    parser.add_argument('--num_classes', default=None, type=int,
+                        help='Decoder channels; inferred from CUSTOM COCO categories by default')
     parser.add_argument('--ignore_index', default=255, type=int)
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--save_predictions', default=False, type=utils.bool_flag, help='Save test predictions to file')

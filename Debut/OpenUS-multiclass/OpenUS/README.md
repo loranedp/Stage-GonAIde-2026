@@ -103,7 +103,7 @@ Mon dataset :
     --images_root ../../data/COCO/images/cavite --split_file data/splits.json \
     --pretrained_vmamba True \
     --pretrained_weights checkpoint/openus_cpt0150.pth \
-    --checkpoint_key teacher --num_classes 3 \
+    --checkpoint_key teacher \
     --epochs 100 --lr 0.001 \
     --batch_size_per_gpu 4 --num_workers 4 \
     --output_dir output/custom_seg_new --log_name custom_seg
@@ -118,7 +118,6 @@ python3 test_segmentation.py \
       --pretrained_vmamba True \
       --pretrained_weights checkpoint/openus_cpt0150.pth \
       --checkpoint_key teacher \
-      --num_classes 3 \
       --output_dir output/custom_seg_new \
       --cpk_name best \
       --batch_size_per_gpu 4 \
@@ -137,6 +136,9 @@ python3 run_cross_validation.py --dry-run
 python3 run_cross_validation.py
 # Après une interruption :
 python3 run_cross_validation.py --resume
+
+# Recompute native-resolution metrics from existing checkpoints without retraining
+python3 run_cross_validation.py --recompute-metrics
 ```
 
 Le lanceur réunit train + validation et répartit les poissons en cinq groupes
@@ -171,8 +173,8 @@ Sorties dans `output/custom_seg_cv5` :
   également moyennes non pondérées et écarts-types d’échantillon (ddof=1),
   avec validation et test séparés et ordre des classes explicite.
 
-La validation conserve son agrégation existante par batch ; le test calcule
-les scores par image. Les prédictions out-of-fold utilisent des poids qui n’ont
+La validation et le test calculent les scores par image à la résolution native.
+Les prédictions out-of-fold utilisent des poids qui n’ont
 pas été entraînés sur ces images, mais ces images participent au choix de
 l’époque par validation. Le test indépendant reste la mesure finale réservée.
 Les scores du test ne servent pas à choisir le fold ; aucun ensemble de modèles
@@ -190,3 +192,12 @@ l’exécution. Le dry-run n’écrit rien et ne lance aucun entraînement.
 NOUVELLE COMMANDE :
 /home/ldepiero/Stage-GonAIde-2026/Debut/OpenUS-multiclass/OpenUs_venv/bin/python \
     run_cross_validation.py --resume
+The foreground class count and order are inferred from the COCO JSON. Switching
+`--coco_json` to `../../data/COCO/labels/cavite/annotations_2_classes.json`
+therefore creates a two-channel Cavite/Gonade run; use a new `--output_dir` because
+two- and three-class decoder checkpoints are not interchangeable.
+
+Cross-validation also writes `oof_validation_metrics.csv` and an UNet-compatible
+`results_OpenUS_Nclasses.pkl`. Metrics are evaluated on masks restored to the
+original image resolution. Surface differences are in cm²; a missing scale is
+reported and stored as an unavailable value without discarding the other metrics.

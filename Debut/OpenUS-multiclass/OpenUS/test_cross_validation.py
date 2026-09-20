@@ -26,7 +26,15 @@ class CrossValidationTests(unittest.TestCase):
         self.weights = self.root / 'weights.pth'
         self.weights.write_bytes(b'weights')
         write_json(self.split, self.splits)
-        write_json(self.coco, {'images': [{'file_name': n} for n in names]})
+        write_json(self.coco, {
+            'images': [{'file_name': n} for n in names],
+            'categories': [
+                {'id': 0, 'name': 'dataset'},
+                {'id': 1, 'name': 'Cavite'},
+                {'id': 2, 'name': 'Gonade'},
+                {'id': 3, 'name': 'ignore'},
+            ],
+        })
 
     def prepare(self):
         return prepare_splits(self.split, self.coco, self.root)
@@ -94,7 +102,10 @@ class CrossValidationTests(unittest.TestCase):
                 return command[command.index(key) + 1]
             attempt = Path(value('--output_dir'))
             metrics = {'loss': .3, 'miou': .4, 'dice': .5,
-                       'iou_per_class': [.4] * 3, 'dice_per_class': [.5] * 3}
+                       'class_names': ['Cavite', 'Gonade'],
+                       'iou_per_class': [.4] * 2, 'dice_per_class': [.5] * 2,
+                       'precision_per_class': [.6] * 2, 'recall_per_class': [.7] * 2,
+                       'diff_surface_per_class': [.8] * 2}
             if 'eval_segmentation.py' in command[1]:
                 (attempt / 'checkpoint_teacher_seg_best.pth').touch()
                 write_json(attempt / 'validation_results_teacher_best.json',
@@ -103,9 +114,20 @@ class CrossValidationTests(unittest.TestCase):
                 dest = Path(value('--results_dir'))
                 masks = dest / 'predicted_masks_teacher'
                 masks.mkdir(parents=True, exist_ok=True)
-                for name in json.loads(Path(value('--split_file')).read_text())['val']:
+                names = json.loads(Path(value('--split_file')).read_text())['val']
+                per_image = []
+                for name in names:
                     (masks / f'pred_{Path(name).stem}.txt').touch()
-                write_json(dest / 'test_results_teacher_best.json', {'test_metrics': metrics})
+                    per_image.append({
+                        'file_name': name,
+                        'metrics_by_class': {
+                            label: {'iou': .4, 'dice': .5, 'precision': .6,
+                                    'recall': .7, 'diff_surface': .8}
+                            for label in ('Cavite', 'Gonade')
+                        },
+                    })
+                write_json(dest / 'test_results_teacher_best.json',
+                           {'test_metrics': metrics, 'per_image': per_image})
             else:
                 if fail_test[0]:
                     fail_test[0] = False
@@ -125,6 +147,8 @@ class CrossValidationTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 runner.main(args + ['--resume', '--epochs', '2'])
         self.assertTrue((output / 'summary.csv').exists())
+        self.assertTrue((output / 'oof_validation_metrics.csv').exists())
+        self.assertTrue((output / 'results_OpenUS_2classes.pkl').exists())
         self.assertEqual(len(json.loads((output / 'summary.json').read_text())['folds']), 5)
 
 

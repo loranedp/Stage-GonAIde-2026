@@ -133,7 +133,7 @@ python eval_segmentation.py \
   --images_root ../../data/COCO/images/cavite \
   --split_file data/splits.json \
   --pretrained_vmamba True --pretrained_weights checkpoint/openus_cpt0150.pth \
-  --checkpoint_key teacher --num_classes 3 \
+  --checkpoint_key teacher \
   --epochs 100 --lr 0.001 --batch_size_per_gpu 8 --num_workers 4 \
   --output_dir output/custom_seg --log_name custom_seg
 ```
@@ -144,7 +144,9 @@ Flags that must not change (they look optional but aren't):
   mentions is *optional* (a warning is printed if absent; the OpenUS checkpoint overwrites the backbone).
 - `--checkpoint_key teacher` — the `student` weights in the checkpoint have a different key prefix and
   would silently not load.
-- `--num_classes 3` — one sigmoid channel per foreground class (multi-label, no background channel).
+- `--num_classes` is inferred from the COCO categories. To train Cavite/Gonade only,
+  use `annotations_2_classes.json` and a separate output directory; an explicit
+  `--num_classes` remains accepted and is checked against the JSON.
 - `--multilabel True` — switches to BCE loss + per-class sigmoid metrics; without it the CrossEntropy
   path mislabels the multi-channel masks.
 
@@ -177,14 +179,14 @@ python test_segmentation.py \
   --images_root ../../data/COCO/images/cavite \
   --split_file data/splits.json \
   --pretrained_vmamba True --pretrained_weights checkpoint/openus_cpt0150.pth \
-  --checkpoint_key teacher --num_classes 3 \
+  --checkpoint_key teacher \
   --batch_size_per_gpu 4 \
   --output_dir output/custom_seg
 ```
 
 Outputs: `test_results_teacher_best.json` (mean + per-class IoU/Dice over the 24 test images, plus a
-`per_image` list with the same metrics for every test image),
-`test_results_per_image_teacher_best.csv` (the per-image metrics as a spreadsheet-friendly table),
+`per_image` list with IoU, Dice, precision, recall and surface difference for every test image),
+`test_results_per_image_teacher_best.csv` (named per-class columns such as `dice_gonade`),
 `predicted_masks_teacher/` (RGB pngs, R=Cavite, G=Gonade, B=Intestin — same encoding as the training
 masks, so overlapping classes show as mixed colors) and `overlay_masks_teacher/` (test images with
 the predicted masks blended on top; opacity via `--overlay_alpha`, default 0.4).

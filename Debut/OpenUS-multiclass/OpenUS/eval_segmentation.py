@@ -26,13 +26,30 @@ from dataset.dataset_tn3k import TN3KDataset
 from dataset.dataset_custom_coco import CocoMultiLabelDataset
 from dataset.transforms import get_transforms, get_transforms_multilabel
 from prepare_cross_validation import write_json
+from segmentation_metrics import METRIC_NAMES, finite_mean, metrics_by_class
 
 
 OPENUS_ROOT = Path(__file__).resolve().parent
-DEBUT_DATA_ROOT = OPENUS_ROOT.parents[1] / 'data'
+DEBUT_ROOT = OPENUS_ROOT.parents[1]
+DEBUT_DATA_ROOT = DEBUT_ROOT / 'data'
 CUSTOM_COCO_JSON = DEBUT_DATA_ROOT / 'COCO/labels/cavite/annotations.json'
 CUSTOM_IMAGES_ROOT = DEBUT_DATA_ROOT / 'COCO/images/cavite'
 CUSTOM_SPLIT_FILE = OPENUS_ROOT / 'data/splits.json'
+CUSTOM_METADATA_FILE = DEBUT_ROOT / 'utils/correspondance_echo_final.xlsx'
+
+
+def configure_custom_classes(args, *datasets):
+    """Infer the decoder width from COCO, validating an explicit override."""
+    class_names = datasets[0].class_names
+    if any(dataset.class_names != class_names for dataset in datasets[1:]):
+        raise ValueError('CUSTOM datasets do not expose the same class order')
+    detected = len(class_names)
+    if args.num_classes is not None and args.num_classes != detected:
+        raise ValueError(f'--num_classes={args.num_classes}, but {args.coco_json} defines '
+                         f'{detected} classes: {list(class_names)}')
+    args.num_classes = detected
+    args.class_names = list(class_names)
+    print(f"Detected classes ({detected}): {', '.join(class_names)}")
 
 def checkpoint_improved(metric, miou, dice, best_miou, best_dice, selected):
     return (not selected or (metric in ("either", "miou") and miou > best_miou)
@@ -167,6 +184,7 @@ def validate_seg(val_loader, model, head, criterion, args):
     total_dice = 0.0
     total_iou_per_class = None
     total_dice_per_class = None
+    totals = {name: [] for name in METRIC_NAMES}
     count = 0
     for imgs, masks, mask_filenames in metric_logger.log_every(val_loader, 20, 'Test:'):
         imgs = imgs.cuda(non_blocking=True)
@@ -182,22 +200,41 @@ def validate_seg(val_loader, model, head, criterion, args):
         loss = criterion(logits, masks)
         if args.multilabel:
             preds = (torch.sigmoid(logits) > 0.5).float()
-            iou_pc = compute_iou_multilabel(preds, masks)
-            dice_pc = compute_dice_multilabel(preds, masks)
+            if args.dataset_name == 'CUSTOM':
+                sample_metrics = []
+                for sample_pred, file_name in zip(preds, mask_filenames):
+                    height, width = val_loader.dataset.original_size(file_name)
+                    native_pred = F.interpolate(
+                        sample_pred[None], size=(height, width), mode='nearest'
+                    )[0].bool().cpu()
+                    native_true = val_loader.dataset.native_mask(file_name)
+                    values = metrics_by_class(
+                        native_pred, native_true,
+                        val_loader.dataset.scale_cm(file_name), height,
+                    )
+                    sample_metrics.append(values)
+                    for name in METRIC_NAMES:
+                        totals[name].append(values[name].cpu())
+                iou_pc = torch.stack([value['iou'] for value in sample_metrics]).mean(0).tolist()
+                dice_pc = torch.stack([value['dice'] for value in sample_metrics]).mean(0).tolist()
+            else:
+                iou_pc = compute_iou_multilabel(preds, masks)
+                dice_pc = compute_dice_multilabel(preds, masks)
             if total_iou_per_class is None:
                 total_iou_per_class = np.zeros(len(iou_pc))
                 total_dice_per_class = np.zeros(len(dice_pc))
-            total_iou_per_class += np.array(iou_pc)
-            total_dice_per_class += np.array(dice_pc)
+            total_iou_per_class += np.array(iou_pc) * preds.shape[0]
+            total_dice_per_class += np.array(dice_pc) * preds.shape[0]
             batch_iou = float(np.mean(iou_pc))
             batch_dice = float(np.mean(dice_pc))
         else:
             preds = logits.argmax(dim=1)
             batch_iou = compute_iou(preds, masks)
             batch_dice = compute_dice(preds, masks)
-        total_iou += batch_iou
-        total_dice += batch_dice
-        count += 1
+        metric_weight = preds.shape[0] if args.multilabel else 1
+        total_iou += batch_iou * metric_weight
+        total_dice += batch_dice * metric_weight
+        count += metric_weight
 
         metric_logger.update(loss=loss.item())
     metric_logger.synchronize_between_processes()
@@ -207,6 +244,16 @@ def validate_seg(val_loader, model, head, criterion, args):
     if args.multilabel and total_iou_per_class is not None:
         metrics['iou_per_class'] = (total_iou_per_class / max(count, 1)).tolist()
         metrics['dice_per_class'] = (total_dice_per_class / max(count, 1)).tolist()
+        metrics['class_names'] = args.class_names
+        if args.dataset_name == 'CUSTOM' and totals['iou']:
+            stacked_totals = {name: torch.stack(values) for name, values in totals.items()}
+            for name in ('precision', 'recall', 'diff_surface'):
+                values = stacked_totals[name]
+                means = [finite_mean(values[:, c]) for c in range(values.shape[1])]
+                metrics[f'{name}_per_class'] = [value if math.isfinite(value) else None
+                                                for value in means]
+                overall = finite_mean(values)
+                metrics[name] = overall if math.isfinite(overall) else None
     return metrics
 
 
@@ -234,10 +281,13 @@ def eval_seg(args):
         val_ds   = TN3KDataset(image_dir=args.data_root, mask_dir=args.data_root2, json_file=args.json_file,   split='val',   transform=val_transform)
     elif args.dataset_name == 'CUSTOM':
         train_transform, val_transform = get_transforms_multilabel(img_size=args.img_size)
-        train_ds = CocoMultiLabelDataset(coco_json=args.coco_json, images_dir=args.images_root, split_file=args.split_file, split='train', transform=train_transform)
-        val_ds   = CocoMultiLabelDataset(coco_json=args.coco_json, images_dir=args.images_root, split_file=args.split_file, split='val',   transform=val_transform)
+        train_ds = CocoMultiLabelDataset(coco_json=args.coco_json, images_dir=args.images_root, split_file=args.split_file, split='train', transform=train_transform, metadata_file=args.metadata_file)
+        val_ds   = CocoMultiLabelDataset(coco_json=args.coco_json, images_dir=args.images_root, split_file=args.split_file, split='val',   transform=val_transform, metadata_file=args.metadata_file)
+        configure_custom_classes(args, train_ds, val_ds)
     else:
         raise ValueError(f"Unsupported dataset: {args.dataset_name}")
+    if args.num_classes is None:
+        args.num_classes = 2
 
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_ds)
     train_loader  = DataLoader(train_ds, batch_size=args.batch_size_per_gpu, sampler=train_sampler,
@@ -340,6 +390,10 @@ def eval_seg(args):
             if 'dice_per_class' in metrics:
                 print(f"  Per-class IoU:  {[f'{v:.4f}' for v in metrics['iou_per_class']]}")
                 print(f"  Per-class Dice: {[f'{v:.4f}' for v in metrics['dice_per_class']]}")
+                for name in ('precision', 'recall', 'diff_surface'):
+                    values = metrics.get(f'{name}_per_class')
+                    if values is not None:
+                        print(f"  Per-class {name}: {values}")
             
             # Check if validation performance improved
             improved = checkpoint_improved(args.selection_metric, miou, dice, best_miou, best_dice, selected)
@@ -351,9 +405,10 @@ def eval_seg(args):
             # log
             log_stats = {**{'epoch': epoch, 'train_loss': train_loss['loss'] if isinstance(train_loss, dict) else train_loss},
                          **{'val_loss': float(val_loss), 'miou': float(miou), 'dice': float(dice), 'best_miou': float(best_miou), 'best_dice': float(best_dice)}}
-            if 'dice_per_class' in metrics:
-                log_stats['iou_per_class'] = metrics['iou_per_class']
-                log_stats['dice_per_class'] = metrics['dice_per_class']
+            for name in ('class_names', 'iou_per_class', 'dice_per_class',
+                         'precision_per_class', 'recall_per_class', 'diff_surface_per_class'):
+                if name in metrics:
+                    log_stats[name] = metrics[name]
             path_txt = os.path.join(args.output_dir, f"log_{args.log_name}.txt")
             with open(path_txt, 'a') as f:
                 f.write(json.dumps(log_stats) + "\n")
@@ -405,6 +460,8 @@ if __name__ == '__main__':
                         help='Image directory (dataset_name=CUSTOM)')
     parser.add_argument('--split_file', default=str(CUSTOM_SPLIT_FILE), type=str,
                         help='train/val/test split json (dataset_name=CUSTOM)')
+    parser.add_argument('--metadata_file', default=str(CUSTOM_METADATA_FILE), type=str,
+                        help='Spreadsheet containing image_id and physical echelle')
     parser.add_argument('--multilabel', default=False, type=utils.bool_flag,
                         help='Multi-label segmentation: per-class sigmoid channels + BCE loss')
     parser.add_argument('--img_size', default=None, type=int,
@@ -426,7 +483,8 @@ if __name__ == '__main__':
     parser.add_argument('--val_freq', default=1, type=int)
     parser.add_argument('--selection_metric', choices=['dice', 'miou', 'either'], default='either')
     parser.add_argument('--output_dir', default='.', type=str)
-    parser.add_argument('--num_classes', default=2, type=int)
+    parser.add_argument('--num_classes', default=None, type=int,
+                        help='Decoder channels; inferred from CUSTOM COCO categories by default')
     parser.add_argument('--ignore_index', default=255, type=int)
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--load_from', default=None, type=str)
