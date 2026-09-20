@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Résultats sur l’échantillon de test</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" integrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2" crossorigin="anonymous"></script><script src="Stats_ech_test_files/libs/clipboard/clipboard.min.js"></script>
+<script src="Stats_ech_test_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="Stats_ech_test_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="Stats_ech_test_files/libs/quarto-html/popper.min.js"></script>
+<script src="Stats_ech_test_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="Stats_ech_test_files/libs/quarto-html/anchor.min.js"></script>
+<link href="Stats_ech_test_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="Stats_ech_test_files/libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="Stats_ech_test_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="Stats_ech_test_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="Stats_ech_test_files/libs/bootstrap/bootstrap-9ffd46718472fef93fa461c69430dba3.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script src="https://cdn.jsdelivr.net/npm/requirejs@2.3.6/require.min.js" integrity="sha384-c9c+LnTbwQ3aujuU7ULEPVvgLs+Fn6fJUvIGTsuu1ZcCf11fiEubah0ttpca4ntM sha384-6V1/AdqZRWk1KAlWbKBlGhN7VG4iE/yAZcO6NZPMF8od0vukrvr0tg4qY6NSrItx" crossorigin="anonymous"></script>
+
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+
+
+</head>
+
+<body class="quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-full">
+
+<main class="content column-page" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Résultats sur l’échantillon de test</h1>
+</div>
+
+
+
+<div class="quarto-title-meta column-page">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="rappels-échantillon-de-test" class="level3">
+<h3 class="anchored" data-anchor-id="rappels-échantillon-de-test">Rappels échantillon de test</h3>
+<section id="global" class="level4">
+<h4 class="anchored" data-anchor-id="global">Global</h4>
+<div id="e7651642" class="cell" data-execution_count="8">
+<div class="cell-output cell-output-stdout">
+<pre><code>Nombre de poissons : 8
+Nombre d'échographies transversales : 24
+Nombre d'écho transversales moyennes par poisson : 3.00
+Nombre d'échographies longitudinales : 11</code></pre>
+</div>
+</div>
+</section>
+<div class="columns">
+<div class="column" style="width:50%;">
+<section id="vrai-annotations" class="level4">
+<h4 class="anchored" data-anchor-id="vrai-annotations">Vrai annotations</h4>
+<div id="8af91d91" class="cell" data-execution_count="9">
+<div class="cell-output cell-output-stdout">
+<pre><code>Nombre d'échographies transversales non vides : 24
+Nombre d'échographies longitudinales non vides : 10
+Nombre d'oeufs : 54</code></pre>
+</div>
+</div>
+</section>
+</div><div class="column" style="width:50%;">
+<section id="prédictions" class="level4">
+<h4 class="anchored" data-anchor-id="prédictions">Prédictions</h4>
+<div id="a425ca1f" class="cell" data-execution_count="10">
+<div class="cell-output cell-output-stdout">
+<pre><code>Nombre d'échographies transversales non vides : 24
+Nombre d'échographies longitudinales non vides : 11
+Nombre d'oeufs : 54</code></pre>
+</div>
+</div>
+</section>
+</div>
+</div>
+</section>
+<section id="volumes-et-fécondité-par-poisson" class="level3">
+<h3 class="anchored" data-anchor-id="volumes-et-fécondité-par-poisson">Volumes et fécondité par poisson</h3>
+<div id="b358e096" class="cell" data-execution_count="11">
+<div class="cell-output cell-output-display" data-execution_count="44">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">id poisson</th>
+<th data-quarto-table-cell-role="th">image_id</th>
+<th data-quarto-table-cell-role="th">echelle</th>
+<th data-quarto-table-cell-role="th">volume_cavite_pred</th>
+<th data-quarto-table-cell-role="th">volume_gonade_pred</th>
+<th data-quarto-table-cell-role="th">volume_cavite_true</th>
+<th data-quarto-table-cell-role="th">volume_gonade_true</th>
+<th data-quarto-table-cell-role="th">poids_poisson</th>
+<th data-quarto-table-cell-role="th">long_poisson</th>
+<th data-quarto-table-cell-role="th">age_poisson</th>
+<th data-quarto-table-cell-role="th">volume_median_oeufs_mm3_true</th>
+<th data-quarto-table-cell-role="th">volume_median_oeufs_mm3_pred</th>
+<th data-quarto-table-cell-role="th">fecondite_pred</th>
+<th data-quarto-table-cell-role="th">fecondite_true</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">0</th>
+<td>356434</td>
+<td>0004596</td>
+<td>3.8</td>
+<td>18.576963</td>
+<td>10.899460</td>
+<td>18.306250</td>
+<td>11.447509</td>
+<td>116.3</td>
+<td>212</td>
+<td>None</td>
+<td>10.905562</td>
+<td>5.593623</td>
+<td>1948.551038</td>
+<td>1049.694506</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">1</th>
+<td>356859</td>
+<td>0004646</td>
+<td>3.8</td>
+<td>11.204507</td>
+<td>6.234258</td>
+<td>10.551703</td>
+<td>5.868178</td>
+<td>126.0</td>
+<td>230</td>
+<td>2+</td>
+<td>11.982479</td>
+<td>10.466806</td>
+<td>595.621840</td>
+<td>489.729869</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2</th>
+<td>363066</td>
+<td>0004898</td>
+<td>3.8</td>
+<td>9.932480</td>
+<td>4.910738</td>
+<td>9.876945</td>
+<td>5.170205</td>
+<td>67.3</td>
+<td>178</td>
+<td>1+</td>
+<td>8.997912</td>
+<td>7.689397</td>
+<td>638.637579</td>
+<td>574.600481</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">3</th>
+<td>406070</td>
+<td>0006010</td>
+<td>3.8</td>
+<td>8.104419</td>
+<td>4.308161</td>
+<td>8.209837</td>
+<td>4.423296</td>
+<td>89.4</td>
+<td>198</td>
+<td>1+</td>
+<td>10.454494</td>
+<td>18.289994</td>
+<td>235.547452</td>
+<td>423.099927</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">4</th>
+<td>406703</td>
+<td>0006218</td>
+<td>3.8</td>
+<td>5.913161</td>
+<td>1.663287</td>
+<td>5.985427</td>
+<td>1.693049</td>
+<td>57.5</td>
+<td>174</td>
+<td>1+</td>
+<td>7.927613</td>
+<td>2.297414</td>
+<td>723.982441</td>
+<td>213.563568</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">5</th>
+<td>406707</td>
+<td>0006222</td>
+<td>3.8</td>
+<td>12.375470</td>
+<td>5.148490</td>
+<td>12.422471</td>
+<td>5.364627</td>
+<td>81.9</td>
+<td>192</td>
+<td>1+</td>
+<td>14.579701</td>
+<td>8.097099</td>
+<td>635.843756</td>
+<td>367.951757</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">6</th>
+<td>426735</td>
+<td>0006943</td>
+<td>3.8</td>
+<td>10.159022</td>
+<td>5.072530</td>
+<td>10.104317</td>
+<td>4.390080</td>
+<td>81.8</td>
+<td>191</td>
+<td>None</td>
+<td>10.946132</td>
+<td>19.910905</td>
+<td>254.761410</td>
+<td>401.062183</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">7</th>
+<td>427237</td>
+<td>0007130</td>
+<td>3.8</td>
+<td>10.099609</td>
+<td>4.548426</td>
+<td>10.565793</td>
+<td>4.058139</td>
+<td>75.5</td>
+<td>188</td>
+<td>1+</td>
+<td>7.756373</td>
+<td>8.759992</td>
+<td>519.227204</td>
+<td>523.200642</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+</section>
+<section id="vérification-des-surfaces-des-gonades-et-de-la-cavité---annotations" class="level2">
+<h2 class="anchored" data-anchor-id="vérification-des-surfaces-des-gonades-et-de-la-cavité---annotations">Vérification des surfaces des gonades et de la cavité - Annotations</h2>
+<div id="67ba19e1" class="cell" data-execution_count="12">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_test_files/figure-html/cell-13-output-1.png" width="953" height="470" class="figure-img"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_test_files/figure-html/cell-13-output-2.png" width="953" height="470" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="vérification-des-surfaces-des-gonades-et-de-la-cavité---prédictions" class="level2">
+<h2 class="anchored" data-anchor-id="vérification-des-surfaces-des-gonades-et-de-la-cavité---prédictions">Vérification des surfaces des gonades et de la cavité - Prédictions</h2>
+<div id="30cb4602" class="cell" data-execution_count="13">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_test_files/figure-html/cell-14-output-1.png" width="953" height="470" class="figure-img"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_test_files/figure-html/cell-14-output-2.png" width="953" height="470" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="détection-des-anomalies-selon-laugmentation-de-la-surface" class="level2">
+<h2 class="anchored" data-anchor-id="détection-des-anomalies-selon-laugmentation-de-la-surface">Détection des anomalies selon l’augmentation de la surface</h2>
+<div id="a5086763" class="cell" data-execution_count="14">
+<div class="cell-output cell-output-stdout">
+<pre><code>pred - Poisson : 406070 - [0, 1, 0] - Problème sur l'écho à la position 0.0 (diminution surface gonade : 0.0%)
+True - Poisson : 406070 - [0, 1, 0] -Problème sur l'écho à la position 0.0 (diminution surface gonade : 0.0%)</code></pre>
+</div>
+</div>
+</section>
+<section id="relations-entre-surfaces-des-gonades-et-de-la-cavité---annotations" class="level2">
+<h2 class="anchored" data-anchor-id="relations-entre-surfaces-des-gonades-et-de-la-cavité---annotations">Relations entre surfaces des gonades et de la cavité - Annotations</h2>
+<div id="ef2b30f5" class="cell" data-execution_count="15">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_test_files/figure-html/cell-16-output-1.png" width="1133" height="470" class="figure-img"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Corrélation : 0.70
+Corrélation (pour position echo &gt;= 2) : 0.71</code></pre>
+</div>
+</div>
+</section>
+<section id="relations-entre-surfaces-des-gonades-et-de-la-cavité---prédictions" class="level2">
+<h2 class="anchored" data-anchor-id="relations-entre-surfaces-des-gonades-et-de-la-cavité---prédictions">Relations entre surfaces des gonades et de la cavité - Prédictions</h2>
+<div id="67a46dc0" class="cell" data-execution_count="16">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_test_files/figure-html/cell-17-output-1.png" width="1133" height="470" class="figure-img"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Corrélation : 0.73
+Corrélation (pour position echo &gt;= 2) : 0.80</code></pre>
+</div>
+</div>
+</section>
+<section id="distribution-du-volume-des-gonades" class="level2">
+<h2 class="anchored" data-anchor-id="distribution-du-volume-des-gonades">Distribution du volume des gonades</h2>
+<div id="7de91e32" class="cell" data-execution_count="17">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_test_files/figure-html/cell-18-output-1.png" width="953" height="374" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="différences-entre-les-surfaces-et-les-volumes-prédits-et-annotés" class="level2">
+<h2 class="anchored" data-anchor-id="différences-entre-les-surfaces-et-les-volumes-prédits-et-annotés">Différences entre les surfaces et les volumes prédits et annotés</h2>
+<div id="cec56e6c" class="cell" data-execution_count="18">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_test_files/figure-html/cell-19-output-1.png" width="1529" height="954" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="relations-entre-le-volume-des-gonades-et-le-poids-des-poissons" class="level2">
+<h2 class="anchored" data-anchor-id="relations-entre-le-volume-des-gonades-et-le-poids-des-poissons">Relations entre le volume des gonades et le poids des poissons</h2>
+<div id="5147b5fa" class="cell" data-execution_count="19">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_test_files/figure-html/cell-20-output-1.png" width="951" height="374" class="figure-img"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Corrélation annotations : 0.72
+Corrélation prédictions : 0.76</code></pre>
+</div>
+</div>
+</section>
+<section id="relations-entre-le-volume-des-cavités-et-le-poids-des-poissons" class="level2">
+<h2 class="anchored" data-anchor-id="relations-entre-le-volume-des-cavités-et-le-poids-des-poissons">Relations entre le volume des cavités et le poids des poissons</h2>
+<div id="46c9e8a2" class="cell" data-execution_count="20">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_test_files/figure-html/cell-21-output-1.png" width="951" height="374" class="figure-img"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Corrélation Annotations : 0.62
+Corrélation prédictions : 0.66</code></pre>
+</div>
+</div>
+</section>
+<section id="distribution-du-volume-des-oeufs" class="level2">
+<h2 class="anchored" data-anchor-id="distribution-du-volume-des-oeufs">Distribution du volume des oeufs</h2>
+<div id="f15410e3" class="cell" data-execution_count="22">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_test_files/figure-html/cell-23-output-1.png" width="1048" height="374" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="volume-du-i-ème-plus-gros-œuf-par-poisson---annotations" class="level2">
+<h2 class="anchored" data-anchor-id="volume-du-i-ème-plus-gros-œuf-par-poisson---annotations">Volume du i-ème plus gros œuf par poisson - Annotations</h2>
+<div id="fa1a8cfd" class="cell" data-execution_count="23">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_test_files/figure-html/cell-24-output-1.png" width="1147" height="1179" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="distribution-du-nombre-dœufs-par-échographie" class="level2">
+<h2 class="anchored" data-anchor-id="distribution-du-nombre-dœufs-par-échographie">Distribution du nombre d’œufs par échographie</h2>
+<div id="3d7340d9" class="cell" data-execution_count="24">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_test_files/figure-html/cell-25-output-1.png" width="1048" height="374" class="figure-img"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Nombre moyen d'œufs par échographie : 4.91 (Q1 : 4, Q3 : 6)</code></pre>
+</div>
+</div>
+</section>
+<section id="annotations" class="level2">
+<h2 class="anchored" data-anchor-id="annotations">Annotations</h2>
+<div id="50890487" class="cell" data-execution_count="25">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_test_files/figure-html/cell-26-output-1.png" width="1317" height="557" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="prédictions-1" class="level2">
+<h2 class="anchored" data-anchor-id="prédictions-1">Prédictions</h2>
+<div id="0bbac128" class="cell" data-execution_count="26">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_test_files/figure-html/cell-27-output-1.png" width="1326" height="557" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="comparaison-du-volume-des-œufs-par-poisson-annotations-vs-prédictions" class="level2">
+<h2 class="anchored" data-anchor-id="comparaison-du-volume-des-œufs-par-poisson-annotations-vs-prédictions">Comparaison du volume des œufs par poisson : annotations vs prédictions</h2>
+<div id="7cc1703f" class="cell" data-execution_count="27">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_test_files/figure-html/cell-28-output-1.png" width="971" height="683" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="534b37a0" class="cell" data-execution_count="28">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_test_files/figure-html/cell-29-output-1.png" width="1163" height="779" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="relation-entre-le-volume-médian-des-oeufs-et-des-gonades" class="level2">
+<h2 class="anchored" data-anchor-id="relation-entre-le-volume-médian-des-oeufs-et-des-gonades">Relation entre le volume médian des oeufs et des gonades</h2>
+<div id="03c7adb1" class="cell" data-execution_count="29">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_test_files/figure-html/cell-30-output-1.png" width="1143" height="374" class="figure-img"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Corrélation annotations : 0.36665748464309983
+Corrélation prédictions : -0.04214434567933398</code></pre>
+</div>
+</div>
+</section>
+<section id="distribution-de-la-fécondité" class="level2">
+<h2 class="anchored" data-anchor-id="distribution-de-la-fécondité">Distribution de la fécondité</h2>
+<div id="b0508226" class="cell" data-execution_count="30">
+<div class="cell-output cell-output-stdout">
+<pre><code>Nombre de poissons avec une fécondité calculable : 8 sur 8 (Annotations)
+Nombre de poissons avec une fécondité calculable : 8 sur 8 (Predictions)</code></pre>
+</div>
+</div>
+<div id="a81dbf4d" class="cell" data-execution_count="31">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_test_files/figure-html/cell-32-output-1.png" width="1049" height="374" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="relations-entre-la-fécondité-et-les-caractéristiques-des-poissons---annotations" class="level2">
+<h2 class="anchored" data-anchor-id="relations-entre-la-fécondité-et-les-caractéristiques-des-poissons---annotations">Relations entre la fécondité et les caractéristiques des poissons - Annotations</h2>
+<div id="ad6d40d5" class="cell" data-execution_count="32">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_test_files/figure-html/cell-33-output-1.png" width="1048" height="374" class="figure-img"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Corrélation fécondité / longueur : 0.4498312740428807
+Corrélation fécondité / poids : 0.5818156785671436</code></pre>
+</div>
+</div>
+</section>
+<section id="relations-entre-la-fécondité-et-les-caractéristiques-des-poissons---prédictions" class="level2">
+<h2 class="anchored" data-anchor-id="relations-entre-la-fécondité-et-les-caractéristiques-des-poissons---prédictions">Relations entre la fécondité et les caractéristiques des poissons - Prédictions</h2>
+<div id="9e7c4667" class="cell" data-execution_count="33">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_test_files/figure-html/cell-34-output-1.png" width="1048" height="374" class="figure-img"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Corrélation fécondité / longueur : 0.2910904603177153
+Corrélation fécondité / poids : 0.4159025783226098</code></pre>
+</div>
+</div>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

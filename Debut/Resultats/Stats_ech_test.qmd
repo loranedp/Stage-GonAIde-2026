@@ -42,9 +42,9 @@ unique_id = np.unique(df.cap_id)
 #| output: false
 
 # -------- 3. Récupère le volume réel et prédit des gonades et des oeufs de l'échantillon de test--------
-cavite_true_root = "data/labels/YOLO/cavite"
+cavite_true_root = "data/YOLO/labels/cavite"
 cavite_pred_root = "UNet/masks/test/UNet/3classes"
-eggs_true_root = "data/labels/YOLO/oeufs"
+eggs_true_root = "data/YOLO/labels/oeufs"
 eggs_pred_root = "YOLO26/masks/test/instance/oeufs"
 
 prediction_mask_size = (510, 380) # Correspond à la taille après crop de l'image originale
@@ -101,8 +101,8 @@ df_echos_oeufs = df[df["type_image"] == "œufs"]
 
 for _, echo in df_echos_oeufs.iterrows():
     mask_pred_path = Path("..") / eggs_pred_root / f"pred_{echo['new_name_file']}.txt"
-    mask_true_path = Path("../data/labels/YOLO/oeufs") / f"{echo['new_name_file']}.txt"
-    image_path = Path("../data/images/oeufs") / f"{echo['new_name_file']}.jpg"
+    mask_true_path = Path("../data/YOLO/labels/oeufs") / f"{echo['new_name_file']}.txt"
+    image_path = Path("../data/YOLO/images/oeufs") / f"{echo['new_name_file']}.jpg"
 
     if not mask_pred_path.exists() or not mask_true_path.exists() or not image_path.exists() or pd.isna(echo["echelle"]):
         continue
@@ -401,6 +401,75 @@ distribution(
     nombre_barres=15,
     ax = axes[1]
     )
+
+plt.tight_layout()
+plt.show()
+```
+
+## Différences entre les surfaces et les volumes prédits et annotés
+
+```{python}
+# Différence de surface des gonades pour chaque échographie
+df_diff_surfaces = df_cavite[
+    ["id poisson", "image_id", "position echo", "surface_gonade_pred", "surface_gonade_true"]
+].dropna(subset=["surface_gonade_pred", "surface_gonade_true"]).copy()
+df_diff_surfaces["difference_absolue"] = (
+    df_diff_surfaces["surface_gonade_pred"] - df_diff_surfaces["surface_gonade_true"]
+).abs()
+df_diff_surfaces["difference_relative"] = np.where(
+    df_diff_surfaces["surface_gonade_true"] != 0,
+    df_diff_surfaces["difference_absolue"] / df_diff_surfaces["surface_gonade_true"] * 100,
+    np.nan,
+)
+df_diff_surfaces = df_diff_surfaces.sort_values(["id poisson", "position echo"])
+
+# Différence de volume des gonades pour chaque poisson
+df_diff_volumes = df_final[
+    ["id poisson", "volume_gonade_pred", "volume_gonade_true"]
+].dropna(subset=["volume_gonade_pred", "volume_gonade_true"]).copy()
+df_diff_volumes["difference_absolue"] = (
+    df_diff_volumes["volume_gonade_pred"] - df_diff_volumes["volume_gonade_true"]
+).abs()
+df_diff_volumes["difference_relative"] = np.where(
+    df_diff_volumes["volume_gonade_true"] != 0,
+    df_diff_volumes["difference_absolue"] / df_diff_volumes["volume_gonade_true"] * 100,
+    np.nan,
+)
+df_diff_volumes = df_diff_volumes.sort_values("id poisson")
+
+fig, axes = plt.subplots(2, 2, figsize=(16, 10))
+
+x_surfaces = np.arange(len(df_diff_surfaces))
+labels_echographies = df_diff_surfaces["image_id"].astype(str)
+axes[0, 0].bar(x_surfaces, df_diff_surfaces["difference_absolue"], color="teal")
+axes[0, 0].set_title("Surface — différence absolue par échographie")
+axes[0, 0].set_xlabel("Échographies")
+axes[0, 0].set_ylabel("Écart (cm²)")
+axes[0, 0].set_xticks(x_surfaces)
+axes[0, 0].set_xticklabels(labels_echographies, rotation=90)
+
+axes[0, 1].bar(x_surfaces, df_diff_surfaces["difference_relative"], color="darkorange")
+axes[0, 1].set_title("Surface — différence relative par échographie")
+axes[0, 1].set_xlabel("Échographies")
+axes[0, 1].set_ylabel("Écart (%)")
+axes[0, 1].set_xticks(x_surfaces)
+axes[0, 1].set_xticklabels(labels_echographies, rotation=90)
+
+x_volumes = np.arange(len(df_diff_volumes))
+labels_poissons = df_diff_volumes["id poisson"].astype(str)
+axes[1, 0].bar(x_volumes, df_diff_volumes["difference_absolue"], color="teal")
+axes[1, 0].set_title("Volume — différence absolue par poisson")
+axes[1, 0].set_xlabel("Poissons")
+axes[1, 0].set_ylabel("Écart (cm³)")
+axes[1, 0].set_xticks(x_volumes)
+axes[1, 0].set_xticklabels(labels_poissons, rotation=90)
+
+axes[1, 1].bar(x_volumes, df_diff_volumes["difference_relative"], color="darkorange")
+axes[1, 1].set_title("Volume — différence relative par poisson")
+axes[1, 1].set_xlabel("Poissons")
+axes[1, 1].set_ylabel("Écart (%)")
+axes[1, 1].set_xticks(x_volumes)
+axes[1, 1].set_xticklabels(labels_poissons, rotation=90)
 
 plt.tight_layout()
 plt.show()
