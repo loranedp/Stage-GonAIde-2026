@@ -63,6 +63,7 @@ class YoloEggSurfaceTests(unittest.TestCase):
             with self.subTest(dataset=dataset), patch('utils.models_config.split_eggs', side_effect=AssertionError('Must not split instances')):
                 *_, difference = self.notebook_metrics(dataset)(
                     masks, masks, torch.tensor([[1.0]]), self.path, self.result,
+                    image_height_px=100,
                 )
                 self.assertAlmostEqual(difference[0, 0].item(), 3.2, places=5)
                 if classes == 2:

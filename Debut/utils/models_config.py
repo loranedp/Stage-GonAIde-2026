@@ -12,7 +12,7 @@ sys.path.append(str(Path.cwd().parent)) # Ajoute le dossier parent au chemin de 
 
 # Importation des datasets personnalisés pour U-Net : 2D et 2,5D
 from utils.dataset_unet import RoboflowUNetDataset
-from utils.unet_spatial import MODEL_IMAGE_SIZE, unpad_array
+from utils.unet_spatial import CROPPED_IMAGE_SIZE, MODEL_IMAGE_SIZE, unpad_array
 from utils.dataset_2_5D import SliceSequenceUNetDataset
 from utils.post_traitement import split_eggs
 
@@ -212,7 +212,9 @@ def metrics_by_class(true, preds, echelle, dataset_name, egg_instance_labels=Non
                      egg_prediction_areas_px=None):
     """Les surfaces annotées sont des listes par image, avant fusion des instances.
 
-    Pour les œufs paddés UNet, fournir la hauteur originale (hors padding).
+    ``image_height_px`` est la hauteur de l'image couverte par ``echelle``, et
+    non la hauteur d'un éventuel canevas ou resize interne au modèle. Pour les
+    données U-Net paddées, fournir la hauteur originale (hors padding).
     Les listes de surfaces prédites préservent aussi les instances superposées.
     Sans ces paramètres, le calcul historique reste disponible.
     """
@@ -237,19 +239,40 @@ def metrics_by_class(true, preds, echelle, dataset_name, egg_instance_labels=Non
     recall_per_img = intersection / (intersection + false_negative + 1e-6)
 
     #--- Calcul des surfaces ---
-    pred_surf_pixels = pred_area
-    true_surf_pixels = true_area
-
-    diff_surf_pixels = (true_surf_pixels - pred_surf_pixels).abs()
     if dataset_name != "oeufs":
+        surface_true = true
+        surface_preds = preds
+        height_px = torch.as_tensor(
+            true.shape[2] if image_height_px is None else image_height_px,
+            device=true.device, dtype=torch.float32,
+        ).reshape(-1)
+        if height_px.numel() not in (1, true.shape[0]) or not torch.isfinite(height_px).all() or (height_px <= 0).any():
+            raise ValueError("La hauteur doit être strictement positive, scalaire ou par image.")
+
+        # Les U-Net conservent le crop 510 x 380 sans déformation dans un
+        # canevas 512 x 512. Le padding ne représente aucune surface physique.
+        is_padded_unet = (
+            image_height_px is not None
+            and true.shape[-2:] == MODEL_IMAGE_SIZE[::-1]
+            and torch.all(height_px == CROPPED_IMAGE_SIZE[1])
+        )
+        if is_padded_unet:
+            surface_true = unpad_array(true)
+            surface_preds = unpad_array(preds)
+
+        true_surf_pixels = surface_true.float().sum((2, 3))
+        pred_surf_pixels = surface_preds.float().sum((2, 3))
+        diff_surf_pixels = (true_surf_pixels - pred_surf_pixels).abs()
         echelle = echelle.to(
             device=diff_surf_pixels.device,
             dtype=diff_surf_pixels.dtype
-        ).reshape(-1, 1)
+        ).reshape(-1)
+        if echelle.numel() not in (1, true.shape[0]) or not torch.isfinite(echelle).all() or (echelle <= 0).any():
+            raise ValueError("L'échelle doit être strictement positive, scalaire ou par image.")
 
         # ``echelle`` est la hauteur physique totale de l'image en cm.
         # Un pixel représente donc (echelle / hauteur_px) ** 2 cm².
-        diff_surface = diff_surf_pixels * (echelle / true.shape[2]) ** 2
+        diff_surface = diff_surf_pixels * (echelle / height_px).reshape(-1, 1) ** 2
         missing_surface = (true_surf_pixels == 0) | (pred_surf_pixels == 0)
         diff_surface[missing_surface] = torch.nan
     else:
@@ -284,6 +307,8 @@ def metrics_by_class(true, preds, echelle, dataset_name, egg_instance_labels=Non
         if height_px.numel() not in (1, true.shape[0]) or not torch.isfinite(height_px).all() or (height_px <= 0).any():
             raise ValueError("La hauteur doit être strictement positive, scalaire ou par image.")
         echelle = echelle.to(device=true.device, dtype=torch.float32).reshape(-1)
+        if echelle.numel() not in (1, true.shape[0]) or not torch.isfinite(echelle).all() or (echelle <= 0).any():
+            raise ValueError("L'échelle doit être strictement positive, scalaire ou par image.")
 
         # ``echelle`` est exprimée en cm ; conversion finale en mm².
         # Le padding conserve les aires : height_px doit exclure ses marges.
