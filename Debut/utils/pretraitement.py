@@ -144,7 +144,12 @@ for index, row in df.iterrows():
 ocr_crop_warning_shown = False
 
 def OCR(image_path):
-    """Lit l'échelle dans une image d'œufs non recadrée."""
+    """Lit l'échelle dans une image originale non recadrée.
+
+    L'échelle est affichée au même endroit sur les échographies de gonade et
+    d'œufs. Cette fonction doit donc être appelée avant le crop, quel que soit
+    le type d'image.
+    """
     global ocr_crop_warning_shown
     image = cv2.imread(image_path)
     if image is None:
@@ -171,25 +176,29 @@ def OCR(image_path):
 echelles_par_poisson = {}
 for poisson, echos in df.groupby("cap_id"):
     echelle = 0
-    image_oeufs_trouvee = False
+    image_originale_trouvee = False
     for file_name in echos["new_name_file"]:
-        image_path = f"../data/COCO/images/oeufs/{file_name}.jpg"
-        if not os.path.exists(image_path):
-            continue
+        # Les deux types d'échographie proviennent du même affichage et
+        # portent donc la même échelle. Les cavités servent de repli lorsque
+        # le poisson n'a pas d'image d'œufs.
+        for image_type in ("oeufs", "cavite"):
+            image_path = f"../data/COCO/images/{image_type}/{file_name}.jpg"
+            if not os.path.exists(image_path):
+                continue
 
-        ocr = OCR(image_path)
-        if ocr is None:
-            continue
+            ocr = OCR(image_path)
+            if ocr is None:
+                continue
 
-        image_oeufs_trouvee = True
-        if ocr == "3,8":
-            echelle = 3.8
-        elif ocr == "4.7":
-            echelle = 4.7
-        elif echelle not in (3.8, 4.7):
-            echelle = 3.1
+            image_originale_trouvee = True
+            if ocr == "3,8":
+                echelle = 3.8
+            elif ocr == "4.7":
+                echelle = 4.7
+            elif echelle not in (3.8, 4.7):
+                echelle = 3.1
 
-    if image_oeufs_trouvee:
+    if image_originale_trouvee:
         echelles_par_poisson[poisson] = echelle
 
 # Les noms renommés suivent le format : image_id_heure_cap_id_annee.jpg
