@@ -141,14 +141,25 @@ for index, row in df.iterrows():
 
 
 # -------- 4.3 Récupère l'échelle de l'échographie avant le crop --------
+ocr_crop_warning_shown = False
+
 def OCR(image_path):
     """Lit l'échelle dans une image d'œufs non recadrée."""
+    global ocr_crop_warning_shown
     image = cv2.imread(image_path)
     if image is None:
         raise ValueError(f"Image OCR illisible : {image_path}")
 
     image_height, image_width = image.shape[:2]
     if (image_width, image_height) != (640, 480): # Si image non conforme, on ne fait pas d'OCR
+        if not ocr_crop_warning_shown:
+            print(
+                "------------------ Attention ------------------\n"
+                "L'échelle ne peut pas être récupérée sur des images déjà crop. "
+                "Veuillez utiliser les images originales en 640x480."
+                "-----------------------------------------\n"
+            )
+            ocr_crop_warning_shown = True
         return None
 
     x, y, w, h = 530, 350, 250, 200
