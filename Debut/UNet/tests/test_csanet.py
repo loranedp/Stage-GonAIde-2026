@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import numpy as np
 import torch
 
 
@@ -67,3 +68,49 @@ def test_state_dict_round_trip(small_model):
     result = small_model.load_state_dict(state)
     assert not result.missing_keys
     assert not result.unexpected_keys
+
+
+def test_missing_pretrained_checkpoint_has_clear_error(small_model, tmp_path):
+    with pytest.raises(FileNotFoundError, match="introuvable"):
+        small_model.load_pretrained(tmp_path / "missing.npz")
+
+
+def test_official_checkpoint_initializes_resnet_and_vit():
+    checkpoint = UNET_DIR / "models" / "R50+ViT-B_16.npz"
+    if not checkpoint.is_file():
+        pytest.skip("Checkpoint officiel non disponible")
+
+    model = CSANet(
+        num_classes=3,
+        in_channels=3,
+        encoder_weights="imagenet",
+        image_size=512,
+    )
+    weights = np.load(checkpoint)
+    try:
+        root = torch.from_numpy(weights["conv_root/kernel"].transpose(3, 2, 0, 1))
+        patch = torch.from_numpy(weights["embedding/kernel"].transpose(3, 2, 0, 1))
+        query = torch.from_numpy(
+            weights[
+                "Transformer/encoderblock_0/"
+                "MultiHeadDotProductAttention_1/query/kernel"
+            ]
+        ).reshape(768, 768).t()
+
+        assert torch.equal(model.center_encoder.root.conv.weight, root)
+        assert torch.equal(model.patch_projection.weight, patch)
+        assert torch.equal(
+            model.transformer.layers[0].self_attn.in_proj_weight[:768], query
+        )
+        assert model.position_embedding.shape == (1, 768, 32, 32)
+        assert torch.isfinite(model.position_embedding).all()
+        assert torch.equal(
+            model.center_encoder.body.block3.unit9.conv3.weight,
+            model.previous_encoder.body.block3.unit9.conv3.weight,
+        )
+        assert (
+            model.center_encoder.body.block3.unit9.conv3.weight.data_ptr()
+            != model.previous_encoder.body.block3.unit9.conv3.weight.data_ptr()
+        )
+    finally:
+        weights.close()
