@@ -15,20 +15,21 @@ from collections import defaultdict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
+from utils.stats_fct import overlay_colored_mask, overlay_mask
 
 
 # ============================ 2. Définition des chemins et paramètres ============================
 UNET_ROOT = PROJECT_ROOT / 'UNet' / 'masks' / 'eval'
 YOLO_ROOT = PROJECT_ROOT / 'YOLO26' / 'masks' / 'eval'
-OPENUS_CV_ROOT = (PROJECT_ROOT / 'Ex1' / 'OpenUS-multiclass' / 'OpenUS'
-                  / 'output' / 'custom_seg_cv5')
+OPENUS_CV_ROOT = (PROJECT_ROOT / 'OpenUS-multiclass' / 'OpenUS'
+                  / 'output' / 'custom_seg_cv5_2classes')
 IMAGE_ROOT = PROJECT_ROOT / 'data' / 'YOLO' / 'images'
 LABEL_ROOT = PROJECT_ROOT / 'data' / 'YOLO' / 'labels'
 OUTPUT_ROOT = PROJECT_ROOT / 'Resultats' / 'visualisation'
 
 TASKS = {
     'oeufs': {'num_classes': 1, 'image_dir': 'oeufs'},
-    '3classes': {'num_classes': 3, 'image_dir': 'cavite'},
+    '2classes': {'num_classes': 2, 'image_dir': 'cavite'},
 }
 
 # ============================ 3. Visualisation des résultats ============================
@@ -151,9 +152,9 @@ def prediction_sources(task_name):
         if task_dir.is_dir():
             sources.append((f'YOLO_{yolo_type}', task_dir))
 
-    if task_name == '3classes':
+    if task_name == '2classes':
         # Les prédictions OpenUS à visualiser sont celles des validations
-        # croisées, et non les prédictions de test de custom_seg_new.
+        # croisées, et non les prédictions de test d'une autre configuration.
         openus_dirs = []
         for fold_dir in sorted(OPENUS_CV_ROOT.glob('fold_*')):
             attempts = sorted(fold_dir.glob('attempt_*/eval/predicted_masks_teacher'))
@@ -165,7 +166,6 @@ def prediction_sources(task_name):
     return sources
 
 def run(task_names, dpi=150):
-  from utils.stats_fct import overlay_colored_mask, overlay_mask
   for task_name in task_names:
     task_config = TASKS[task_name]
     num_classes = task_config['num_classes']
@@ -296,7 +296,7 @@ def main(argv=None):
     parser.add_argument('--dpi', type=int, default=150)
     args = parser.parse_args(argv)
     if args.dpi <= 0: parser.error('--dpi doit être strictement positif')
-    selected = ('oeufs', '3classes') if args.task == 'both' else (('3classes',) if args.task == 'cavite' else ('oeufs',))
+    selected = ('oeufs', '2classes') if args.task == 'both' else (('2classes',) if args.task == 'cavite' else ('oeufs',))
     run(selected, args.dpi)
 
 if __name__ == '__main__':
