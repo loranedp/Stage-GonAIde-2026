@@ -1,4 +1,4 @@
-"""Réexporte les prédictions YOLO dans le repère du crop U-Net."""
+"""Réexporte les prédictions YOLO dans le repère natif des images source."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ import sys
 from pathlib import Path
 
 import torch
-from ultralytics import YOLO
 
 
 YOLO_ROOT = Path(__file__).resolve().parent
@@ -15,15 +14,39 @@ PROJECT_ROOT = YOLO_ROOT.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from utils.stats_fct import mask_to_yolo_polygons
-from utils.yolo_metrics import result_to_instance_masks, result_to_masks
+from utils.yolo_metrics import result_to_instance_masks
 
 
-CROP = (85, 33, 510, 380)
 DATASETS = {
     "3classes": ("Cavite", "Gonade", "Intestin"),
     "2classes": ("Cavite", "Gonade"),
     "oeufs": ("Oeuf",),
+    "oeufsclasses": ("Gonade", "Oeuf"),
 }
+
+
+def instance_masks_to_yolo_lines(
+    instance_masks,
+    image_shape: tuple[int, int],
+) -> list[str]:
+    """Convertit des instances dans le repère natif de l'image source."""
+    height, width = image_shape
+    lines = []
+    for class_index, instance_mask in instance_masks:
+        if instance_mask.shape != (height, width):
+            raise ValueError(
+                "Le masque d'instance et l'image source n'ont pas les mêmes "
+                f"dimensions : {instance_mask.shape} != {(height, width)}."
+            )
+        lines.extend(
+            mask_to_yolo_polygons(
+                torch.from_numpy(instance_mask),
+                class_index,
+                target_size=(width, height),
+                largest_only=True,
+            )
+        )
+    return lines
 
 
 def validation_paths(fold_index: int) -> list[Path]:
@@ -61,6 +84,8 @@ def export_fold(
     device: str,
 ) -> int:
     """Prédit et exporte un fold sans relancer l'entraînement."""
+    from ultralytics import YOLO
+
     names = DATASETS[dataset]
     image_paths = validation_paths(fold_index)
     checkpoint = checkpoint_path(dataset, fold_index)
@@ -86,36 +111,13 @@ def export_fold(
 
     output_dir = YOLO_ROOT / "masks" / "eval" / "instance" / dataset
     output_dir.mkdir(parents=True, exist_ok=True)
-    crop_x, crop_y, crop_width, crop_height = CROP
-
     for image_path, prediction in zip(image_paths, predictions):
-        masks = result_to_masks(
-            prediction,
-            names,
-            len(names),
-        )
-        if masks.shape[1] < crop_y + crop_height or masks.shape[2] < crop_x + crop_width:
-            raise ValueError(
-                f"Crop {CROP} incompatible avec {image_path} : "
-                f"masque de forme {masks.shape}."
-            )
-
         output_path = output_dir / f"pred_{image_path.stem}.txt"
-        lines = []
         instance_masks = result_to_instance_masks(prediction, names)
-        for class_index, instance_mask in instance_masks:
-            cropped_mask = instance_mask[
-                crop_y:crop_y + crop_height,
-                crop_x:crop_x + crop_width,
-            ]
-            lines.extend(
-                mask_to_yolo_polygons(
-                    torch.from_numpy(cropped_mask),
-                    class_index,
-                    target_size=(crop_width, crop_height),
-                    largest_only=True,
-                )
-            )
+        lines = instance_masks_to_yolo_lines(
+            instance_masks,
+            prediction.orig_shape,
+        )
         output_path.write_text("\n".join(lines) + ("\n" if lines else ""))
 
     return len(image_paths)

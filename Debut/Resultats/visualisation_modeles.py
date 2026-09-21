@@ -12,6 +12,7 @@ import sys
 from PIL import Image
 import re
 from collections import defaultdict
+from dataclasses import dataclass
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -36,6 +37,13 @@ TASKS = {
 # Format des images visualisées. Les images et labels ont déjà été cropés.
 IMAGE_SIZE = (510, 380)
 
+
+@dataclass(frozen=True)
+class PredictionSource:
+    name: str
+    directories: Path | list[Path]
+    class_id_map: dict[int, int] | None = None
+
 def image_id_from_prediction(mask_path):
     match = re.fullmatch(r'pred_fold_\d+_(.+)\.txt', mask_path.name)
     if match is not None:
@@ -46,7 +54,7 @@ def image_id_from_prediction(mask_path):
     raise ValueError(f'Nom de prédiction inattendu : {mask_path.name}')
 
 def mask_from_yolo_file(mask_path, num_classes, width, height,
-                        preserve_instances=False):
+                        preserve_instances=False, class_id_map=None):
     """Rasterise une prédiction normalisée dans le repère du crop."""
     mask_shape = (height, width) if preserve_instances else (
         num_classes, height, width
@@ -62,7 +70,13 @@ def mask_from_yolo_file(mask_path, num_classes, width, height,
             if len(parts) < 3 or len(parts[1:]) % 2:
                 raise ValueError(f'Polygone YOLO invalide dans {mask_path}')
 
-            class_id = int(parts[0])
+            source_class_id = int(parts[0])
+            if class_id_map is not None:
+                if source_class_id not in class_id_map:
+                    continue
+                class_id = class_id_map[source_class_id]
+            else:
+                class_id = source_class_id
             if not 0 <= class_id < num_classes:
                 continue
 
@@ -145,12 +159,19 @@ def prediction_sources(task_name):
         for model_dir in sorted(UNET_ROOT.iterdir()):
             task_dir = model_dir / task_name
             if model_dir.is_dir() and task_dir.is_dir():
-                sources.append((model_dir.name, task_dir))
+                sources.append(PredictionSource(model_dir.name, task_dir))
 
     for yolo_type in ('instance', 'semantique'):
         task_dir = YOLO_ROOT / yolo_type / task_name
         if task_dir.is_dir():
-            sources.append((f'YOLO_{yolo_type}', task_dir))
+            sources.append(PredictionSource(f'YOLO_{yolo_type}', task_dir))
+
+    if task_name == 'oeufs':
+        task_dir = YOLO_ROOT / 'instance' / 'oeufsclasses'
+        if task_dir.is_dir():
+            sources.append(PredictionSource(
+                'YOLO_instance_oeufsclasses', task_dir, {1: 0}
+            ))
 
     if task_name == '2classes':
         # Les prédictions OpenUS à visualiser sont celles des validations
@@ -161,7 +182,7 @@ def prediction_sources(task_name):
             if attempts:
                 openus_dirs.append(attempts[-1])
         if openus_dirs:
-            sources.append(('OpenUS', openus_dirs))
+            sources.append(PredictionSource('OpenUS', openus_dirs))
 
     return sources
 
@@ -177,18 +198,22 @@ def run(task_names, dpi=150):
     # Indexe toutes les prédictions par image et par modèle.
     predictions_by_image = defaultdict(dict)
     sources = prediction_sources(task_name)
-    for source_name, source_dir in sources:
-        source_dirs = source_dir if isinstance(source_dir, list) else [source_dir]
+    for source in sources:
+        source_dirs = (
+            source.directories
+            if isinstance(source.directories, list)
+            else [source.directories]
+        )
         for source_dir in source_dirs:
             for mask_path in sorted(source_dir.glob('pred_*.txt')):
                 image_id = image_id_from_prediction(mask_path)
-                previous = predictions_by_image[image_id].get(source_name)
+                previous = predictions_by_image[image_id].get(source.name)
                 if previous is not None:
                     print(
-                        f'Avertissement : doublon {source_name} pour {image_id} '
+                        f'Avertissement : doublon {source.name} pour {image_id} '
                         f'({previous} et {mask_path}); dernière prédiction conservée'
                     )
-                predictions_by_image[image_id][source_name] = mask_path
+                predictions_by_image[image_id][source.name] = mask_path
 
     print(f'Sauvegarde des résultats pour {task_name}: {len(sources)} modèles, '
           f'{len(predictions_by_image)} images')
@@ -216,35 +241,34 @@ def run(task_names, dpi=150):
                 overlay_egg_instances if preserve_instances else overlay_mask
             )
             true_display = overlay_function(
-                image_tensor, true_mask_tensor, alpha=0.4,
-                target_size=image.size
+                image_tensor, true_mask_tensor, alpha=0.4
             )
         else:
             true_display = None
 
         displays = []
         model_names = []
-        for source_name, _ in sources:
-            mask_path = predictions_by_image[image_id].get(source_name)
+        for source in sources:
+            mask_path = predictions_by_image[image_id].get(source.name)
             if mask_path is None:
                 continue
             mask_tensor = mask_from_yolo_file(
                 mask_path, num_classes, width, height,
-                preserve_instances=preserve_instances
+                preserve_instances=preserve_instances,
+                class_id_map=source.class_id_map,
             )
             overlay_function = (
                 overlay_egg_instances if preserve_instances else overlay_mask
             )
             displays.append(
-                overlay_function(image_tensor, mask_tensor, alpha=0.4,
-                                 target_size=image.size)
+                overlay_function(image_tensor, mask_tensor, alpha=0.4)
             )
-            model_names.append(source_name)
+            model_names.append(source.name)
 
         # Tous les panneaux sont affichés sur une seule ligne. La hauteur de
         # la figure est calculée à partir du ratio des images cropées afin de
         # conserver leur format rectangulaire sans les déformer.
-        num_panels = len(displays) + 1 + (true_display is not None)
+        num_panels = len(displays) + (true_display is not None)
         panel_width = 5
         panel_height = panel_width * IMAGE_SIZE[1] / IMAGE_SIZE[0]
         fig, axes = plt.subplots(
@@ -253,21 +277,15 @@ def run(task_names, dpi=150):
         )
         axes_flat = np.asarray(axes).reshape(-1)
 
-        axes_flat[0].imshow(image)
-        axes_flat[0].set_title(
-            'original', fontsize=14, fontweight='bold', pad=8
-        )
-        axes_flat[0].axis('off')
-
-        first_model_index = 1
+        first_model_index = 0
         if true_display is not None:
-            axes_flat[1].imshow(true_display)
-            axes_flat[1].set_title(
+            axes_flat[0].imshow(true_display)
+            axes_flat[0].set_title(
                 'verite_terrain', fontsize=14,
                 fontweight='bold', pad=8
             )
-            axes_flat[1].axis('off')
-            first_model_index = 2
+            axes_flat[0].axis('off')
+            first_model_index = 1
 
         for index, (display_image, model_name) in enumerate(
             zip(displays, model_names), start=first_model_index
