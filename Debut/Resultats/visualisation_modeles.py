@@ -164,14 +164,7 @@ def prediction_sources(task_name):
     for yolo_type in ('instance', 'semantique'):
         task_dir = YOLO_ROOT / yolo_type / task_name
         if task_dir.is_dir():
-            sources.append(PredictionSource(f'YOLO_{yolo_type}', task_dir))
-
-    if task_name == 'oeufs':
-        task_dir = YOLO_ROOT / 'instance' / 'oeufsclasses'
-        if task_dir.is_dir():
-            sources.append(PredictionSource(
-                'YOLO_instance_oeufsclasses', task_dir, {1: 0}
-            ))
+            sources.append(PredictionSource(f'YOLO26', task_dir))
 
     if task_name == '2classes':
         # Les prédictions OpenUS à visualiser sont celles des validations
@@ -281,7 +274,7 @@ def run(task_names, dpi=150):
         if true_display is not None:
             axes_flat[0].imshow(true_display)
             axes_flat[0].set_title(
-                'verite_terrain', fontsize=14,
+                'Annotation', fontsize=16,
                 fontweight='bold', pad=8
             )
             axes_flat[0].axis('off')
@@ -292,7 +285,7 @@ def run(task_names, dpi=150):
         ):
             axes_flat[index].imshow(display_image)
             axes_flat[index].set_title(
-                model_name, fontsize=14,
+                model_name, fontsize=16,
                 fontweight='bold', pad=8
             )
             axes_flat[index].axis('off')

@@ -43,7 +43,7 @@ unique_id = np.unique(df.cap_id)
 
 # -------- 3. Récupère le volume réel et prédit des gonades et des oeufs de l'échantillon de test--------
 cavite_true_root = "data/YOLO/labels/cavite"
-cavite_pred_root = "UNet/masks/test/UNet/3classes"
+cavite_pred_root = "UNet/masks/test/UNet/2classes"
 eggs_true_root = "data/YOLO/labels/oeufs"
 eggs_pred_root = "YOLO26/masks/test/instance/oeufs"
 
