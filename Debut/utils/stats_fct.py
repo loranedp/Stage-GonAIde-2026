@@ -148,7 +148,8 @@ def nuage_points(
     xlabel="Axe X",
     ylabel="Axe Y",
     couleur="blue",
-    ax=None
+    ax=None,
+    diagonale=None
 ):
     # Crée une figure seulement si aucun axe n'est fourni
     if ax is None:
@@ -158,7 +159,6 @@ def nuage_points(
         fig = ax.figure
         show_plot = False
 
-    # Si une variable color_var est fournie, on l'utilise pour la couleur
     if color_var is not None:
         scatter = ax.scatter(
             x,
@@ -170,7 +170,6 @@ def nuage_points(
             s=40
         )
 
-        # Barre de couleur associée à la bonne figure / au bon axe
         cbar = fig.colorbar(scatter, ax=ax)
         cbar.set_label("Position Écho")
 
@@ -184,13 +183,16 @@ def nuage_points(
             s=40
         )
 
+    # Ligne diagonale rouge en pointillés
+    if diagonale:
+        ax.axline((0, 0), slope=1, color="red", linestyle="--")
+
     ax.set_title(titre, fontsize=14, pad=15)
     ax.set_xlabel(xlabel, fontsize=12)
     ax.set_ylabel(ylabel, fontsize=12)
 
     ax.grid(True, linestyle="--", alpha=0.5)
 
-    # Si la fonction a créé elle-même la figure, on l'affiche
     if show_plot:
         plt.show()
 

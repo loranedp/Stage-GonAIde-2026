@@ -319,13 +319,40 @@ def metrics_by_class(true, preds, echelle, dataset_name, egg_instance_labels=Non
 
     return intersection, union,iou_per_img, dice_per_img, precision_per_img, recall_per_img, diff_surface
 
-def save_validation_masks(masks_dir, best_masks):
-    """Exporte les prédictions du meilleur epoch au format YOLO."""
+def save_validation_masks(masks_dir, best_masks, dataset_name=None):
+    """Exporte les prédictions du meilleur epoch au format YOLO.
+
+    Pour les œufs, ``pred_mask`` est une carte 2D d'identifiants d'instances.
+    Chaque identifiant positif est exporté séparément afin que deux œufs
+    adjacents ne soient pas refusionnés lors de l'extraction des contours.
+    """
     for file_name, _true_mask, pred_mask in best_masks:
         stem = Path(file_name).stem
         pred_path = Path(masks_dir) / f"pred_{stem}.txt"
 
         with pred_path.open("w") as f_pred:
+            if dataset_name == "oeufs":
+                instance_labels = unpad_array(pred_mask)
+                if instance_labels.ndim == 3 and instance_labels.shape[0] == 1:
+                    instance_labels = instance_labels[0]
+                if instance_labels.ndim != 2:
+                    raise ValueError(
+                        "La carte d'instances d'œufs doit avoir la forme "
+                        "(H, W) ou (1, H, W)."
+                    )
+                for instance_id in torch.unique(instance_labels):
+                    if int(instance_id) <= 0:
+                        continue
+                    polygons = mask_to_yolo_polygons(
+                        instance_labels == instance_id,
+                        class_id=0,
+                        target_size=(510, 380),
+                        largest_only=True,
+                    )
+                    if polygons:
+                        f_pred.write(polygons[0] + "\n")
+                continue
+
             for class_idx in range(pred_mask.shape[0]):
                 polygons = mask_to_yolo_polygons(
                     unpad_array(pred_mask[class_idx]), class_idx, target_size=(510, 380)
