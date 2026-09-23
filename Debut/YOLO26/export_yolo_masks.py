@@ -6,15 +6,11 @@ import argparse
 import sys
 from pathlib import Path
 
-import torch
-
-
 YOLO_ROOT = Path(__file__).resolve().parent
 PROJECT_ROOT = YOLO_ROOT.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from utils.stats_fct import mask_to_yolo_polygons
-from utils.yolo_metrics import result_to_instance_masks
+from utils.yolo_metrics import instance_masks_to_yolo_lines, result_to_instance_masks
 
 
 DATASETS = {
@@ -23,30 +19,6 @@ DATASETS = {
     "oeufs": ("Oeuf",),
     "oeufsclasses": ("Gonade", "Oeuf"),
 }
-
-
-def instance_masks_to_yolo_lines(
-    instance_masks,
-    image_shape: tuple[int, int],
-) -> list[str]:
-    """Convertit des instances dans le repère natif de l'image source."""
-    height, width = image_shape
-    lines = []
-    for class_index, instance_mask in instance_masks:
-        if instance_mask.shape != (height, width):
-            raise ValueError(
-                "Le masque d'instance et l'image source n'ont pas les mêmes "
-                f"dimensions : {instance_mask.shape} != {(height, width)}."
-            )
-        lines.extend(
-            mask_to_yolo_polygons(
-                torch.from_numpy(instance_mask),
-                class_index,
-                target_size=(width, height),
-                largest_only=True,
-            )
-        )
-    return lines
 
 
 def validation_paths(fold_index: int) -> list[Path]:

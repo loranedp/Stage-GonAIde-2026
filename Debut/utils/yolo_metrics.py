@@ -7,6 +7,9 @@ from typing import Iterable
 
 import cv2
 import numpy as np
+from PIL import Image
+
+from utils.segmentation_metrics import metrics_from_counts
 
 
 def _read_polygons(label_path: str | Path, image_shape: tuple[int, int]):
@@ -168,39 +171,64 @@ def result_to_instance_map(result, class_names: Iterable[str]) -> np.ndarray:
     return instance_map
 
 
-def metrics_from_counts(
-    intersection: np.ndarray,
-    union: np.ndarray,
-    predicted_area: np.ndarray,
-    true_area: np.ndarray,
-) -> dict[str, np.ndarray]:
-    """Compute stable IoU/Dice/precision/recall from pooled pixel counts."""
+def mask_to_yolo_polygons(
+    mask_bool,
+    class_id,
+    target_size=(510, 380),
+    *,
+    largest_only=False,
+):
+    """Convertit un masque binaire en lignes polygonales YOLO normalisées."""
+    if hasattr(mask_bool, "detach"):
+        mask_array = mask_bool.detach().cpu().numpy()
+    else:
+        mask_array = np.asarray(mask_bool)
+    if mask_array.ndim != 2:
+        raise ValueError("Le masque à exporter doit avoir la forme (H, W).")
 
-    intersection = np.asarray(intersection, dtype=np.float64)
-    union = np.asarray(union, dtype=np.float64)
-    predicted_area = np.asarray(predicted_area, dtype=np.float64)
-    true_area = np.asarray(true_area, dtype=np.float64)
+    resized = Image.fromarray((mask_array > 0.5).astype(np.uint8) * 255).resize(
+        target_size, Image.NEAREST
+    )
+    mask_array = np.asarray(resized)
+    contours, _ = cv2.findContours(
+        np.ascontiguousarray(mask_array.astype(np.uint8)),
+        cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_NONE,
+    )
+    if largest_only and contours:
+        contours = [max(contours, key=cv2.contourArea)]
 
-    total_area = predicted_area + true_area
-    metrics = {
-        "iou": np.divide(intersection, union, out=np.ones_like(intersection), where=union > 0),
-        "dice": np.divide(
-            2 * intersection,
-            total_area,
-            out=np.ones_like(intersection),
-            where=total_area > 0,
-        ),
-        "precision": np.divide(
-            intersection,
-            predicted_area,
-            out=(true_area == 0).astype(np.float64),
-            where=predicted_area > 0,
-        ),
-        "recall": np.divide(
-            intersection,
-            true_area,
-            out=(predicted_area == 0).astype(np.float64),
-            where=true_area > 0,
-        ),
-    }
-    return metrics
+    height, width = mask_array.shape
+    polygons = []
+    for contour in contours:
+        if len(contour) < 3:
+            continue
+        points = contour.reshape(-1, 2)
+        coordinates = [f"{x / width:.6f} {y / height:.6f}" for x, y in points]
+        polygons.append(f"{class_id} " + " ".join(coordinates))
+    return polygons
+
+
+def instance_masks_to_yolo_lines(
+    instance_masks,
+    image_shape: tuple[int, int],
+) -> list[str]:
+    """Convertit des instances en polygones dans le repère natif de l'image."""
+    height, width = image_shape
+    lines = []
+    for class_index, instance_mask in instance_masks:
+        instance_mask = np.asarray(instance_mask)
+        if instance_mask.shape != (height, width):
+            raise ValueError(
+                "Le masque d'instance et l'image source n'ont pas les mêmes "
+                f"dimensions : {instance_mask.shape} != {(height, width)}."
+            )
+        lines.extend(
+            mask_to_yolo_polygons(
+                instance_mask,
+                class_index,
+                target_size=(width, height),
+                largest_only=True,
+            )
+        )
+    return lines
