@@ -475,6 +475,22 @@ plt.tight_layout()
 plt.show()
 ```
 
+## Relations entre le volume prédit et le volume annoté des gonades
+
+```{python}
+# Nuage de points pour visualiser la relation entre le volume prédit et le volume annoté des gonades
+nuage_points(
+    x=df_final.volume_gonade_true,
+    y=df_final.volume_gonade_pred,
+    titre="Gonades",
+    xlabel="Volume annoté (en cm³)",
+    ylabel="Volume prédit (en cm³)",
+    couleur="teal",
+    diagonale=True
+)
+print(df_final[["volume_gonade_true", "volume_gonade_pred"]])
+```
+
 ## Relations entre le volume des gonades et le poids des poissons
 
 ```{python}
