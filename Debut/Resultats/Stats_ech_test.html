@@ -76,7 +76,7 @@ ul.task-list li input[type="checkbox"] {
 <h3 class="anchored" data-anchor-id="rappels-échantillon-de-test">Rappels échantillon de test</h3>
 <section id="global" class="level4">
 <h4 class="anchored" data-anchor-id="global">Global</h4>
-<div id="5f7f38a1" class="cell" data-execution_count="8">
+<div id="9759172f" class="cell" data-execution_count="8">
 <div class="cell-output cell-output-stdout">
 <pre><code>Nombre de poissons : 8
 Nombre d'échographies transversales : 24
@@ -89,7 +89,7 @@ Nombre d'échographies longitudinales : 11</code></pre>
 <div class="column" style="width:50%;">
 <section id="vrai-annotations" class="level4">
 <h4 class="anchored" data-anchor-id="vrai-annotations">Vrai annotations</h4>
-<div id="1c2e8c17" class="cell" data-execution_count="9">
+<div id="91ca2a15" class="cell" data-execution_count="9">
 <div class="cell-output cell-output-stdout">
 <pre><code>Nombre d'échographies transversales non vides : 24
 Nombre d'échographies longitudinales non vides : 10
@@ -100,11 +100,11 @@ Nombre d'oeufs : 54</code></pre>
 </div><div class="column" style="width:50%;">
 <section id="prédictions" class="level4">
 <h4 class="anchored" data-anchor-id="prédictions">Prédictions</h4>
-<div id="e744504e" class="cell" data-execution_count="10">
+<div id="a31ee1d2" class="cell" data-execution_count="10">
 <div class="cell-output cell-output-stdout">
 <pre><code>Nombre d'échographies transversales non vides : 24
-Nombre d'échographies longitudinales non vides : 11
-Nombre d'oeufs : 54</code></pre>
+Nombre d'échographies longitudinales non vides : 9
+Nombre d'oeufs : 28</code></pre>
 </div>
 </div>
 </section>
@@ -113,8 +113,8 @@ Nombre d'oeufs : 54</code></pre>
 </section>
 <section id="volumes-et-fécondité-par-poisson" class="level3">
 <h3 class="anchored" data-anchor-id="volumes-et-fécondité-par-poisson">Volumes et fécondité par poisson</h3>
-<div id="c4903000" class="cell" data-execution_count="11">
-<div class="cell-output cell-output-display" data-execution_count="11">
+<div id="23f4da74" class="cell" data-execution_count="11">
+<div class="cell-output cell-output-display" data-execution_count="45">
 <div>
 
 
@@ -134,6 +134,8 @@ Nombre d'oeufs : 54</code></pre>
 <th data-quarto-table-cell-role="th">age_poisson</th>
 <th data-quarto-table-cell-role="th">volume_median_oeufs_mm3_true</th>
 <th data-quarto-table-cell-role="th">volume_median_oeufs_mm3_pred</th>
+<th data-quarto-table-cell-role="th">volume_moyen_oeufs_mm3_true</th>
+<th data-quarto-table-cell-role="th">volume_moyen_oeufs_mm3_pred</th>
 <th data-quarto-table-cell-role="th">fecondite_pred</th>
 <th data-quarto-table-cell-role="th">fecondite_true</th>
 </tr>
@@ -152,8 +154,10 @@ Nombre d'oeufs : 54</code></pre>
 <td>212</td>
 <td>None</td>
 <td>10.905562</td>
-<td>5.593623</td>
-<td>1719.806405</td>
+<td>23.343878</td>
+<td>9.876946</td>
+<td>24.422355</td>
+<td>412.097276</td>
 <td>1049.694506</td>
 </tr>
 <tr class="even">
@@ -169,8 +173,10 @@ Nombre d'oeufs : 54</code></pre>
 <td>230</td>
 <td>2+</td>
 <td>11.982479</td>
-<td>10.466806</td>
-<td>494.981270</td>
+<td>16.355747</td>
+<td>12.349415</td>
+<td>16.023200</td>
+<td>316.761612</td>
 <td>489.729869</td>
 </tr>
 <tr class="odd">
@@ -186,8 +192,10 @@ Nombre d'oeufs : 54</code></pre>
 <td>178</td>
 <td>1+</td>
 <td>8.997912</td>
-<td>7.689397</td>
-<td>622.314902</td>
+<td>17.229331</td>
+<td>8.183569</td>
+<td>17.211093</td>
+<td>277.737229</td>
 <td>574.600481</td>
 </tr>
 <tr class="even">
@@ -203,8 +211,10 @@ Nombre d'oeufs : 54</code></pre>
 <td>198</td>
 <td>1+</td>
 <td>10.454494</td>
-<td>18.289994</td>
-<td>230.917396</td>
+<td>16.410813</td>
+<td>9.758140</td>
+<td>16.410813</td>
+<td>257.359450</td>
 <td>423.099927</td>
 </tr>
 <tr class="odd">
@@ -220,8 +230,10 @@ Nombre d'oeufs : 54</code></pre>
 <td>174</td>
 <td>1+</td>
 <td>7.927613</td>
-<td>2.297414</td>
-<td>698.280065</td>
+<td>18.166887</td>
+<td>9.897542</td>
+<td>18.166887</td>
+<td>88.305611</td>
 <td>213.563568</td>
 </tr>
 <tr class="even">
@@ -237,8 +249,10 @@ Nombre d'oeufs : 54</code></pre>
 <td>192</td>
 <td>1+</td>
 <td>14.579701</td>
-<td>8.097099</td>
-<td>627.268798</td>
+<td>NaN</td>
+<td>14.579701</td>
+<td>NaN</td>
+<td>NaN</td>
 <td>367.951757</td>
 </tr>
 <tr class="odd">
@@ -254,8 +268,10 @@ Nombre d'oeufs : 54</code></pre>
 <td>191</td>
 <td>None</td>
 <td>10.946132</td>
-<td>19.910905</td>
-<td>250.413402</td>
+<td>15.160333</td>
+<td>11.499589</td>
+<td>15.259626</td>
+<td>328.881777</td>
 <td>401.062183</td>
 </tr>
 <tr class="even">
@@ -271,8 +287,10 @@ Nombre d'oeufs : 54</code></pre>
 <td>188</td>
 <td>1+</td>
 <td>7.756373</td>
-<td>8.759992</td>
-<td>491.031009</td>
+<td>13.516066</td>
+<td>9.161230</td>
+<td>13.516066</td>
+<td>318.245545</td>
 <td>523.200642</td>
 </tr>
 </tbody>
@@ -284,7 +302,7 @@ Nombre d'oeufs : 54</code></pre>
 </section>
 <section id="vérification-des-surfaces-des-gonades-et-de-la-cavité---annotations" class="level2">
 <h2 class="anchored" data-anchor-id="vérification-des-surfaces-des-gonades-et-de-la-cavité---annotations">Vérification des surfaces des gonades et de la cavité - Annotations</h2>
-<div id="90702cc5" class="cell" data-execution_count="12">
+<div id="6587ff46" class="cell" data-execution_count="12">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -303,7 +321,7 @@ Nombre d'oeufs : 54</code></pre>
 </section>
 <section id="vérification-des-surfaces-des-gonades-et-de-la-cavité---prédictions" class="level2">
 <h2 class="anchored" data-anchor-id="vérification-des-surfaces-des-gonades-et-de-la-cavité---prédictions">Vérification des surfaces des gonades et de la cavité - Prédictions</h2>
-<div id="840a755c" class="cell" data-execution_count="13">
+<div id="2e7cd47d" class="cell" data-execution_count="13">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -322,7 +340,7 @@ Nombre d'oeufs : 54</code></pre>
 </section>
 <section id="détection-des-anomalies-selon-laugmentation-de-la-surface" class="level2">
 <h2 class="anchored" data-anchor-id="détection-des-anomalies-selon-laugmentation-de-la-surface">Détection des anomalies selon l’augmentation de la surface</h2>
-<div id="4dde602e" class="cell" data-execution_count="14">
+<div id="84e7c9fc" class="cell" data-execution_count="14">
 <div class="cell-output cell-output-stdout">
 <pre><code>True - Poisson : 406070 - [0, 1, 0] -Problème sur l'écho à la position 0.0 (diminution surface gonade : 0.0%)</code></pre>
 </div>
@@ -330,7 +348,7 @@ Nombre d'oeufs : 54</code></pre>
 </section>
 <section id="relations-entre-surfaces-des-gonades-et-de-la-cavité---annotations" class="level2">
 <h2 class="anchored" data-anchor-id="relations-entre-surfaces-des-gonades-et-de-la-cavité---annotations">Relations entre surfaces des gonades et de la cavité - Annotations</h2>
-<div id="f13b2461" class="cell" data-execution_count="15">
+<div id="1eabec93" class="cell" data-execution_count="15">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -346,7 +364,7 @@ Corrélation (pour position echo &gt;= 2) : 0.71</code></pre>
 </section>
 <section id="relations-entre-surfaces-des-gonades-et-de-la-cavité---prédictions" class="level2">
 <h2 class="anchored" data-anchor-id="relations-entre-surfaces-des-gonades-et-de-la-cavité---prédictions">Relations entre surfaces des gonades et de la cavité - Prédictions</h2>
-<div id="3f2e844f" class="cell" data-execution_count="16">
+<div id="e4a50f8a" class="cell" data-execution_count="16">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -362,7 +380,7 @@ Corrélation (pour position echo &gt;= 2) : 0.68</code></pre>
 </section>
 <section id="distribution-du-volume-des-gonades" class="level2">
 <h2 class="anchored" data-anchor-id="distribution-du-volume-des-gonades">Distribution du volume des gonades</h2>
-<div id="04dd7220" class="cell" data-execution_count="17">
+<div id="4168f4ac" class="cell" data-execution_count="17">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -374,7 +392,7 @@ Corrélation (pour position echo &gt;= 2) : 0.68</code></pre>
 </section>
 <section id="différences-entre-les-surfaces-et-les-volumes-prédits-et-annotés" class="level2">
 <h2 class="anchored" data-anchor-id="différences-entre-les-surfaces-et-les-volumes-prédits-et-annotés">Différences entre les surfaces et les volumes prédits et annotés</h2>
-<div id="40902eb0" class="cell" data-execution_count="18">
+<div id="ee3ce829" class="cell" data-execution_count="18">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -386,7 +404,7 @@ Corrélation (pour position echo &gt;= 2) : 0.68</code></pre>
 </section>
 <section id="relations-entre-le-volume-prédit-et-le-volume-annoté-des-gonades" class="level2">
 <h2 class="anchored" data-anchor-id="relations-entre-le-volume-prédit-et-le-volume-annoté-des-gonades">Relations entre le volume prédit et le volume annoté des gonades</h2>
-<div id="b83f8387" class="cell" data-execution_count="19">
+<div id="0bfa7fa2" class="cell" data-execution_count="19">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -409,7 +427,7 @@ Corrélation (pour position echo &gt;= 2) : 0.68</code></pre>
 </section>
 <section id="relations-entre-le-volume-des-gonades-et-le-poids-des-poissons" class="level2">
 <h2 class="anchored" data-anchor-id="relations-entre-le-volume-des-gonades-et-le-poids-des-poissons">Relations entre le volume des gonades et le poids des poissons</h2>
-<div id="a8b2992e" class="cell" data-execution_count="20">
+<div id="d8dd4f15" class="cell" data-execution_count="20">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -425,7 +443,7 @@ Corrélation prédictions : 0.70</code></pre>
 </section>
 <section id="relations-entre-le-volume-des-cavités-et-le-poids-des-poissons" class="level2">
 <h2 class="anchored" data-anchor-id="relations-entre-le-volume-des-cavités-et-le-poids-des-poissons">Relations entre le volume des cavités et le poids des poissons</h2>
-<div id="11cb12a1" class="cell" data-execution_count="21">
+<div id="f4870620" class="cell" data-execution_count="21">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -441,7 +459,7 @@ Corrélation prédictions : 0.68</code></pre>
 </section>
 <section id="distribution-du-volume-des-oeufs" class="level2">
 <h2 class="anchored" data-anchor-id="distribution-du-volume-des-oeufs">Distribution du volume des oeufs</h2>
-<div id="d2e2dea0" class="cell" data-execution_count="23">
+<div id="b58e739e" class="cell" data-execution_count="23">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -453,7 +471,7 @@ Corrélation prédictions : 0.68</code></pre>
 </section>
 <section id="volume-du-i-ème-plus-gros-œuf-par-poisson---annotations" class="level2">
 <h2 class="anchored" data-anchor-id="volume-du-i-ème-plus-gros-œuf-par-poisson---annotations">Volume du i-ème plus gros œuf par poisson - Annotations</h2>
-<div id="a942640a" class="cell" data-execution_count="24">
+<div id="8d1e3b4a" class="cell" data-execution_count="24">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -465,22 +483,22 @@ Corrélation prédictions : 0.68</code></pre>
 </section>
 <section id="distribution-du-nombre-dœufs-par-échographie" class="level2">
 <h2 class="anchored" data-anchor-id="distribution-du-nombre-dœufs-par-échographie">Distribution du nombre d’œufs par échographie</h2>
-<div id="ff9a471a" class="cell" data-execution_count="25">
+<div id="072cf5f9" class="cell" data-execution_count="25">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_test_files/figure-html/cell-26-output-1.png" width="1048" height="374" class="figure-img"></p>
+<p><img src="Stats_ech_test_files/figure-html/cell-26-output-1.png" width="1047" height="374" class="figure-img"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Nombre moyen d'œufs par échographie : 4.91 (Q1 : 4, Q3 : 6)</code></pre>
+<pre><code>Nombre moyen d'œufs par échographie : 3.11 (Q1 : 1, Q3 : 5)</code></pre>
 </div>
 </div>
 </section>
 <section id="annotations" class="level2">
 <h2 class="anchored" data-anchor-id="annotations">Annotations</h2>
-<div id="84a8d98b" class="cell" data-execution_count="26">
+<div id="17345872" class="cell" data-execution_count="26">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -492,11 +510,11 @@ Corrélation prédictions : 0.68</code></pre>
 </section>
 <section id="prédictions-1" class="level2">
 <h2 class="anchored" data-anchor-id="prédictions-1">Prédictions</h2>
-<div id="3ab15a1c" class="cell" data-execution_count="27">
+<div id="a0ce6181" class="cell" data-execution_count="27">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_test_files/figure-html/cell-28-output-1.png" width="1326" height="557" class="figure-img"></p>
+<p><img src="Stats_ech_test_files/figure-html/cell-28-output-1.png" width="1317" height="557" class="figure-img"></p>
 </figure>
 </div>
 </div>
@@ -504,7 +522,7 @@ Corrélation prédictions : 0.68</code></pre>
 </section>
 <section id="comparaison-du-volume-des-œufs-par-poisson-annotations-vs-prédictions" class="level2">
 <h2 class="anchored" data-anchor-id="comparaison-du-volume-des-œufs-par-poisson-annotations-vs-prédictions">Comparaison du volume des œufs par poisson : annotations vs prédictions</h2>
-<div id="780ae95a" class="cell" data-execution_count="28">
+<div id="873b2e6f" class="cell" data-execution_count="28">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -513,7 +531,7 @@ Corrélation prédictions : 0.68</code></pre>
 </div>
 </div>
 </div>
-<div id="71641f10" class="cell" data-execution_count="29">
+<div id="f1f86333" class="cell" data-execution_count="29">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -525,7 +543,7 @@ Corrélation prédictions : 0.68</code></pre>
 </section>
 <section id="relation-entre-le-volume-médian-des-oeufs-et-des-gonades" class="level2">
 <h2 class="anchored" data-anchor-id="relation-entre-le-volume-médian-des-oeufs-et-des-gonades">Relation entre le volume médian des oeufs et des gonades</h2>
-<div id="380ad2cb" class="cell" data-execution_count="30">
+<div id="562b30c7" class="cell" data-execution_count="30">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -535,19 +553,19 @@ Corrélation prédictions : 0.68</code></pre>
 </div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Corrélation annotations : 0.36665748464309983
-Corrélation prédictions : 0.005880053785688695</code></pre>
+Corrélation prédictions : 0.6349602106530092</code></pre>
 </div>
 </div>
 </section>
 <section id="distribution-de-la-fécondité" class="level2">
 <h2 class="anchored" data-anchor-id="distribution-de-la-fécondité">Distribution de la fécondité</h2>
-<div id="3b46874e" class="cell" data-execution_count="31">
+<div id="d6268e21" class="cell" data-execution_count="31">
 <div class="cell-output cell-output-stdout">
 <pre><code>Nombre de poissons avec une fécondité calculable : 8 sur 8 (Annotations)
-Nombre de poissons avec une fécondité calculable : 8 sur 8 (Predictions)</code></pre>
+Nombre de poissons avec une fécondité calculable : 7 sur 8 (Predictions)</code></pre>
 </div>
 </div>
-<div id="85c1287c" class="cell" data-execution_count="32">
+<div id="7fa93571" class="cell" data-execution_count="32">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -559,7 +577,7 @@ Nombre de poissons avec une fécondité calculable : 8 sur 8 (Predictions)</code
 </section>
 <section id="relations-entre-la-fécondité-et-les-caractéristiques-des-poissons---annotations" class="level2">
 <h2 class="anchored" data-anchor-id="relations-entre-la-fécondité-et-les-caractéristiques-des-poissons---annotations">Relations entre la fécondité et les caractéristiques des poissons - Annotations</h2>
-<div id="09d5ea61" class="cell" data-execution_count="33">
+<div id="082ffdff" class="cell" data-execution_count="33">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -575,7 +593,7 @@ Corrélation fécondité / poids : 0.5818156785671436</code></pre>
 </section>
 <section id="relations-entre-la-fécondité-et-les-caractéristiques-des-poissons---prédictions" class="level2">
 <h2 class="anchored" data-anchor-id="relations-entre-la-fécondité-et-les-caractéristiques-des-poissons---prédictions">Relations entre la fécondité et les caractéristiques des poissons - Prédictions</h2>
-<div id="573b64e8" class="cell" data-execution_count="34">
+<div id="ebef7224" class="cell" data-execution_count="34">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -584,8 +602,8 @@ Corrélation fécondité / poids : 0.5818156785671436</code></pre>
 </div>
 </div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Corrélation fécondité / longueur : 0.23057160126244403
-Corrélation fécondité / poids : 0.35818383208463467</code></pre>
+<pre><code>Corrélation fécondité / longueur : 0.5984066153234652
+Corrélation fécondité / poids : 0.6791485441619322</code></pre>
 </div>
 </div>
 </section>

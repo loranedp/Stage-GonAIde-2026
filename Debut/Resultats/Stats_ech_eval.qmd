@@ -18,6 +18,7 @@ import sys
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 import seaborn as sns
+from matplotlib.patches import Patch
 
 sys.path.append(str(Path.cwd().parent))
 
@@ -41,7 +42,7 @@ unique_id = np.unique(df.cap_id)
 cavite_true_root = "data/YOLO/labels/cavite"
 cavite_pred_root = "UNet/masks/eval/UNet/2classes"
 eggs_true_root = "data/YOLO/labels/oeufs"
-eggs_pred_root = "YOLO26/masks/eval/instance/oeufs"
+eggs_pred_root = "YOLO26/masks/eval/instance/oeufs" # "YOLO26/masks/eval/instance/oeufs" ou "UNet/masks/eval/UNet/oeufs" ou "UNet/masks/eval/EggSegmentationHVUNet/oeufs"
 
 prediction_mask_size = (510, 380) # Correspond à la taille après crop de l'image originale
 
@@ -229,6 +230,20 @@ print(f"Nombre d'oeufs : {len(df_oeufs_individuels_pred)}")
 :::
 
 ::::
+
+#### Taille et poids des poissons
+
+```{python}
+longueurs = df_final["long_poisson"].dropna()
+poids = df_final["poids_poisson"].dropna()
+
+print(f"Longueur moyenne : {longueurs.mean():.1f} mm")
+print(f"Longueur médiane : {longueurs.median():.1f} mm")
+print(f"Étendue des longueurs : {longueurs.min():.1f} à {longueurs.max():.1f} mm")
+print(f"Poids moyen : {poids.mean():.1f} g")
+print(f"Poids médian : {poids.median():.1f} g")
+print(f"Étendue des poids : {poids.min():.1f} à {poids.max():.1f} g")
+```
 
 
 ### Volumes et fécondité par poisson
@@ -467,6 +482,54 @@ axes[1, 1].set_ylabel("Écart (%)")
 axes[1, 1].set_xticks(x_volumes)
 axes[1, 1].set_xticklabels(labels_poissons, rotation=90)
 
+plt.tight_layout()
+plt.show()
+```
+
+### Différence entre les volumes médians des œufs prédits et annotés
+
+```{python}
+df_diff_volumes_medians_oeufs = df_final[
+    ["id poisson", "volume_median_oeufs_mm3_pred", "volume_median_oeufs_mm3_true"]
+].dropna(subset=[
+    "volume_median_oeufs_mm3_pred", "volume_median_oeufs_mm3_true"
+]).copy()
+
+# Une différence négative correspond à une sous-estimation et une différence
+# positive à une surestimation du volume médian des œufs.
+df_diff_volumes_medians_oeufs["difference"] = (
+    df_diff_volumes_medians_oeufs["volume_median_oeufs_mm3_pred"]
+    - df_diff_volumes_medians_oeufs["volume_median_oeufs_mm3_true"]
+)
+df_diff_volumes_medians_oeufs = df_diff_volumes_medians_oeufs.sort_values("difference")
+
+fig, ax = plt.subplots(
+    figsize=(max(10, 0.4 * len(df_diff_volumes_medians_oeufs)), 5)
+)
+couleurs = np.where(
+    df_diff_volumes_medians_oeufs["difference"] < 0,
+    "#4C78A8",
+    "#E45756",
+)
+x = np.arange(len(df_diff_volumes_medians_oeufs))
+ax.bar(x, df_diff_volumes_medians_oeufs["difference"], color=couleurs)
+ax.axhline(0, color="black", linewidth=1)
+ax.set_xticks(x)
+ax.set_xticklabels(
+    df_diff_volumes_medians_oeufs["id poisson"].astype(str),
+    rotation=90,
+    fontsize=8,
+)
+ax.set(
+    title="",
+    xlabel="ID poisson",
+    ylabel="Volume prédit − volume annoté (mm³)",
+)
+ax.grid(axis="y", alpha=0.2)
+ax.legend(handles=[
+    Patch(facecolor="#4C78A8", label="Sous-estimation"),
+    Patch(facecolor="#E45756", label="Surestimation"),
+])
 plt.tight_layout()
 plt.show()
 ```
@@ -794,8 +857,6 @@ plt.show()
 ## Comparaison du volume des œufs par poisson : annotations vs prédictions
 
 ```{python}
-from matplotlib.patches import Patch
-
 ordre_poissons_comparaison = sorted(
     set(df_oeufs_individuels_true["id poisson"])
     | set(df_oeufs_individuels_pred["id poisson"])
