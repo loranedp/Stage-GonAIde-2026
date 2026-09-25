@@ -15,6 +15,7 @@ checkpoints
 Debut/UNet/__pycache__
 Debut/UNet/saves
 Debut/UNet/*.pth
+R50+ViT-B_16.npz
 
 Debut/App/__pycache__
 
