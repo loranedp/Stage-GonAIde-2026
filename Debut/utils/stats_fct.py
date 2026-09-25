@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import statsmodels.api as sm
 import seaborn as sns
 from matplotlib.ticker import MaxNLocator
+from matplotlib.patches import Patch
 
 from utils.segmentation_visualization import (
     CLASS_OVERLAY_COLORS,
@@ -14,6 +15,46 @@ from utils.segmentation_visualization import (
     tensor_to_numpy_image,
 )
 from utils.yolo_metrics import mask_to_yolo_polygons
+
+
+def plot_differences_par_poisson(
+    df,
+    colonne_predite,
+    colonne_annote,
+    colonne_id="id poisson",
+    ylabel="Valeur prédite − valeur annotée",
+    figsize_par_poisson=0.4,
+    hauteur=5,
+):
+    """Trace les différences prédites − annotées, triées par poisson.
+
+    Retourne le DataFrame utilisé pour le graphique, ainsi que la figure et
+    l'axe Matplotlib, pour permettre de réutiliser ou personnaliser le tracé.
+    """
+    donnees = df[[colonne_id, colonne_predite, colonne_annote]].dropna(
+        subset=[colonne_predite, colonne_annote]
+    ).copy()
+    donnees["difference"] = donnees[colonne_predite] - donnees[colonne_annote]
+    donnees = donnees.sort_values("difference")
+
+    fig, ax = plt.subplots(
+        figsize=(max(10, figsize_par_poisson * len(donnees)), hauteur)
+    )
+    couleurs = np.where(donnees["difference"] < 0, "#4C78A8", "#E45756")
+    x = np.arange(len(donnees))
+    ax.bar(x, donnees["difference"], color=couleurs)
+    ax.axhline(0, color="black", linewidth=1)
+    ax.set_xticks(x)
+    ax.set_xticklabels(donnees[colonne_id].astype(str), rotation=90, fontsize=8)
+    ax.set(title="", xlabel="ID poisson", ylabel=ylabel)
+    ax.grid(axis="y", alpha=0.2)
+    ax.legend(handles=[
+        Patch(facecolor="#4C78A8", label="Sous-estimation"),
+        Patch(facecolor="#E45756", label="Surestimation"),
+    ])
+    fig.tight_layout()
+    plt.show()
+    return donnees, fig, ax
 
 
 def distribution(
@@ -279,47 +320,35 @@ def linear_regression(x, y):
 
 
 
-def plot_evolution_curves(df, var1 = "augmentation_surface_gonade", var2 = "augmentation_surface_cavite"):
-    # Palette de 20 couleurs distinctes
+def plot_evolution_curves(df, var1="augmentation_surface_gonade", var2="augmentation_surface_cavite"):
+    """Trace les évolutions et adapte la hauteur au nombre de poissons."""
+    poisson_ids = df["id poisson"].dropna().unique()
     colors = plt.cm.tab20(np.linspace(0, 1, 20))
 
-    # Graphique 1 : Gonades
-    plt.figure(figsize=(10, 5))
-    for i, poisson_id in enumerate(df['id poisson'].unique()):
-        poisson_data = df[df['id poisson'] == poisson_id]
-        plt.plot(
-            poisson_data['position echo'],
-            poisson_data[var1],
-            marker='o',
-            color=colors[i % 20],
-            label=f"Poisson {poisson_id}"
-        )
-    plt.title("Augmentation de la surface des gonades selon la position de l'échographie")
-    plt.xlabel('Position de l\'échographie')
-    plt.ylabel('Augmentation de la surface (en %)')
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
+    # Garder une hauteur de tracé lisible tout en donnant une ligne à chaque
+    # poisson dans la légende. La légende est ainsi incluse dans la figure.
+    hauteur = max(5, 1.5 + 0.28 * len(poisson_ids))
 
-    # Graphique 2 : Cavités
-    plt.figure(figsize=(10, 5))
-    for i, poisson_id in enumerate(df['id poisson'].unique()):
-        poisson_data = df[df['id poisson'] == poisson_id]
-        plt.plot(
-            poisson_data['position echo'],
-            poisson_data[var2],
-            marker='x',
-            color=colors[i % 20],
-            label=f"Poisson {poisson_id}"
-        )
-    plt.title("Augmentation de la surface de la cavité selon la position de l'échographie")
-    plt.xlabel('Position de l\'échographie')
-    plt.ylabel('Augmentation de la surface (en %)')
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
+    for colonne, marqueur, titre in (
+        (var1, "o", "Augmentation de la surface des gonades selon la position de l'échographie"),
+        (var2, "x", "Augmentation de la surface de la cavité selon la position de l'échographie"),
+    ):
+        fig, ax = plt.subplots(figsize=(14, hauteur), layout="constrained")
+        for i, poisson_id in enumerate(poisson_ids):
+            poisson_data = df[df["id poisson"] == poisson_id]
+            ax.plot(
+                poisson_data["position echo"],
+                poisson_data[colonne],
+                marker=marqueur,
+                color=colors[i % 20],
+                label=f"Poisson {poisson_id}",
+            )
+        ax.set_title(titre)
+        ax.set_xlabel("Position de l'échographie")
+        ax.set_ylabel("Augmentation de la surface (en %)")
+        ax.grid(True)
+        ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), borderaxespad=0)
+        plt.show()
 
 
 # Affiche une image avec les masques superposés (pour l'instant non utilisée)
