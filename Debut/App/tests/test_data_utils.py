@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest import mock
 
 import numpy as np
+from pycocotools import mask as mask_util
 from PIL import Image
 
 import config
@@ -64,6 +65,30 @@ class DataUtilsTests(unittest.TestCase):
         data_utils.remove_image_from_corrected_set(filename)
         self.assertIsNone(data_utils.load_corrected_image_and_masks(filename))
         self.assertFalse((self.image_dir / filename).exists())
+
+    def test_legacy_intestine_annotation_is_ignored_when_loading_correction(self):
+        filename = "0000005_10.00.00_123456_2026.jpg"
+        image = Image.new("RGB", (10, 8), (20, 30, 40))
+        data_utils.add_image_to_corrected_set(filename, image, self.masks())
+        data = json.loads(self.ann_path.read_text(encoding="utf-8"))
+        intestine = np.zeros((8, 10), dtype=np.uint8)
+        intestine[1:3, 1:3] = 1
+        rle = mask_util.encode(np.asfortranarray(intestine))
+        rle["counts"] = rle["counts"].decode("utf-8")
+        data["annotations"].append(
+            {
+                "id": 99,
+                "image_id": data["images"][0]["id"],
+                "category_id": 3,
+                "segmentation": rle,
+            }
+        )
+        self.ann_path.write_text(json.dumps(data), encoding="utf-8")
+
+        loaded = data_utils.load_corrected_image_and_masks(filename)
+
+        self.assertEqual(set(loaded["masks"]), {"Cavite", "Gonade"})
+        self.assertFalse(loaded["masks"]["Cavite"][1:3, 1:3].any())
 
     def test_failed_json_write_restores_previous_image_and_annotations(self):
         filename = "0000001_10.00.00_123456_2026.jpg"

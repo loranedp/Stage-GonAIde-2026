@@ -10,26 +10,25 @@ DATA_DIR = ROOT_DIR / "data"
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-# --- Modèle : ensemble des 5 folds (U-NET) ---
+# --- Modèle cavité : ensemble U-Net 2 classes (Cavité, Gonade) ---
 FOLD_MODEL_PATHS = [
-    ROOT_DIR / "App" / "checkpoints" / "unet_finetuned_fold_1.pth",
-    ROOT_DIR / "App" / "checkpoints" / "unet_finetuned_fold_2.pth",
-    ROOT_DIR / "App" / "checkpoints" / "unet_finetuned_fold_3.pth",
-    ROOT_DIR / "App" / "checkpoints" / "unet_finetuned_fold_4.pth",
-    ROOT_DIR / "App" / "checkpoints" / "unet_finetuned_fold_5.pth",
-    ]
-FOLD_EGG_MODEL_PATHS = [
-    ROOT_DIR / "App" / "checkpoints" / f"unet_finetuned_fold_{fold}_UNet_oeufs.pth"
+    ROOT_DIR / "UNet" / "saves" / f"unet_finetuned_fold_{fold}_UNet_2classes.pth"
     for fold in range(1, 6)
 ]
+EGG_YOLO_MODEL_PATH = (
+    ROOT_DIR / "YOLO26" / "runs" / "segment" / "train_oeufs_instance_all" / "weights" / "best.pt"
+)
+YOLO_CONFIDENCE = 0.25
 IMAGE_SIZE = (512, 512)  # (W, H) taille d'entrée du modèle, après crop
 CROP_PARAMS = [85, 33, 510, 380]  # x, y, w, h appliqué avant resize (RoboflowUNetDataset)
 OCR_SCALE_CROP = (530, 350, 250, 200)  # x, y, w, h ; zone d'affichage de l'échelle à l'écran (cf. utils/pre-traitement.ipynb)
 ENCODER_NAME = "resnet34"
 
-# Classes de segmentation (sortie sigmoïde multi-label, pas de classe fond).
-# Index 0/1/2 = category_id 1/2/3 de data/COCO/labels/cavite/annotations.json.
-CLASS_NAMES = ["Cavite", "Gonade", "Intestin"]
+# Classes de segmentation du modèle cavité (sortie sigmoïde multi-label).
+# Index 0/1 = category_id 1/2 de data/COCO/labels/cavite/annotations.json.
+CLASS_NAMES = ["Cavite", "Gonade"]
+# Les magasins de correction historiques peuvent encore contenir la catégorie 3.
+LEGACY_CAVITY_NUM_CLASSES = 3
 EGG_CLASS_NAMES = ["Oeuf"]
 NUM_CLASSES = len(CLASS_NAMES)
 GONAD_CLASS_INDEX = CLASS_NAMES.index("Gonade")
@@ -84,7 +83,7 @@ EGG_CORRECTED_IMAGES_DIR = EGG_CORRECTED_DIR / "images"
 EGG_CORRECTED_ANN_PATH = EGG_CORRECTED_DIR / "annotations.json"
 
 # --- Export des résultats de calcul de volume ---
-RESULTATS_DIR = ROOT_DIR / "Résultats"
+RESULTATS_DIR = ROOT_DIR / "Resultats"
 RESULTATS_CSV_PATH = RESULTATS_DIR / "volumes_poissons.csv"
 
 # --- Statuts de validation ---

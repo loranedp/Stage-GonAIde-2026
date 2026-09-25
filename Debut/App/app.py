@@ -31,19 +31,16 @@ st.markdown(
 CLASS_COLORS = {
     "Cavite": (10, 10, 200),
     "Gonade": (0, 150, 240),
-    "Intestin": (170, 130, 250),
     "Oeuf": (245, 170, 35),
 }
 CLASS_ALPHAS = {
     "Cavite": 0.25,
     "Gonade": 0.55,
-    "Intestin": 0.35,
     "Oeuf": 0.50,
 }
 EDIT_CLASS_ALPHAS = {
     "Cavite": 0.15,
     "Gonade": 0.45,
-    "Intestin": 0.25,
     "Oeuf": 0.40,
 }
 IMAGE_DISPLAY_WIDTH = 500
@@ -131,7 +128,7 @@ def overlay_masks(image: Image.Image, masks: dict, alphas: dict | None = None) -
     base = np.array(image.convert("RGB"), dtype=np.float32)
     overlay = base.copy()
     # Gonade dessinée en dernier (par-dessus) pour rester bien visible en cas de chevauchement.
-    draw_order = ["Cavite", "Intestin", "Gonade", "Oeuf"]
+    draw_order = ["Cavite", "Gonade", "Oeuf"]
     for class_name in draw_order:
         color = CLASS_COLORS.get(class_name)
         if color is None:
@@ -524,13 +521,6 @@ with tab_prediction:
                         st.caption(
                             f"Nombre d'œufs distincts retrouvés : {distinct_egg_count}"
                         )
-                    #conf_cols = st.columns(len(config.CLASS_NAMES))
-                    #for conf_col, class_name in zip(conf_cols, config.CLASS_NAMES):
-                    #    confidence = pred["confidences"].get(class_name)
-                    #    conf_col.metric(
-                    #        f"Confiance ({class_name})",
-                    #        f"{confidence:.1%}" if confidence is not None else "N/A",
-                    #    )
                     class_names = (
                         config.EGG_CLASS_NAMES
                         if image_type == "oeufs"
@@ -544,7 +534,7 @@ with tab_prediction:
                             pred["masks"], gt_masks, class_names
                         )
                         st.caption(
-                            "Image présente dans data/COCO/labels/cavite — IoU par classe (vs vérité terrain) :"
+                            "IoU par classe (vs vérité terrain) :"
                         )
                         iou_cols = st.columns(len(class_names))
                         for iou_col, class_name in zip(iou_cols, class_names):
@@ -621,7 +611,7 @@ with tab_prediction:
                                         # Ne retirer la seule correction valide qu'une fois
                                         # son remplacement par une prédiction confirmé.
                                         models = (
-                                            model_utils.load_egg_models()
+                                            model_utils.load_egg_model()
                                             if image_type == "oeufs"
                                             else model_utils.load_models()
                                         )
@@ -639,6 +629,7 @@ with tab_prediction:
                                         OSError,
                                         ValueError,
                                         KeyError,
+                                        RuntimeError,
                                         data_utils.DataStoreError,
                                     ) as exc:
                                         logger.exception(

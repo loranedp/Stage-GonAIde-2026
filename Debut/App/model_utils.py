@@ -1,4 +1,4 @@
-"""Chargement des ensembles U-Net et inférence sur une image."""
+"""Chargement des modèles cavité et œufs et inférence sur une image."""
 
 import numpy as np
 import streamlit as st
@@ -38,18 +38,15 @@ def load_models() -> list:
 
 
 @st.cache_resource
-def load_egg_models() -> list:
-    """Charge les cinq modèles U-Net mono-classe dédiés aux œufs."""
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    models = []
-    for path in config.FOLD_EGG_MODEL_PATHS:
-        model = _build_model(num_classes=1)
-        state_dict = torch.load(path, map_location=device)
-        model.load_state_dict(state_dict, strict=True)
-        model.to(device)
-        model.eval()
-        models.append(model)
-    return models
+def load_egg_model():
+    """Charge le modèle YOLO instance entraîné sur l'ensemble des données œufs."""
+    from ultralytics import YOLO
+
+    if not config.EGG_YOLO_MODEL_PATH.is_file():
+        raise FileNotFoundError(
+            f"Checkpoint YOLO œufs introuvable : {config.EGG_YOLO_MODEL_PATH}"
+        )
+    return YOLO(str(config.EGG_YOLO_MODEL_PATH))
 
 
 def _preprocess_image(image: Image.Image, device: torch.device) -> torch.Tensor:
@@ -75,12 +72,11 @@ def _preprocess(image: Image.Image, id_image: str, device: torch.device) -> torc
 
 
 def predict(models: list, image: Image.Image, id_image: str) -> dict:
-    """Prédit les masques multi-classes (Cavite/Gonade/Intestin) d'une image.
+    """Prédit les masques Cavite/Gonade d'une image.
 
     Retourne un dict :
       - masks: dict {class_name: np.ndarray bool (H, W)} à la résolution d'origine
-      - confidence_gonad: float (probabilité moyenne de l'ensemble sur les pixels
-        prédits Gonade) ou None si aucun pixel Gonade n'est prédit.
+      - confidences: score moyen de l'ensemble sur les pixels prédits pour chaque classe.
     """
     device = next(models[0].parameters()).device
     original_size = image.size  # (W, H) de l'image complète uploadée
@@ -125,54 +121,52 @@ def predict(models: list, image: Image.Image, id_image: str) -> dict:
 
 
 def predict_eggs(
-    models: list,
+    model,
     image: Image.Image,
-    min_distance: int = config.EGG_MIN_DISTANCE,
-    min_area: int = config.EGG_MIN_AREA,
 ) -> dict:
-    """Prédit le masque mono-classe et les instances d'œufs d'une image."""
-    if not models:
-        raise ValueError("Aucun modèle œufs n'est chargé.")
-    device = next(models[0].parameters()).device
+    """Prédit les instances d'œufs avec YOLO et les replace dans l'image source."""
+    if model is None:
+        raise ValueError("Aucun modèle YOLO œufs n'est chargé.")
     original_size = image.size
-    input_tensor = _preprocess_image(image, device)
-
-    with torch.no_grad():
-        ensemble_probs = torch.zeros((1, *config.IMAGE_SIZE[::-1]), device=device)
-        for model in models:
-            ensemble_probs += torch.sigmoid(model(input_tensor))[0]
-        ensemble_probs /= len(models)
-
-    pred_tensor = (ensemble_probs > config.PRED_THRESHOLD).unsqueeze(0)
-    instances_small = (
-        split_eggs(pred_tensor, min_distance=min_distance, min_area=min_area)[0]
-        .cpu()
-        .numpy()
-        .astype(np.int32)
-    )
-    semantic_small = instances_small > 0
-
     x, y, w, h = config.CROP_PARAMS
-    semantic_resized = Image.fromarray(semantic_small.astype(np.uint8) * 255).resize(
-        (w, h), Image.Resampling.NEAREST
+    cropped = image.convert("RGB").crop((x, y, x + w, y + h))
+    device = "0" if torch.cuda.is_available() else "cpu"
+    results = model.predict(
+        source=np.asarray(cropped),
+        imgsz=config.IMAGE_SIZE[0],
+        conf=config.YOLO_CONFIDENCE,
+        retina_masks=True,
+        verbose=False,
+        device=device,
     )
-    full_semantic = Image.new("L", original_size, 0)
-    full_semantic.paste(semantic_resized, (x, y))
 
-    instances_resized = Image.fromarray(instances_small).resize(
-        (w, h), Image.Resampling.NEAREST
-    )
+    instances_crop = np.zeros((h, w), dtype=np.int32)
+    confidences = []
+    if results and results[0].masks is not None:
+        instance_masks = results[0].masks.data.detach().cpu().numpy() > 0.5
+        boxes = results[0].boxes
+        if boxes is not None:
+            confidences = boxes.conf.detach().cpu().numpy().astype(float).tolist()
+        for instance_id, instance_mask in enumerate(instance_masks, start=1):
+            if instance_mask.shape != instances_crop.shape:
+                instance_mask = np.asarray(
+                    Image.fromarray(instance_mask.astype(np.uint8)).resize(
+                        (w, h), Image.Resampling.NEAREST
+                    ),
+                    dtype=bool,
+                )
+            instances_crop[instance_mask] = instance_id
+    semantic_crop = instances_crop > 0
+
+    full_semantic = Image.new("L", original_size, 0)
+    full_semantic.paste(Image.fromarray(semantic_crop.astype(np.uint8) * 255), (x, y))
     full_instances = np.zeros((original_size[1], original_size[0]), dtype=np.int32)
-    instance_array = np.asarray(instances_resized, dtype=np.int32)
     paste_w = min(w, original_size[0] - x)
     paste_h = min(h, original_size[1] - y)
     if paste_w > 0 and paste_h > 0:
-        full_instances[y : y + paste_h, x : x + paste_w] = instance_array[:paste_h, :paste_w]
+        full_instances[y : y + paste_h, x : x + paste_w] = instances_crop[:paste_h, :paste_w]
 
-    foreground = semantic_small
-    confidence = (
-        float(ensemble_probs[0].cpu().numpy()[foreground].mean()) if foreground.any() else None
-    )
+    confidence = float(np.mean(confidences)) if confidences else None
     return {
         "masks": {"Oeuf": np.asarray(full_semantic) > 0},
         "instances": full_instances,

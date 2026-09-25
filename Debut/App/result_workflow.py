@@ -103,7 +103,7 @@ def predict_uploads(
                     if models_by_type[image_type] is None:
                         try:
                             models_by_type[image_type] = (
-                                model_utils.load_egg_models()
+                                model_utils.load_egg_model()
                                 if image_type == "oeufs"
                                 else model_utils.load_models()
                             )

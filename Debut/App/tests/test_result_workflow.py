@@ -23,7 +23,6 @@ class ResultWorkflowTests(unittest.TestCase):
         masks = {
             "Cavite": np.zeros((8, 10), dtype=bool),
             "Gonade": np.zeros((8, 10), dtype=bool),
-            "Intestin": np.zeros((8, 10), dtype=bool),
         }
         if active:
             masks["Cavite"][1:7, 1:9] = True
@@ -46,7 +45,7 @@ class ResultWorkflowTests(unittest.TestCase):
         }
         cavity_result = {
             "masks": self.cavity_masks(),
-            "confidences": {"Cavite": 0.9, "Gonade": 0.8, "Intestin": None},
+            "confidences": {"Cavite": 0.9, "Gonade": 0.8},
         }
 
         with (
@@ -63,7 +62,7 @@ class ResultWorkflowTests(unittest.TestCase):
             ) as load_cavity,
             mock.patch.object(
                 result_workflow.model_utils,
-                "load_egg_models",
+                "load_egg_model",
                 return_value=[object()],
             ) as load_eggs,
             mock.patch.object(

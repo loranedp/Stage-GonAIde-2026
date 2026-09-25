@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 import inspect
 import unittest
 from unittest.mock import patch
@@ -11,12 +12,9 @@ import config
 
 
 class EggSeparationParameterTests(unittest.TestCase):
-    def test_public_helpers_expose_the_new_defaults(self):
-        predict_parameters = inspect.signature(model_utils.predict_eggs).parameters
+    def test_split_helper_exposes_the_configured_defaults(self):
         split_parameters = inspect.signature(model_utils.split_egg_mask).parameters
 
-        self.assertEqual(predict_parameters["min_distance"].default, config.EGG_MIN_DISTANCE)
-        self.assertEqual(predict_parameters["min_area"].default, config.EGG_MIN_AREA)
         self.assertEqual(split_parameters["min_distance"].default, config.EGG_MIN_DISTANCE)
         self.assertEqual(split_parameters["min_area"].default, config.EGG_MIN_AREA)
 
@@ -31,26 +29,34 @@ class EggSeparationParameterTests(unittest.TestCase):
         _, kwargs = mocked_split.call_args
         self.assertEqual(kwargs, {"min_distance": 3, "min_area": 40})
 
-    def test_predict_eggs_forwards_custom_parameters(self):
-        model = torch.nn.Conv2d(3, 1, kernel_size=1)
+    def test_predict_eggs_preserves_yolo_instances_in_source_coordinates(self):
+        detection_mask = torch.zeros((1, 3, 4), dtype=torch.float32)
+        detection_mask[0, 1, 2] = 1
+        detection = SimpleNamespace(
+            masks=SimpleNamespace(data=detection_mask),
+            boxes=SimpleNamespace(conf=torch.tensor([0.9])),
+        )
+        model = SimpleNamespace(predict=lambda **_kwargs: [detection])
+        image = Image.new("RGB", (8, 6))
 
-        def empty_instances(tensor, **_kwargs):
-            return torch.zeros(
-                (tensor.shape[0], tensor.shape[2], tensor.shape[3]),
-                dtype=torch.int32,
-                device=tensor.device,
-            )
+        with patch.object(config, "CROP_PARAMS", [1, 1, 4, 3]):
+            result = model_utils.predict_eggs(model, image)
 
-        with patch("model_utils.split_eggs", side_effect=empty_instances) as mocked_split:
-            model_utils.predict_eggs(
-                [model],
-                Image.new("RGB", (640, 480)),
-                min_distance=4,
-                min_area=75,
-            )
+        self.assertEqual(result["instances"].shape, (6, 8))
+        self.assertEqual(result["instances"][2, 3], 1)
+        self.assertAlmostEqual(result["confidences"]["Oeuf"], 0.9)
+        self.assertEqual(int(result["masks"]["Oeuf"].sum()), 1)
 
-        _, kwargs = mocked_split.call_args
-        self.assertEqual(kwargs, {"min_distance": 4, "min_area": 75})
+    def test_predict_eggs_returns_empty_masks_when_yolo_finds_no_instance(self):
+        model = SimpleNamespace(
+            predict=lambda **_kwargs: [SimpleNamespace(masks=None, boxes=None)]
+        )
+        with patch.object(config, "CROP_PARAMS", [1, 1, 4, 3]):
+            result = model_utils.predict_eggs(model, Image.new("RGB", (8, 6)))
+
+        self.assertFalse(result["masks"]["Oeuf"].any())
+        self.assertFalse(result["instances"].any())
+        self.assertIsNone(result["confidences"]["Oeuf"])
 
 
 if __name__ == "__main__":

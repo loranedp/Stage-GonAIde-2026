@@ -12,7 +12,7 @@ import pycocotools.mask as mask_util
 from PIL import Image
 
 import config
-import dataset
+from utils.dataset_unet import decode_segmentation
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,9 @@ def _safe_filename(filename: str) -> str:
     return filename
 
 
-def _validate_store(data: object, path: Path, num_classes: int = config.NUM_CLASSES) -> dict:
+def _validate_store(
+    data: object, path: Path, num_classes: int = config.LEGACY_CAVITY_NUM_CLASSES
+) -> dict:
     if not isinstance(data, dict) or not isinstance(data.get("images"), list) or not isinstance(
         data.get("annotations"), list
     ):
@@ -75,7 +77,9 @@ def _validate_store(data: object, path: Path, num_classes: int = config.NUM_CLAS
     return data
 
 
-def load_added_annotations(path: Path | None = None, num_classes: int = config.NUM_CLASSES) -> dict:
+def load_added_annotations(
+    path: Path | None = None, num_classes: int = config.LEGACY_CAVITY_NUM_CLASSES
+) -> dict:
     """Charge et valide un magasin d'annotations géré par l'application."""
     path = Path(path or config.TRAIN_ADDED_ANN_PATH)
     _ensure_dirs()
@@ -112,7 +116,9 @@ def _atomic_write_bytes(path: Path, content: bytes) -> None:
 
 
 def _save_added_annotations(
-    data: dict, path: Path | None = None, num_classes: int = config.NUM_CLASSES
+    data: dict,
+    path: Path | None = None,
+    num_classes: int = config.LEGACY_CAVITY_NUM_CLASSES,
 ) -> None:
     path = Path(path or config.TRAIN_ADDED_ANN_PATH)
     _validate_store(data, path, num_classes=num_classes)
@@ -221,10 +227,15 @@ def _add_image(
 ) -> None:
     filename = _safe_filename(filename)
     class_names = class_names or config.CLASS_NAMES
+    store_num_classes = (
+        config.LEGACY_CAVITY_NUM_CLASSES
+        if class_names == config.CLASS_NAMES
+        else len(class_names)
+    )
     normalized_masks = _normalize_masks(masks, image.size, class_names)
     image_path = image_dir / filename
     try:
-        data = load_added_annotations(ann_path, num_classes=len(class_names))
+        data = load_added_annotations(ann_path, num_classes=store_num_classes)
         previous = next((item for item in data["images"] if item["file_name"] == filename), None)
         if previous is not None:
             previous_id = previous["id"]
@@ -245,11 +256,11 @@ def _add_image(
 
         # Préparer et valider les deux contenus avant le premier remplacement.
         encoded_image = _image_bytes(image, filename)
-        _validate_store(data, ann_path, num_classes=len(class_names))
+        _validate_store(data, ann_path, num_classes=store_num_classes)
         previous_image = image_path.read_bytes() if image_path.exists() else None
         _atomic_write_bytes(image_path, encoded_image)
         try:
-            _save_added_annotations(data, ann_path, num_classes=len(class_names))
+            _save_added_annotations(data, ann_path, num_classes=store_num_classes)
         except Exception:
             # Le JSON encore en place référence l'ancienne image. On la restaure
             # donc si le second remplacement échoue.
@@ -339,7 +350,12 @@ def load_corrected_image_and_masks(filename: str, image_type: str = "cavite") ->
         class_names = config.CLASS_NAMES
     else:
         raise ValueError(f"Type d'image inconnu : {image_type!r}.")
-    data = load_added_annotations(ann_path, num_classes=len(class_names))
+    store_num_classes = (
+        config.LEGACY_CAVITY_NUM_CLASSES
+        if class_names == config.CLASS_NAMES
+        else len(class_names)
+    )
+    data = load_added_annotations(ann_path, num_classes=store_num_classes)
     image_entry = next((item for item in data["images"] if item["file_name"] == filename), None)
     if image_entry is None:
         return None
@@ -362,7 +378,10 @@ def load_corrected_image_and_masks(filename: str, image_type: str = "cavite") ->
         for annotation in data["annotations"]:
             if annotation["image_id"] != image_entry["id"]:
                 continue
-            class_name = class_names[int(annotation["category_id"]) - 1]
+            class_idx = int(annotation["category_id"]) - 1
+            if class_idx >= len(class_names):
+                continue
+            class_name = class_names[class_idx]
             segmentation = annotation.get("segmentation")
             if (
                 not isinstance(segmentation, dict)
@@ -419,7 +438,7 @@ def load_coco_ground_truth_masks(
         class_idx = annotation["category_id"] - 1
         if not 0 <= class_idx < len(class_names):
             continue
-        decoded = dataset.decode_segmentation(annotation["segmentation"], height, width)
+        decoded = decode_segmentation(annotation["segmentation"], height, width)
         masks[class_names[class_idx]] |= np.asarray(decoded, dtype=bool)
     return masks
 
