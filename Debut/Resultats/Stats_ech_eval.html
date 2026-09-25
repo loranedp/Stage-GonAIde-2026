@@ -72,11 +72,11 @@ ul.task-list li input[type="checkbox"] {
 </header>
 
 
-<section id="rappels-échantillon-de-validation" class="level3">
-<h3 class="anchored" data-anchor-id="rappels-échantillon-de-validation">Rappels échantillon de validation</h3>
+<section id="rappels-échantillon-dévaluation" class="level3">
+<h3 class="anchored" data-anchor-id="rappels-échantillon-dévaluation">Rappels échantillon d’évaluation</h3>
 <section id="global" class="level4">
 <h4 class="anchored" data-anchor-id="global">Global</h4>
-<div id="3efcfba9" class="cell" data-execution_count="8">
+<div id="f2693717" class="cell" data-execution_count="8">
 <div class="cell-output cell-output-stdout">
 <pre><code>Nombre de poissons : 41
 Nombre d'échographies transversales : 145
@@ -89,7 +89,7 @@ Nombre d'échographies longitudinales : 58</code></pre>
 <div class="column" style="width:50%;">
 <section id="vrai-annotations" class="level4">
 <h4 class="anchored" data-anchor-id="vrai-annotations">Vrai annotations</h4>
-<div id="2cf4052e" class="cell" data-execution_count="9">
+<div id="99099b02" class="cell" data-execution_count="9">
 <div class="cell-output cell-output-stdout">
 <pre><code>Nombre d'échographies transversales non vides : 135
 Nombre d'échographies longitudinales non vides : 49
@@ -100,7 +100,7 @@ Nombre d'oeufs : 326</code></pre>
 </div><div class="column" style="width:50%;">
 <section id="prédictions" class="level4">
 <h4 class="anchored" data-anchor-id="prédictions">Prédictions</h4>
-<div id="355385ba" class="cell" data-execution_count="10">
+<div id="e4d4807e" class="cell" data-execution_count="10">
 <div class="cell-output cell-output-stdout">
 <pre><code>Nombre d'échographies transversales non vides : 144
 Nombre d'échographies longitudinales non vides : 54
@@ -112,7 +112,7 @@ Nombre d'oeufs : 320</code></pre>
 </div>
 <section id="taille-et-poids-des-poissons" class="level4">
 <h4 class="anchored" data-anchor-id="taille-et-poids-des-poissons">Taille et poids des poissons</h4>
-<div id="ca7a5a2e" class="cell" data-execution_count="11">
+<div id="8f226fd0" class="cell" data-execution_count="11">
 <div class="cell-output cell-output-stdout">
 <pre><code>Longueur moyenne : 209.5 mm
 Longueur médiane : 208.0 mm
@@ -126,8 +126,8 @@ Poids médian : 94.1 g
 </section>
 <section id="volumes-et-fécondité-par-poisson" class="level3">
 <h3 class="anchored" data-anchor-id="volumes-et-fécondité-par-poisson">Volumes et fécondité par poisson</h3>
-<div id="c7ef262c" class="cell" data-execution_count="12">
-<div class="cell-output cell-output-display" data-execution_count="226">
+<div id="b9bc3074" class="cell" data-execution_count="12">
+<div class="cell-output cell-output-display" data-execution_count="12">
 <div>
 
 
@@ -147,6 +147,8 @@ Poids médian : 94.1 g
 <th data-quarto-table-cell-role="th">age_poisson</th>
 <th data-quarto-table-cell-role="th">volume_median_oeufs_mm3_true</th>
 <th data-quarto-table-cell-role="th">volume_median_oeufs_mm3_pred</th>
+<th data-quarto-table-cell-role="th">volume_moyen_oeufs_mm3_true</th>
+<th data-quarto-table-cell-role="th">volume_moyen_oeufs_mm3_pred</th>
 <th data-quarto-table-cell-role="th">fecondite_pred</th>
 <th data-quarto-table-cell-role="th">fecondite_true</th>
 </tr>
@@ -166,6 +168,8 @@ Poids médian : 94.1 g
 <td>None</td>
 <td>7.578333</td>
 <td>5.882318</td>
+<td>6.209923</td>
+<td>5.349596</td>
 <td>475.661576</td>
 <td>333.917572</td>
 </tr>
@@ -183,6 +187,8 @@ Poids médian : 94.1 g
 <td>2+</td>
 <td>13.491831</td>
 <td>19.420461</td>
+<td>13.849627</td>
+<td>18.587901</td>
 <td>438.478539</td>
 <td>677.227451</td>
 </tr>
@@ -200,6 +206,8 @@ Poids médian : 94.1 g
 <td>2+</td>
 <td>18.163414</td>
 <td>19.329195</td>
+<td>15.809371</td>
+<td>19.730468</td>
 <td>585.181513</td>
 <td>657.727060</td>
 </tr>
@@ -217,6 +225,8 @@ Poids médian : 94.1 g
 <td>2+</td>
 <td>13.250699</td>
 <td>14.594024</td>
+<td>14.100028</td>
+<td>14.306707</td>
 <td>422.974495</td>
 <td>630.279324</td>
 </tr>
@@ -233,6 +243,8 @@ Poids médian : 94.1 g
 <td>147</td>
 <td>1+</td>
 <td>3.963647</td>
+<td>18.769816</td>
+<td>4.135366</td>
 <td>18.769816</td>
 <td>90.815852</td>
 <td>447.828070</td>
@@ -251,6 +263,8 @@ Poids médian : 94.1 g
 <td>1+</td>
 <td>4.629828</td>
 <td>9.308889</td>
+<td>4.620410</td>
+<td>10.676717</td>
 <td>188.355783</td>
 <td>350.548528</td>
 </tr>
@@ -268,6 +282,8 @@ Poids médian : 94.1 g
 <td>2+</td>
 <td>12.902081</td>
 <td>16.049745</td>
+<td>12.815333</td>
+<td>16.365868</td>
 <td>533.714062</td>
 <td>674.988295</td>
 </tr>
@@ -285,6 +301,8 @@ Poids médian : 94.1 g
 <td>1+</td>
 <td>6.465735</td>
 <td>17.647528</td>
+<td>6.555381</td>
+<td>14.458745</td>
 <td>179.876682</td>
 <td>471.317909</td>
 </tr>
@@ -302,6 +320,8 @@ Poids médian : 94.1 g
 <td>3+3</td>
 <td>16.324145</td>
 <td>18.038971</td>
+<td>16.548619</td>
+<td>19.006627</td>
 <td>585.332650</td>
 <td>644.843016</td>
 </tr>
@@ -319,6 +339,8 @@ Poids médian : 94.1 g
 <td>1+</td>
 <td>8.127562</td>
 <td>13.486587</td>
+<td>8.127562</td>
+<td>13.432456</td>
 <td>60.491230</td>
 <td>107.208903</td>
 </tr>
@@ -336,6 +358,8 @@ Poids médian : 94.1 g
 <td>1+</td>
 <td>14.243595</td>
 <td>23.121769</td>
+<td>14.587642</td>
+<td>20.942312</td>
 <td>158.283480</td>
 <td>269.572873</td>
 </tr>
@@ -353,6 +377,8 @@ Poids médian : 94.1 g
 <td>2+</td>
 <td>14.079636</td>
 <td>15.327719</td>
+<td>14.078797</td>
+<td>15.586449</td>
 <td>518.315422</td>
 <td>405.933157</td>
 </tr>
@@ -370,6 +396,8 @@ Poids médian : 94.1 g
 <td>1+</td>
 <td>NaN</td>
 <td>15.798120</td>
+<td>NaN</td>
+<td>17.407735</td>
 <td>182.376818</td>
 <td>NaN</td>
 </tr>
@@ -387,6 +415,8 @@ Poids médian : 94.1 g
 <td>2+</td>
 <td>13.480608</td>
 <td>19.680773</td>
+<td>14.093432</td>
+<td>19.008619</td>
 <td>550.063953</td>
 <td>808.156990</td>
 </tr>
@@ -404,6 +434,8 @@ Poids médian : 94.1 g
 <td>1+</td>
 <td>3.062197</td>
 <td>15.311954</td>
+<td>3.155961</td>
+<td>13.569034</td>
 <td>104.271056</td>
 <td>607.149825</td>
 </tr>
@@ -421,6 +453,8 @@ Poids médian : 94.1 g
 <td>1+</td>
 <td>6.936373</td>
 <td>4.165664</td>
+<td>6.936373</td>
+<td>3.992048</td>
 <td>289.158164</td>
 <td>163.620533</td>
 </tr>
@@ -440,6 +474,8 @@ Poids médian : 94.1 g
 <td>NaN</td>
 <td>NaN</td>
 <td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">17</th>
@@ -455,6 +491,8 @@ Poids médian : 94.1 g
 <td>4+34</td>
 <td>4.808585</td>
 <td>4.775990</td>
+<td>4.902420</td>
+<td>4.539964</td>
 <td>1629.464017</td>
 <td>921.697492</td>
 </tr>
@@ -472,6 +510,8 @@ Poids médian : 94.1 g
 <td>1+</td>
 <td>8.805562</td>
 <td>18.502416</td>
+<td>8.805562</td>
+<td>18.414563</td>
 <td>132.816087</td>
 <td>310.534356</td>
 </tr>
@@ -489,6 +529,8 @@ Poids médian : 94.1 g
 <td>1+</td>
 <td>NaN</td>
 <td>15.020320</td>
+<td>NaN</td>
+<td>14.512077</td>
 <td>53.178429</td>
 <td>NaN</td>
 </tr>
@@ -505,6 +547,8 @@ Poids médian : 94.1 g
 <td>201</td>
 <td>None</td>
 <td>5.345084</td>
+<td>19.514868</td>
+<td>5.009701</td>
 <td>19.514868</td>
 <td>206.534475</td>
 <td>753.556473</td>
@@ -523,6 +567,8 @@ Poids médian : 94.1 g
 <td>None</td>
 <td>13.915082</td>
 <td>16.332080</td>
+<td>14.363138</td>
+<td>15.068691</td>
 <td>708.057788</td>
 <td>835.682907</td>
 </tr>
@@ -539,6 +585,8 @@ Poids médian : 94.1 g
 <td>236</td>
 <td>2+</td>
 <td>9.642006</td>
+<td>21.783682</td>
+<td>10.404002</td>
 <td>21.783682</td>
 <td>423.157579</td>
 <td>855.903297</td>
@@ -557,6 +605,8 @@ Poids médian : 94.1 g
 <td>2+</td>
 <td>24.681117</td>
 <td>18.569112</td>
+<td>23.936330</td>
+<td>17.740361</td>
 <td>484.432768</td>
 <td>324.341221</td>
 </tr>
@@ -574,6 +624,8 @@ Poids médian : 94.1 g
 <td>3+3</td>
 <td>14.262559</td>
 <td>18.038740</td>
+<td>14.870066</td>
+<td>16.825920</td>
 <td>496.935529</td>
 <td>463.166281</td>
 </tr>
@@ -591,6 +643,8 @@ Poids médian : 94.1 g
 <td>1+</td>
 <td>NaN</td>
 <td>17.197023</td>
+<td>NaN</td>
+<td>16.134087</td>
 <td>113.179858</td>
 <td>NaN</td>
 </tr>
@@ -608,6 +662,8 @@ Poids médian : 94.1 g
 <td>1+</td>
 <td>4.447960</td>
 <td>16.690926</td>
+<td>4.613947</td>
+<td>16.031196</td>
 <td>318.416068</td>
 <td>1430.587993</td>
 </tr>
@@ -625,6 +681,8 @@ Poids médian : 94.1 g
 <td>2+</td>
 <td>13.405610</td>
 <td>14.730398</td>
+<td>13.164727</td>
+<td>17.526157</td>
 <td>664.995290</td>
 <td>233.193836</td>
 </tr>
@@ -642,6 +700,8 @@ Poids médian : 94.1 g
 <td>3+3</td>
 <td>20.440288</td>
 <td>21.472406</td>
+<td>20.149452</td>
+<td>22.972390</td>
 <td>415.870597</td>
 <td>468.499106</td>
 </tr>
@@ -659,6 +719,8 @@ Poids médian : 94.1 g
 <td>3+</td>
 <td>23.931485</td>
 <td>18.955382</td>
+<td>22.818129</td>
+<td>19.300333</td>
 <td>381.676133</td>
 <td>211.311955</td>
 </tr>
@@ -676,6 +738,8 @@ Poids médian : 94.1 g
 <td>1+</td>
 <td>7.602857</td>
 <td>18.889437</td>
+<td>8.104539</td>
+<td>18.934685</td>
 <td>175.520272</td>
 <td>481.262586</td>
 </tr>
@@ -695,6 +759,8 @@ Poids médian : 94.1 g
 <td>NaN</td>
 <td>NaN</td>
 <td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">32</th>
@@ -710,6 +776,8 @@ Poids médian : 94.1 g
 <td>None</td>
 <td>21.783879</td>
 <td>17.406076</td>
+<td>22.262058</td>
+<td>16.017502</td>
 <td>584.120840</td>
 <td>463.828329</td>
 </tr>
@@ -727,6 +795,8 @@ Poids médian : 94.1 g
 <td>None</td>
 <td>7.505258</td>
 <td>10.129421</td>
+<td>7.869375</td>
+<td>11.766342</td>
 <td>505.660175</td>
 <td>796.120691</td>
 </tr>
@@ -744,6 +814,8 @@ Poids médian : 94.1 g
 <td>None</td>
 <td>15.040883</td>
 <td>10.849190</td>
+<td>15.794700</td>
+<td>13.971334</td>
 <td>718.979447</td>
 <td>471.777111</td>
 </tr>
@@ -760,6 +832,8 @@ Poids médian : 94.1 g
 <td>295</td>
 <td>None</td>
 <td>14.074853</td>
+<td>19.274042</td>
+<td>15.527695</td>
 <td>19.274042</td>
 <td>964.710892</td>
 <td>1559.802516</td>
@@ -778,6 +852,8 @@ Poids médian : 94.1 g
 <td>2+</td>
 <td>17.611609</td>
 <td>18.856178</td>
+<td>16.303719</td>
+<td>19.751225</td>
 <td>683.168702</td>
 <td>788.115090</td>
 </tr>
@@ -795,6 +871,8 @@ Poids médian : 94.1 g
 <td>2+</td>
 <td>NaN</td>
 <td>14.286604</td>
+<td>NaN</td>
+<td>13.784737</td>
 <td>110.825410</td>
 <td>NaN</td>
 </tr>
@@ -812,6 +890,8 @@ Poids médian : 94.1 g
 <td>1+</td>
 <td>7.073498</td>
 <td>14.745995</td>
+<td>6.759487</td>
+<td>16.058643</td>
 <td>386.173563</td>
 <td>971.174944</td>
 </tr>
@@ -829,6 +909,8 @@ Poids médian : 94.1 g
 <td>None</td>
 <td>21.687655</td>
 <td>11.041880</td>
+<td>20.920401</td>
+<td>12.583155</td>
 <td>727.878742</td>
 <td>312.176160</td>
 </tr>
@@ -846,6 +928,8 @@ Poids médian : 94.1 g
 <td>2+2</td>
 <td>31.422877</td>
 <td>NaN</td>
+<td>32.055166</td>
+<td>NaN</td>
 <td>NaN</td>
 <td>192.086935</td>
 </tr>
@@ -858,18 +942,18 @@ Poids médian : 94.1 g
 </section>
 <section id="vérification-des-surfaces-des-gonades-et-de-la-cavité---annotations" class="level2">
 <h2 class="anchored" data-anchor-id="vérification-des-surfaces-des-gonades-et-de-la-cavité---annotations">Vérification des surfaces des gonades et de la cavité - Annotations</h2>
-<div id="b44f5257" class="cell" data-execution_count="13">
+<div id="8fe76617" class="cell" data-execution_count="13">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-14-output-1.png" width="942" height="703" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-14-output-1.png" width="1355" height="1015" class="figure-img"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-14-output-2.png" width="953" height="703" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-14-output-2.png" width="1355" height="1015" class="figure-img"></p>
 </figure>
 </div>
 </div>
@@ -877,18 +961,18 @@ Poids médian : 94.1 g
 </section>
 <section id="vérification-des-surfaces-des-gonades-et-de-la-cavité---prédictions" class="level2">
 <h2 class="anchored" data-anchor-id="vérification-des-surfaces-des-gonades-et-de-la-cavité---prédictions">Vérification des surfaces des gonades et de la cavité - Prédictions</h2>
-<div id="e55c9812" class="cell" data-execution_count="14">
+<div id="db1c67fd" class="cell" data-execution_count="14">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-15-output-1.png" width="942" height="703" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-15-output-1.png" width="1355" height="1015" class="figure-img"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-15-output-2.png" width="953" height="703" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-15-output-2.png" width="1355" height="1015" class="figure-img"></p>
 </figure>
 </div>
 </div>
@@ -896,7 +980,7 @@ Poids médian : 94.1 g
 </section>
 <section id="détection-des-anomalies-selon-laugmentation-de-la-surface" class="level2">
 <h2 class="anchored" data-anchor-id="détection-des-anomalies-selon-laugmentation-de-la-surface">Détection des anomalies selon l’augmentation de la surface</h2>
-<div id="9c1feb9d" class="cell" data-execution_count="15">
+<div id="430479f5" class="cell" data-execution_count="15">
 <div class="cell-output cell-output-stdout">
 <pre><code>pred - Poisson : 356302 - [0, 1, 0] - Problème sur l'écho à la position 1.0 (diminution surface gonade : 0.0%)
 Pred - Poisson : 356918 - [0, 1, 1] - Problème sur l'écho à la position 2.0 (diminution surface gonade : -76.0%)
@@ -915,7 +999,7 @@ pred - Poisson : 426711 - [0, 1, 0, 0] - Problème sur l'écho à la position 2.
 </section>
 <section id="relations-entre-surfaces-des-gonades-et-de-la-cavité---annotations" class="level2">
 <h2 class="anchored" data-anchor-id="relations-entre-surfaces-des-gonades-et-de-la-cavité---annotations">Relations entre surfaces des gonades et de la cavité - Annotations</h2>
-<div id="845b35d9" class="cell" data-execution_count="16">
+<div id="0597ed16" class="cell" data-execution_count="16">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -931,7 +1015,7 @@ Corrélation (pour position echo &gt;= 2) : 0.64</code></pre>
 </section>
 <section id="relations-entre-surfaces-des-gonades-et-de-la-cavité---prédictions" class="level2">
 <h2 class="anchored" data-anchor-id="relations-entre-surfaces-des-gonades-et-de-la-cavité---prédictions">Relations entre surfaces des gonades et de la cavité - Prédictions</h2>
-<div id="61b22b46" class="cell" data-execution_count="17">
+<div id="cfec3afc" class="cell" data-execution_count="17">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -947,7 +1031,7 @@ Corrélation (pour position echo &gt;= 2) : 0.75</code></pre>
 </section>
 <section id="distribution-du-volume-des-gonades" class="level2">
 <h2 class="anchored" data-anchor-id="distribution-du-volume-des-gonades">Distribution du volume des gonades</h2>
-<div id="f36c34d3" class="cell" data-execution_count="18">
+<div id="8bc3ecd6" class="cell" data-execution_count="18">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -959,7 +1043,7 @@ Corrélation (pour position echo &gt;= 2) : 0.75</code></pre>
 </section>
 <section id="différences-entre-les-surfaces-et-les-volumes-prédits-et-annotés" class="level2">
 <h2 class="anchored" data-anchor-id="différences-entre-les-surfaces-et-les-volumes-prédits-et-annotés">Différences entre les surfaces et les volumes prédits et annotés</h2>
-<div id="e8faa922" class="cell" data-execution_count="19">
+<div id="571f3a18" class="cell" data-execution_count="19">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -968,26 +1052,62 @@ Corrélation (pour position echo &gt;= 2) : 0.75</code></pre>
 </div>
 </div>
 </div>
-<section id="différence-entre-les-volumes-médians-des-œufs-prédits-et-annotés" class="level3">
-<h3 class="anchored" data-anchor-id="différence-entre-les-volumes-médians-des-œufs-prédits-et-annotés">Différence entre les volumes médians des œufs prédits et annotés</h3>
-<div id="752c9827" class="cell" data-execution_count="20">
+<section id="différence-entre-les-volumes-des-gonades-prédits-et-annotés" class="level3">
+<h3 class="anchored" data-anchor-id="différence-entre-les-volumes-des-gonades-prédits-et-annotés">Différence entre les volumes des gonades prédits et annotés</h3>
+<div id="067f08fc" class="cell" data-execution_count="20">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-21-output-1.png" width="1298" height="468" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-21-output-1.png" width="1566" height="468" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="relation-entre-les-volumes-prédits-et-annotés-des-gonades" class="level3">
+<h3 class="anchored" data-anchor-id="relation-entre-les-volumes-prédits-et-annotés-des-gonades">Relation entre les volumes prédits et annotés des gonades</h3>
+<div id="8de9b955" class="cell" data-execution_count="21">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_eval_files/figure-html/cell-22-output-1.png" width="527" height="360" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="différence-entre-les-volumes-médians-des-œufs-prédits-et-annotés" class="level3">
+<h3 class="anchored" data-anchor-id="différence-entre-les-volumes-médians-des-œufs-prédits-et-annotés">Différence entre les volumes médians des œufs prédits et annotés</h3>
+<div id="a3b57687" class="cell" data-execution_count="22">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_eval_files/figure-html/cell-23-output-1.png" width="1298" height="468" class="figure-img"></p>
 </figure>
 </div>
 </div>
 </div>
 </section>
 </section>
-<section id="relations-entre-le-volume-des-gonades-et-le-poids-des-poissons" class="level2">
-<h2 class="anchored" data-anchor-id="relations-entre-le-volume-des-gonades-et-le-poids-des-poissons">Relations entre le volume des gonades et le poids des poissons</h2>
-<div id="afe33b59" class="cell" data-execution_count="21">
+<section id="relation-entre-les-volumes-médians-prédits-et-annotés-des-œufs" class="level2">
+<h2 class="anchored" data-anchor-id="relation-entre-les-volumes-médians-prédits-et-annotés-des-œufs">Relation entre les volumes médians prédits et annotés des œufs</h2>
+<div id="15d37e24" class="cell" data-execution_count="23">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-22-output-1.png" width="951" height="374" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-24-output-1.png" width="514" height="360" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="relations-entre-le-volume-des-gonades-et-le-poids-des-poissons" class="level2">
+<h2 class="anchored" data-anchor-id="relations-entre-le-volume-des-gonades-et-le-poids-des-poissons">Relations entre le volume des gonades et le poids des poissons</h2>
+<div id="b7b06dd3" class="cell" data-execution_count="24">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_eval_files/figure-html/cell-25-output-1.png" width="951" height="374" class="figure-img"></p>
 </figure>
 </div>
 </div>
@@ -999,11 +1119,11 @@ Corrélation prédictions : 0.66</code></pre>
 </section>
 <section id="relations-entre-le-volume-des-cavités-et-le-poids-des-poissons" class="level2">
 <h2 class="anchored" data-anchor-id="relations-entre-le-volume-des-cavités-et-le-poids-des-poissons">Relations entre le volume des cavités et le poids des poissons</h2>
-<div id="5f8b7c95" class="cell" data-execution_count="22">
+<div id="06227c4f" class="cell" data-execution_count="25">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-23-output-1.png" width="951" height="374" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-26-output-1.png" width="951" height="374" class="figure-img"></p>
 </figure>
 </div>
 </div>
@@ -1015,11 +1135,11 @@ Corrélation prédictions : 0.66</code></pre>
 </section>
 <section id="distribution-du-volume-des-oeufs" class="level2">
 <h2 class="anchored" data-anchor-id="distribution-du-volume-des-oeufs">Distribution du volume des oeufs</h2>
-<div id="7fdc93fe" class="cell" data-execution_count="24">
+<div id="f214f397" class="cell" data-execution_count="27">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-25-output-1.png" width="1048" height="374" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-28-output-1.png" width="1048" height="374" class="figure-img"></p>
 </figure>
 </div>
 </div>
@@ -1027,11 +1147,11 @@ Corrélation prédictions : 0.66</code></pre>
 </section>
 <section id="volume-du-i-ème-plus-gros-œuf-par-poisson---annotations" class="level2">
 <h2 class="anchored" data-anchor-id="volume-du-i-ème-plus-gros-œuf-par-poisson---annotations">Volume du i-ème plus gros œuf par poisson - Annotations</h2>
-<div id="0ebf8bc5" class="cell" data-execution_count="25">
+<div id="a7d1a54c" class="cell" data-execution_count="28">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-26-output-1.png" width="1147" height="1179" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-29-output-1.png" width="1147" height="1179" class="figure-img"></p>
 </figure>
 </div>
 </div>
@@ -1039,11 +1159,11 @@ Corrélation prédictions : 0.66</code></pre>
 </section>
 <section id="distribution-du-nombre-dœufs-par-échographie" class="level2">
 <h2 class="anchored" data-anchor-id="distribution-du-nombre-dœufs-par-échographie">Distribution du nombre d’œufs par échographie</h2>
-<div id="98011c1f" class="cell" data-execution_count="26">
+<div id="d7cf0ebd" class="cell" data-execution_count="29">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-27-output-1.png" width="1047" height="374" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-30-output-1.png" width="1047" height="374" class="figure-img"></p>
 </figure>
 </div>
 </div>
@@ -1054,11 +1174,11 @@ Corrélation prédictions : 0.66</code></pre>
 </section>
 <section id="annotations" class="level2">
 <h2 class="anchored" data-anchor-id="annotations">Annotations</h2>
-<div id="3841e758" class="cell" data-execution_count="27">
+<div id="25c36a17" class="cell" data-execution_count="30">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-28-output-1.png" width="1317" height="557" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-31-output-1.png" width="1317" height="557" class="figure-img"></p>
 </figure>
 </div>
 </div>
@@ -1066,11 +1186,11 @@ Corrélation prédictions : 0.66</code></pre>
 </section>
 <section id="prédictions-1" class="level2">
 <h2 class="anchored" data-anchor-id="prédictions-1">Prédictions</h2>
-<div id="511ad20d" class="cell" data-execution_count="28">
+<div id="3f150cfe" class="cell" data-execution_count="31">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-29-output-1.png" width="1317" height="557" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-32-output-1.png" width="1317" height="557" class="figure-img"></p>
 </figure>
 </div>
 </div>
@@ -1078,20 +1198,20 @@ Corrélation prédictions : 0.66</code></pre>
 </section>
 <section id="comparaison-du-volume-des-œufs-par-poisson-annotations-vs-prédictions" class="level2">
 <h2 class="anchored" data-anchor-id="comparaison-du-volume-des-œufs-par-poisson-annotations-vs-prédictions">Comparaison du volume des œufs par poisson : annotations vs prédictions</h2>
-<div id="f57f56d2" class="cell" data-execution_count="29">
+<div id="c759f63a" class="cell" data-execution_count="32">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-30-output-1.png" width="1782" height="683" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-33-output-1.png" width="1782" height="683" class="figure-img"></p>
 </figure>
 </div>
 </div>
 </div>
-<div id="b7947c89" class="cell" data-execution_count="30">
+<div id="dc2f5b15" class="cell" data-execution_count="33">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-31-output-1.png" width="1163" height="779" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-34-output-1.png" width="1163" height="779" class="figure-img"></p>
 </figure>
 </div>
 </div>
@@ -1099,11 +1219,11 @@ Corrélation prédictions : 0.66</code></pre>
 </section>
 <section id="relation-entre-le-volume-médian-des-oeufs-et-des-gonades" class="level2">
 <h2 class="anchored" data-anchor-id="relation-entre-le-volume-médian-des-oeufs-et-des-gonades">Relation entre le volume médian des oeufs et des gonades</h2>
-<div id="55702549" class="cell" data-execution_count="31">
+<div id="a50321a5" class="cell" data-execution_count="34">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-32-output-1.png" width="1143" height="374" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-35-output-1.png" width="1143" height="374" class="figure-img"></p>
 </figure>
 </div>
 </div>
@@ -1115,17 +1235,17 @@ Corrélation prédictions : 0.32219175427721675</code></pre>
 </section>
 <section id="distribution-de-la-fécondité" class="level2">
 <h2 class="anchored" data-anchor-id="distribution-de-la-fécondité">Distribution de la fécondité</h2>
-<div id="cb6dd114" class="cell" data-execution_count="32">
+<div id="fd546abe" class="cell" data-execution_count="35">
 <div class="cell-output cell-output-stdout">
 <pre><code>Nombre de poissons avec une fécondité calculable : 35 sur 41 (Annotations)
 Nombre de poissons avec une fécondité calculable : 38 sur 41 (Predictions)</code></pre>
 </div>
 </div>
-<div id="e0c9cb6f" class="cell" data-execution_count="33">
+<div id="be825849" class="cell" data-execution_count="36">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-34-output-1.png" width="1048" height="374" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-37-output-1.png" width="1048" height="374" class="figure-img"></p>
 </figure>
 </div>
 </div>
@@ -1133,11 +1253,11 @@ Nombre de poissons avec une fécondité calculable : 38 sur 41 (Predictions)</co
 </section>
 <section id="relations-entre-la-fécondité-et-les-caractéristiques-des-poissons---annotations" class="level2">
 <h2 class="anchored" data-anchor-id="relations-entre-la-fécondité-et-les-caractéristiques-des-poissons---annotations">Relations entre la fécondité et les caractéristiques des poissons - Annotations</h2>
-<div id="ee902741" class="cell" data-execution_count="34">
+<div id="be7a4053" class="cell" data-execution_count="37">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-35-output-1.png" width="1048" height="374" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-38-output-1.png" width="1048" height="374" class="figure-img"></p>
 </figure>
 </div>
 </div>
@@ -1149,11 +1269,11 @@ Corrélation fécondité / poids : 0.44658508348298276</code></pre>
 </section>
 <section id="relations-entre-la-fécondité-et-les-caractéristiques-des-poissons---prédictions" class="level2">
 <h2 class="anchored" data-anchor-id="relations-entre-la-fécondité-et-les-caractéristiques-des-poissons---prédictions">Relations entre la fécondité et les caractéristiques des poissons - Prédictions</h2>
-<div id="2313fda7" class="cell" data-execution_count="35">
+<div id="d7a13aba" class="cell" data-execution_count="38">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Stats_ech_eval_files/figure-html/cell-36-output-1.png" width="1048" height="374" class="figure-img"></p>
+<p><img src="Stats_ech_eval_files/figure-html/cell-39-output-1.png" width="1048" height="374" class="figure-img"></p>
 </figure>
 </div>
 </div>
@@ -1162,6 +1282,18 @@ Corrélation fécondité / poids : 0.44658508348298276</code></pre>
 Corrélation fécondité / poids : 0.8842315664894623</code></pre>
 </div>
 </div>
+<section id="relation-entre-la-fécondité-prédite-et-annotée" class="level3">
+<h3 class="anchored" data-anchor-id="relation-entre-la-fécondité-prédite-et-annotée">Relation entre la fécondité prédite et annotée</h3>
+<div id="c3330fe6" class="cell" data-execution_count="39">
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Stats_ech_eval_files/figure-html/cell-40-output-1.png" width="531" height="360" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
 </section>
 
 </main>

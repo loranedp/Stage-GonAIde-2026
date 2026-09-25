@@ -24,7 +24,7 @@ from matplotlib.patches import Patch
 sys.path.append(str(Path.cwd().parent))
 
 from utils.calcul_volume_fct import calculate_volumes, calculate_eggs_volumes, calculate_eggs_areas
-from utils.stats_fct import distribution, nuage_points, linear_regression, plot_evolution_curves
+from utils.stats_fct import distribution, nuage_points, linear_regression, plot_evolution_curves, plot_differences_par_poisson
 ```
 
 
@@ -276,19 +276,21 @@ df_final
 ```
 
 
-## Vérification des surfaces des gonades et de la cavité - Annotations
+## ================ Volume des gonades ================
+
+### Vérification des surfaces des gonades et de la cavité - Annotations
 
 ```{python}
 plot_evolution_curves(df_other, var1 = "augmentation_surface_gonade_true", var2 = "augmentation_surface_cavite_true")
 ```
 
-## Vérification des surfaces des gonades et de la cavité - Prédictions
+### Vérification des surfaces des gonades et de la cavité - Prédictions
 
 ```{python}
 plot_evolution_curves(df_other, var1 = "augmentation_surface_gonade_pred", var2 = "augmentation_surface_cavite_pred")
 ```
 
-## Détection des anomalies selon l'augmentation de la surface
+### Détection des anomalies selon l'augmentation de la surface
 
 ```{python}
 for id in df_cavite['id poisson'].unique():
@@ -345,7 +347,34 @@ for id in df_cavite['id poisson'].unique():
             print(f"True - Poisson : {id} - {pb_list_true} -Problème sur l'écho à la position {rows.iloc[0]['position echo']} (diminution surface gonade : {rows.iloc[0]['augmentation_surface_gonade_true']}%)")
 ```
 
-## Relations entre surfaces des gonades et de la cavité - Annotations
+### Distribution du volume des gonades
+
+```{python}
+fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+
+distribution(
+    df_final.volume_gonade_true, 
+    titre = "Annotations", 
+    xlabel = "Volume des gonades (en cm³)", 
+    nombre_barres=15,
+    axe_x_fixe = (0, 14, 1),
+    ax = axes[0]
+    )
+
+distribution(
+    df_final.volume_gonade_pred, 
+    titre = "Prédictions", 
+    xlabel = "Volume des gonades (en cm³)",
+    axe_x_fixe = (0, 14, 1),
+    nombre_barres=15,
+    ax = axes[1]
+    )
+
+plt.tight_layout()
+plt.show()
+```
+
+### Relations entre surfaces des gonades et de la cavité - Annotations
 
 ```{python}
 fig, axes = plt.subplots(1, 2, figsize=(12, 5))
@@ -379,7 +408,7 @@ print(f"Corrélation : {df_cavite.surface_cavite_true.corr(df_cavite.surface_gon
 print(f"Corrélation (pour position echo >= 2) : {df_fin.surface_cavite_true.corr(df_fin.surface_gonade_true):.2f}")
 ```
 
-## Relations entre surfaces des gonades et de la cavité - Prédictions
+### Relations entre surfaces des gonades et de la cavité - Prédictions
 
 ```{python}
 fig, axes = plt.subplots(1, 2, figsize=(12, 5))
@@ -413,149 +442,18 @@ print(f"Corrélation : {df_cavite.surface_cavite_pred.corr(df_cavite.surface_gon
 print(f"Corrélation (pour position echo >= 2) : {df_fin.surface_cavite_pred.corr(df_fin.surface_gonade_pred):.2f}")
 ```
 
-## Distribution du volume des gonades
+
+### Diférence entre les volumes des gonades prédits et annotés
 
 ```{python}
-fig, axes = plt.subplots(1, 2, figsize=(10, 4))
-
-distribution(
-    df_final.volume_gonade_true, 
-    titre = "Annotations", 
-    xlabel = "Volume des gonades (en cm³)", 
-    nombre_barres=15,
-    axe_x_fixe = (0, 14, 1),
-    ax = axes[0]
-    )
-
-distribution(
-    df_final.volume_gonade_pred, 
-    titre = "Prédictions", 
-    xlabel = "Volume des gonades (en cm³)",
-    axe_x_fixe = (0, 14, 1),
-    nombre_barres=15,
-    ax = axes[1]
-    )
-
-plt.tight_layout()
-plt.show()
+df_diff_volumes_gonades, fig, ax = plot_differences_par_poisson(
+    df_final,
+    colonne_predite="volume_gonade_pred",
+    colonne_annote="volume_gonade_true",
+    ylabel="Volume prédit − volume annoté (mm³)"
+)
 ```
 
-## Différences entre les surfaces et les volumes prédits et annotés
-
-```{python}
-# Différence de surface des gonades pour chaque échographie
-df_diff_surfaces = df_cavite[
-    ["id poisson", "image_id", "position echo", "surface_gonade_pred", "surface_gonade_true"]
-].dropna(subset=["surface_gonade_pred", "surface_gonade_true"]).copy()
-df_diff_surfaces["difference_absolue"] = (
-    df_diff_surfaces["surface_gonade_pred"] - df_diff_surfaces["surface_gonade_true"]
-).abs()
-df_diff_surfaces["difference_relative"] = np.where(
-    df_diff_surfaces["surface_gonade_true"] != 0,
-    df_diff_surfaces["difference_absolue"] / df_diff_surfaces["surface_gonade_true"] * 100,
-    np.nan,
-)
-df_diff_surfaces = df_diff_surfaces.sort_values(["id poisson", "position echo"])
-
-# Différence de volume des gonades pour chaque poisson
-df_diff_volumes = df_final[
-    ["id poisson", "volume_gonade_pred", "volume_gonade_true"]
-].dropna(subset=["volume_gonade_pred", "volume_gonade_true"]).copy()
-df_diff_volumes["difference_absolue"] = (
-    df_diff_volumes["volume_gonade_pred"] - df_diff_volumes["volume_gonade_true"]
-).abs()
-df_diff_volumes["difference_relative"] = np.where(
-    df_diff_volumes["volume_gonade_true"] != 0,
-    df_diff_volumes["difference_absolue"] / df_diff_volumes["volume_gonade_true"] * 100,
-    np.nan,
-)
-df_diff_volumes = df_diff_volumes.sort_values("id poisson")
-
-fig, axes = plt.subplots(2, 2, figsize=(16, 10))
-
-x_surfaces = np.arange(len(df_diff_surfaces))
-labels_echographies = df_diff_surfaces["image_id"].astype(str)
-axes[0, 0].bar(x_surfaces, df_diff_surfaces["difference_absolue"], color="teal")
-axes[0, 0].set_title("Surface — différence absolue par échographie")
-axes[0, 0].set_xlabel("Échographies")
-axes[0, 0].set_ylabel("Écart (cm²)")
-axes[0, 0].set_xticks(x_surfaces)
-axes[0, 0].set_xticklabels(labels_echographies, rotation=90)
-
-axes[0, 1].bar(x_surfaces, df_diff_surfaces["difference_relative"], color="darkorange")
-axes[0, 1].set_title("Surface — différence relative par échographie")
-axes[0, 1].set_xlabel("Échographies")
-axes[0, 1].set_ylabel("Écart (%)")
-axes[0, 1].set_xticks(x_surfaces)
-axes[0, 1].set_xticklabels(labels_echographies, rotation=90)
-
-x_volumes = np.arange(len(df_diff_volumes))
-labels_poissons = df_diff_volumes["id poisson"].astype(str)
-axes[1, 0].bar(x_volumes, df_diff_volumes["difference_absolue"], color="teal")
-axes[1, 0].set_title("Volume — différence absolue par poisson")
-axes[1, 0].set_xlabel("Poissons")
-axes[1, 0].set_ylabel("Écart (cm³)")
-axes[1, 0].set_xticks(x_volumes)
-axes[1, 0].set_xticklabels(labels_poissons, rotation=90)
-
-axes[1, 1].bar(x_volumes, df_diff_volumes["difference_relative"], color="darkorange")
-axes[1, 1].set_title("Volume — différence relative par poisson")
-axes[1, 1].set_xlabel("Poissons")
-axes[1, 1].set_ylabel("Écart (%)")
-axes[1, 1].set_xticks(x_volumes)
-axes[1, 1].set_xticklabels(labels_poissons, rotation=90)
-
-plt.tight_layout()
-plt.show()
-```
-
-### Différence entre les volumes médians des œufs prédits et annotés
-
-```{python}
-df_diff_volumes_medians_oeufs = df_final[
-    ["id poisson", "volume_median_oeufs_mm3_pred", "volume_median_oeufs_mm3_true"]
-].dropna(subset=[
-    "volume_median_oeufs_mm3_pred", "volume_median_oeufs_mm3_true"
-]).copy()
-
-# Une différence négative correspond à une sous-estimation et une différence
-# positive à une surestimation du volume médian des œufs.
-df_diff_volumes_medians_oeufs["difference"] = (
-    df_diff_volumes_medians_oeufs["volume_median_oeufs_mm3_pred"]
-    - df_diff_volumes_medians_oeufs["volume_median_oeufs_mm3_true"]
-)
-df_diff_volumes_medians_oeufs = df_diff_volumes_medians_oeufs.sort_values("difference")
-
-fig, ax = plt.subplots(
-    figsize=(max(10, 0.4 * len(df_diff_volumes_medians_oeufs)), 5)
-)
-couleurs = np.where(
-    df_diff_volumes_medians_oeufs["difference"] < 0,
-    "#4C78A8",
-    "#E45756",
-)
-x = np.arange(len(df_diff_volumes_medians_oeufs))
-ax.bar(x, df_diff_volumes_medians_oeufs["difference"], color=couleurs)
-ax.axhline(0, color="black", linewidth=1)
-ax.set_xticks(x)
-ax.set_xticklabels(
-    df_diff_volumes_medians_oeufs["id poisson"].astype(str),
-    rotation=90,
-    fontsize=8,
-)
-ax.set(
-    title="",
-    xlabel="ID poisson",
-    ylabel="Volume prédit − volume annoté (mm³)",
-)
-ax.grid(axis="y", alpha=0.2)
-ax.legend(handles=[
-    Patch(facecolor="#4C78A8", label="Sous-estimation"),
-    Patch(facecolor="#E45756", label="Surestimation"),
-])
-plt.tight_layout()
-plt.show()
-```
 
 ## Relations entre le volume prédit et le volume annoté des gonades
 
@@ -564,7 +462,7 @@ plt.show()
 nuage_points(
     x=df_final.volume_gonade_true,
     y=df_final.volume_gonade_pred,
-    titre="Gonades",
+    titre="",
     xlabel="Volume annoté (en cm³)",
     ylabel="Volume prédit (en cm³)",
     couleur="teal",
@@ -710,6 +608,10 @@ resume_extremes_pred["proportion_extremes_superieurs"] = (
 )
 ```
 
+
+## ================ Volume des oeufs ================
+
+
 ## Distribution du volume des oeufs
 
 ```{python}
@@ -736,6 +638,32 @@ plt.tight_layout()
 plt.show()
 ```
 
+
+### Différence entre les volumes médians des œufs prédits et annotés
+
+```{python}
+df_diff_volumes_medians_oeufs, fig, ax = plot_differences_par_poisson(
+    df_final,
+    colonne_predite="volume_median_oeufs_mm3_pred",
+    colonne_annote="volume_median_oeufs_mm3_true",
+    ylabel="Volume prédit − volume annoté (mm³)"
+)
+```
+
+## Relations entre le volume médian prédit et le volume médian annoté des oeufs
+
+```{python}
+# Nuage de points pour visualiser la relation entre le volume prédit et le volume annoté des gonades
+nuage_points(
+    x=df_diff_volumes_medians_oeufs["volume_median_oeufs_mm3_true"],
+    y=df_diff_volumes_medians_oeufs["volume_median_oeufs_mm3_pred"],
+    titre="",
+    xlabel="Volume annoté (en cm³)",
+    ylabel="Volume prédit (en cm³)",
+    couleur="teal",
+    diagonale=True
+)
+```
 
 ## Volume du i-ème plus gros œuf par poisson - Annotations
 
@@ -1023,6 +951,9 @@ print(f"Corrélation annotations : {df_final.volume_median_oeufs_mm3_true.corr(d
 print(f"Corrélation prédictions : {df_final.volume_median_oeufs_mm3_pred.corr(df_final.volume_gonade_pred)}") # Corrélation
 ```
 
+
+## ================ Volume des gonades ================
+
 ## Distribution de la fécondité
 
 ```{python}
@@ -1125,4 +1056,20 @@ plt.show()
 
 print(f"Corrélation fécondité / longueur : {df_final_NA_pred.fecondite_pred.corr(df_final_NA_pred.long_poisson)}") # Corrélation
 print(f"Corrélation fécondité / poids : {df_final_NA_pred.fecondite_pred.corr(df_final_NA_pred.poids_poisson)}") # Corrélation
+```
+
+
+### Relation entre la fécondité prédite et annotée
+
+```{python}
+nuage_points(
+    x=df_final_NA_pred.fecondite_true, # long_poisson ou poids_poisson
+    y=df_final_NA_pred.fecondite_pred,
+    titre="", 
+    diagonale=True,
+    xlabel="Fécondité annotée", 
+    ylabel="Fecondité prédite",
+    couleur='teal'
+    )
+df_final_NA_pred
 ```
