@@ -190,7 +190,7 @@ l’exécution. Le dry-run n’écrit rien et ne lance aucun entraînement.
 
 
 NOUVELLE COMMANDE :
-/home/ldepiero/Stage-GonAIde-2026/Debut/OpenUS-multiclass/OpenUs_venv/bin/python \
+/home/ldepiero/Stage-GonAIde-2026/Projet/OpenUS-multiclass/OpenUs_venv/bin/python \
     run_cross_validation.py --resume
 The foreground class count and order are inferred from the COCO JSON. Switching
 `--coco_json` to `../../data/COCO/labels/cavite/annotations_2_classes.json`

@@ -1,4 +1,4 @@
-"""Validate Debut/data and write OpenUS split files without copying the dataset."""
+"""Validate Projet/data and write OpenUS split files without copying the dataset."""
 
 import argparse
 import json
@@ -6,10 +6,10 @@ from pathlib import Path
 import random
 
 
-def prepare(debut_root):
-    source = debut_root / 'data/COCO/images/cavite'
-    coco = json.loads((debut_root / 'data/COCO/labels/cavite/annotations.json').read_text())
-    test_fish = set(json.loads((debut_root / 'utils/common_test_fish.json').read_text()))
+def prepare(projet_root):
+    source = projet_root / 'data/COCO/images/cavite'
+    coco = json.loads((projet_root / 'data/COCO/labels/cavite/annotations.json').read_text())
+    test_fish = set(json.loads((projet_root / 'utils/common_test_fish.json').read_text()))
     categories = {c['id']: c['name'] for c in coco['categories']}
     if any(categories.get(cid) != name for cid, name in
            [(1, 'Cavite'), (2, 'Gonade'), (3, 'Intestin')]):
@@ -49,8 +49,8 @@ def prepare(debut_root):
     return source, coco, splits
 
 
-def synchronize(debut_root, destination, dry_run=False):
-    source, coco, splits = prepare(debut_root)
+def synchronize(projet_root, destination, dry_run=False):
+    source, coco, splits = prepare(projet_root)
     print(f"{len(coco['images'])} images: " + ', '.join(
         f'{key}={len(values)}' for key, values in splits.items()))
     if dry_run:
@@ -64,12 +64,12 @@ def synchronize(debut_root, destination, dry_run=False):
         temporary = destination / f'.{name}.tmp'
         temporary.write_text(json.dumps(payload, indent=2) + '\n')
         temporary.replace(destination / name)
-    print(f'Wrote split files to {destination}; images and annotations remain in Debut/data')
+    print(f'Wrote split files to {destination}; images and annotations remain in Projet/data')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--debut-root', type=Path, default=Path(__file__).resolve().parents[2])
+    parser.add_argument('--projet-root', type=Path, default=Path(__file__).resolve().parents[2])
     parser.add_argument('--dry-run', action='store_true', help='Validate inputs and report split sizes only')
     args = parser.parse_args()
-    synchronize(args.debut_root.resolve(), Path(__file__).resolve().parent / 'data', args.dry_run)
+    synchronize(args.projet_root.resolve(), Path(__file__).resolve().parent / 'data', args.dry_run)

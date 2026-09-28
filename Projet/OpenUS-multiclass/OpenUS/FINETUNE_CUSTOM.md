@@ -90,13 +90,13 @@ python sync_custom_data.py --dry-run  # validate sources without writing
 python sync_custom_data.py
 ```
 
-The command reads `Debut/data/COCO/images/cavite` and
-`Debut/data/COCO/labels/cavite/annotations.json` directly. It validates the sources and
+The command reads `Projet/data/COCO/images/cavite` and
+`Projet/data/COCO/labels/cavite/annotations.json` directly. It validates the sources and
 writes only the split files into local `data/`; no images or annotations are copied.
-Use `--debut-root /path/to/Debut` if the shared inputs are elsewhere.
+Use `--projet-root /path/to/Projet` if the shared inputs are elsewhere.
 
 Test images are exactly those belonging to the fish listed in
-`Debut/utils/common_test_fish.json` (third underscore-separated field of each image
+`Projet/utils/common_test_fish.json` (third underscore-separated field of each image
 name). The remaining fish IDs are sorted, shuffled with seed 42, and the first
 `round(20% * number_of_remaining_fish)` are reserved for validation. No fish is
 shared between splits. Current counts: **118 train / 27 val / 24 test**.
