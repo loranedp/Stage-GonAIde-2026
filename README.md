@@ -13,9 +13,9 @@ pip install -r requirements.txt
 
 ## Téléchargement des données et des poids
 Les données et les poids des modèles sont disponibles sur next cloud : https://nextcloud.inrae.fr/s/6o4xxWFft2fap59?dir=/Github
-- Données : mettre le dossier 'data' dans 'Debut/' pour récupérer les données.
-- App : mettre le dossier 'checkpoints' dans 'Debut/App/' pour pouvoir lancer les prédictions de l'interface.
-- UNet : mettre le dossier 'saves' dans 'Debut/UNet/' pour récupérer les poids de tous les modèles UNet.
+- Données : mettre le dossier 'data' dans 'Projet/' pour récupérer les données.
+- App : mettre le dossier 'checkpoints' dans 'Projet/App/' pour pouvoir lancer les prédictions de l'interface.
+- UNet : mettre le dossier 'saves' dans 'Projet/UNet/' pour récupérer les poids de tous les modèles UNet.
 
 ## Ajout de nouvelles données :
 - Telecharger depuis Roboflow les données au format "YOLO26" et "COCO segmentation"
@@ -23,12 +23,12 @@ Les données et les poids des modèles sont disponibles sur next cloud : https:/
 - Lancer le pretraitement des nouvelles données : utils/python3 pretraitement.py
 
 ## Lancement de l'application
-streamlit run Debut/App/app.py
+streamlit run Projet/App/app.py
 
 L'application est alors accessible à l'adresse http://localhost:8501.
 
 ## Résultats
-Les résultats du calcul des volumes et de la fécondité sont disponibles dans 'Debut/Résultats/volumes_poissons.csv'.
+Les résultats du calcul des volumes et de la fécondité pour les poissons prédits dans l'interface sont disponibles dans 'Projet/Résultats/volumes_poissons.csv'.
 
 ## OpenUS
 Pour relancer le modèle, suivre le .README présent dans le dossier.
