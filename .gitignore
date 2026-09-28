@@ -2,7 +2,7 @@
 mon_venv
 ultrasam_venv
 OpenUs_venv
-Debut/data
+Projet/data
 .vscode
 .codex
 .agents
@@ -12,25 +12,24 @@ __init__.py
 checkpoint
 checkpoints
 
-Debut/UNet/__pycache__
-Debut/UNet/saves
-Debut/UNet/*.pth
+Projet/UNet/__pycache__
+Projet/UNet/saves
+Projet/UNet/*.pth
 R50+ViT-B_16.npz
 
-Debut/App/__pycache__
+Projet/App/__pycache__
 
-Debut/YOLO26/*.pt
-Debut/YOLO26/*.yaml
-Debut/YOLO26/folds
-Debut/YOLO26/runs
+Projet/YOLO26/*.pt
+Projet/YOLO26/*.yaml
+Projet/YOLO26/folds
+Projet/YOLO26/runs
 
-Debut/utils/__pycache__
+Projet/utils/__pycache__
 
-Debut/OpenUS
-Debut/Ex1
-Debut/SAM
-Debut/UltraSam
+Projet/OpenUS
+Projet/Ex1
+Projet/SAM
+Projet/UltraSam
 
 # OpenUS-multiclass
-CLAUDE.md
 output/

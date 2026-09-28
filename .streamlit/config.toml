@@ -1,0 +1,4 @@
+[server]
+# Port fixe pour accéder à l'application via http://localhost:8501.
+port = 8501
+
