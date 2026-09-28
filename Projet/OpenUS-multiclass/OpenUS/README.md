@@ -1,203 +1,115 @@
-# OpenUS
-OpenUS: A Fully Open-Source Foundation Model for Ultrasound Image Analysis via Self-Adaptive Masked Contrastive Learning
+# OpenUS : segmentation des échographies
 
-Pre-train a general-purpose ultrasound representation with our recipe, then fine‑tune or evaluate on classification, segmentation, landmark localization, LVEF regression, image enhancement, and fetal cardiac detection tasks.
+Ce dossier adapte [OpenUS](https://www.arxiv.org/abs/2511.11510) à la segmentation multi-label du jeu de données COCO de `Projet/data`. Le parcours principal entraîne et évalue **Cavite** et **Gonade** par validation croisée à cinq folds. Une variante à trois classes ajoute **Intestin**.
 
----
+Les commandes ci-dessous partent de la racine du dépôt `Stage-GonAIde-2026`.
 
-## Overview
-
-This repository contains the code for our paper:  
- 
-[[Paper on arXiv](https://www.arxiv.org/abs/2511.11510)]
-
-![OpenUS Architecture](figs/Fig_1_1.png)
-
-- **Foundation pre-training** for ultrasound images using self‑adaptive masked contrastive learning.
-- **Plug‑and‑play backbones** (e.g., `vmamba_small`) with optional pretrained V‑Mamba weights.
-- **Ready‑to‑use evaluation** for **classification** (e.g., *Fetal Planes*, *BUSI*), **segmentation** (e.g., *TN3K*, *BUSBRA*), and four additional downstream tasks from the US-DINO pipeline.
-
-
-## Installation
-
-**Requirements**
-
-- Python **3.10**
-- PyTorch **2.2** with CUDA 12.x (recommended)
-- Linux or WSL2 (Windows)
-- Optional: a Weights & Biases account for logging
+## 1. Créer `OpenUs_venv`
 
 ```bash
-conda create -n openus python=3.10 -y
-conda activate openus
-
-pip install torch==2.2 torchvision torchaudio triton pytest chardet yacs termcolor fvcore seaborn packaging ninja einops numpy==1.24.4 timm==0.4.12
-
-# Optional V‑Mamba dependency if you plan to use vmamba_small
-pip install https://github.com/state-spaces/mamba/releases/download/v2.2.4/mamba_ssm-2.2.4+cu12torch2.2cxx11abiTRUE-cp310-cp310-linux_x86_64.whl
-
-# Extra downstream-task utilities
-pip install pyiqa clean-fid pandas openpyxl scikit-image
+cd Projet/OpenUS-multiclass
+python3.10 -m venv OpenUs_venv
+source OpenUs_venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cu121
+python -m pip install triton==2.2.0 pytest chardet yacs termcolor fvcore seaborn packaging ninja einops numpy==1.24.4 timm==0.4.12 wandb pyiqa clean-fid pandas openpyxl scikit-image
 ```
 
----
-
-## Dataset Preparation
-
-This copy contains the CUSTOM segmentation training and evaluation pipeline.
-
-### Evaluation datasets
-
-| Task | Dataset | Example Arg(s) |
-|---|---|---|
-| Segmentation | `TN3K` | `--dataset_name TN3K --data_root <ROOT> --data_root2 <ALT_ROOT> --json_file <META.json>` |
-| Segmentation | `BUSBRA` | `--dataset_name BUSBRA --data_root <ROOT> --json_file <META.json>` |
-
-> **Tip**: Keep a consistent directory structure and use absolute paths for reproducibility.
-
----
-
-## Downstream Tasks
-
-### 1) Segmentation
-
-Supported example datasets: **`TN3K`** and **`BUSBRA`**.
+Le noyau CUDA `selective_scan` accélère VMamba. Sa compilation demande `nvcc`, un compilateur C++ et les en-têtes Python 3.10 ; installez-le dans le même venv si ces outils sont disponibles :
 
 ```bash
-python eval_segmentation.py   
-  --arch vmamba_small   
-  --dataset_name TN3K                 # or 'BUSBRA'
-  --data_root <DATA_ROOT>   
-  --data_root2 <OPTIONAL_SECOND_ROOT>   
-  --json_file <METADATA_JSON>   
-  --pretrained_vmamba True   
-  --pretrained_weights <CKPT_PATH>   
-  --output_dir <OUTPUT_DIR>   
-  --log_name <RUN_NAME>   
-  --lr 0.001
+nvcc --version
+python -m pip install --no-build-isolation ./OpenUS/vmamba_models/selective_scan
+python -c "import selective_scan_cuda_core; print('selective_scan OK')"
 ```
 
-## Fine-tune in your custom dataset
+Sans ce noyau, le repli PyTorch fonctionne mais l'entraînement est beaucoup plus lent. Le poids OpenUS `OpenUS/checkpoint/openus_cpt0150.pth` est requis. Le poids VMamba optionnel `OpenUS/pretrained/vmamba/vssm_small_0229_ckpt_epoch_222.pth` peut être absent : le code affiche alors un avertissement et charge le poids OpenUS.
 
-### 1) Segmentation
+Pour les sessions suivantes :
 
 ```bash
-python eval_segmentation.py   
-  --arch vmamba_small   
-  --dataset_name <Custom Dataset>                  
-  --data_root <DATA_ROOT>   
-  --data_root2 <OPTIONAL_SECOND_ROOT>   
-  --json_file <METADATA_JSON>   
-  --pretrained_vmamba True   
-  --pretrained_weights <Pre-trained_OpenUS_CKPT_PATH>   
-  --output_dir <OUTPUT_DIR>   
-  --log_name <RUN_NAME>   
-  --lr <.>
+cd Projet/OpenUS-multiclass
+source OpenUs_venv/bin/activate
+cd OpenUS
 ```
 
-Mon dataset : 
+## 2. Préparer les données
 
- python3 eval_segmentation.py \
-    --arch vmamba_small --dataset_name CUSTOM --multilabel True \
-    --coco_json ../../data/COCO/labels/cavite/annotations.json \
-    --images_root ../../data/COCO/images/cavite --split_file data/splits.json \
-    --pretrained_vmamba True \
-    --pretrained_weights checkpoint/openus_cpt0150.pth \
-    --checkpoint_key teacher \
-    --epochs 100 --lr 0.001 \
-    --batch_size_per_gpu 4 --num_workers 4 \
-    --output_dir output/custom_seg_new --log_name custom_seg
-
-python3 test_segmentation.py \
-      --arch vmamba_small \
-      --dataset_name CUSTOM \
-      --multilabel True \
-      --coco_json ../../data/COCO/labels/cavite/annotations.json \
-      --images_root ../../data/COCO/images/cavite \
-      --split_file data/splits.json \
-      --pretrained_vmamba True \
-      --pretrained_weights checkpoint/openus_cpt0150.pth \
-      --checkpoint_key teacher \
-      --output_dir output/custom_seg_new \
-      --cpk_name best \
-      --batch_size_per_gpu 4 \
-      --num_workers 4 \
-      --save_predictions True \
-      --save_masks True \
-      --save_overlays True
----
-
-### Cross-validation CUSTOM en 5 folds
-
-Depuis `OpenUS`, avec l’environnement Python OpenUS activé :
+Depuis `Projet/OpenUS-multiclass`, entrer dans `OpenUS`, vérifier les entrées, puis créer les fichiers de splits :
 
 ```bash
-python3 run_cross_validation.py --dry-run
-python3 run_cross_validation.py
-# Après une interruption :
-python3 run_cross_validation.py --resume
-
-# Recompute native-resolution metrics from existing checkpoints without retraining
-python3 run_cross_validation.py --recompute-metrics
+cd OpenUS
+python sync_custom_data.py --dry-run
+python sync_custom_data.py
 ```
 
-Le lanceur réunit train + validation et répartit les poissons en cinq groupes
-(graine 42). Toutes les images d’un poisson restent ensemble. Le test source
-est conservé identique et indépendant. Chaque fold entraîne un nouveau décodeur
-avec le backbone gelé, sélectionne le meilleur Dice de validation, exporte les
-prédictions de validation out-of-fold, puis évalue le test indépendant.
+Le script lit les images et `annotations.json` dans `Projet/data/COCO`, ainsi que les poissons de test dans `Projet/utils/common_test_fish.json`. Il écrit `data/splits.json` et `data/splits_smoke.json` sans recopier les images. Le test est fixé par poisson et reste indépendant des cinq folds. Le fichier `Projet/utils/correspondance_echo_final.xlsx` est aussi nécessaire pour les mesures de surface en cm².
 
-Les valeurs par défaut reprennent la commande CUSTOM ci-dessus : 100 époques,
-lr 0.001, batch 4, 4 workers, images 512, teacher, initialisation VMamba activée.
-Les scripts enfants utilisent le même interpréteur Python que le lanceur.
-Les chemins relatifs sont résolus depuis `OpenUS`.
+Si les données partagées se trouvent dans un autre répertoire `Projet`, passer son chemin à `sync_custom_data.py --projet-root /chemin/vers/Projet`. Pour la validation croisée, indiquer ensuite les chemins correspondants avec `--coco_json`, `--images_root` et `--metadata_file`.
 
-Options : `--epochs`, `--lr`, `--batch_size_per_gpu`, `--num_workers`,
-`--img_size`, `--val_freq`, `--seed`, `--checkpoint_key`, `--pretrained_weights`,
-`--split_file`, `--coco_json`, `--images_root`, `--output_dir`. Les options
-`--no-save_predictions`, `--no-save_masks`, `--no-save_overlays` désactivent les
-exports de test correspondants ; les TXT out-of-fold restent obligatoires.
-`--no-pretrained_vmamba` désactive l’initialisation VMamba ; par défaut son poids
-est attendu dans `pretrained/vmamba/vssm_small_0229_ckpt_epoch_222.pth`.
+## 3. Lancer la validation croisée à deux classes
 
-Sorties dans `output/custom_seg_cv5` :
+Toujours depuis `Projet/OpenUS-multiclass/OpenUS`, avec `OpenUs_venv` activé :
 
-- `splits/` : cinq JSON train/val/test et manifeste avec empreintes des données.
-- `fold_N/attempt_M/` : checkpoints, métriques et journaux d’entraînement/test.
-- `fold_N/attempt_M/eval/predicted_masks_teacher/pred_<image>.txt` : prédictions
-  out-of-fold, un fichier par image, vide si aucun polygone n’est prédit. Format
-  existant : classe 0=Cavite, 1=Gonade, 2=Intestin, puis coordonnées normalisées
-  des contours externes à la taille originale. Ce format ne représente pas les
-  trous internes. Les folds couvrent une fois toutes les images train + val.
-- `summary.json` et `summary.csv` : résultats des cinq folds ; le JSON contient
-  également moyennes non pondérées et écarts-types d’échantillon (ddof=1),
-  avec validation et test séparés et ordre des classes explicite.
+```bash
+python run_cross_validation.py \
+  --coco_json ../../data/COCO/labels/cavite/annotations_2_classes.json \
+  --output_dir output/custom_seg_cv5_2classes_v2 --dry-run
 
-La validation et le test calculent les scores par image à la résolution native.
-Les prédictions out-of-fold utilisent des poids qui n’ont
-pas été entraînés sur ces images, mais ces images participent au choix de
-l’époque par validation. Le test indépendant reste la mesure finale réservée.
-Les scores du test ne servent pas à choisir le fold ; aucun ensemble de modèles
-ni réentraînement final n’est effectué.
+python run_cross_validation.py \
+  --coco_json ../../data/COCO/labels/cavite/annotations_2_classes.json \
+  --output_dir output/custom_seg_cv5_2classes_v2
+```
 
-Le lanceur refuse un dossier existant sans `--resume`. La reprise vérifie les
-paramètres et empreintes des données/checkpoint, ignore les folds terminés et
-reprend l’export de validation ou le test si l’entraînement était terminé. Un
-entraînement interrompu recommence dans une nouvelle tentative ; ses anciens
-fichiers sont conservés. Une commande échouée ou un résultat manquant arrête
-l’exécution. Le dry-run n’écrit rien et ne lance aucun entraînement.
+`--dry-run` contrôle les entrées et affiche les commandes des cinq folds sans écrire de résultats ni entraîner de modèle. Le lancement normal exige un dossier de sortie encore inexistant. Si `output/custom_seg_cv5_2classes_v2` existe déjà, choisir un nouveau nom ou reprendre la même expérience :
 
+```bash
+python run_cross_validation.py \
+  --coco_json ../../data/COCO/labels/cavite/annotations_2_classes.json \
+  --output_dir output/custom_seg_cv5_2classes_v2 --resume
+```
 
+Après une modification du calcul des métriques, recalculer validation et test à partir des checkpoints existants, sans réentraînement :
 
-NOUVELLE COMMANDE :
-/home/ldepiero/Stage-GonAIde-2026/Projet/OpenUS-multiclass/OpenUs_venv/bin/python \
-    run_cross_validation.py --resume
-The foreground class count and order are inferred from the COCO JSON. Switching
-`--coco_json` to `../../data/COCO/labels/cavite/annotations_2_classes.json`
-therefore creates a two-channel Cavite/Gonade run; use a new `--output_dir` because
-two- and three-class decoder checkpoints are not interchangeable.
+```bash
+python run_cross_validation.py \
+  --coco_json ../../data/COCO/labels/cavite/annotations_2_classes.json \
+  --output_dir output/custom_seg_cv5_2classes_v2 --recompute-metrics
+```
 
-Cross-validation also writes `oof_validation_metrics.csv` and an UNet-compatible
-`results_OpenUS_Nclasses.pkl`. Metrics are evaluated on masks restored to the
-original image resolution. Surface differences are in cm²; a missing scale is
-reported and stored as an unavailable value without discarding the other metrics.
+Le lanceur partage les poissons du train et de la validation entre cinq folds (graine 42). Chaque fold entraîne un décodeur neuf sur un backbone gelé, choisit son checkpoint par Dice de validation, exporte les prédictions de validation hors fold, puis évalue le test indépendant. Le test n'intervient pas dans le choix du checkpoint. Les poids ne sont pas entraînés sur les images de leur fold de validation, mais celles-ci servent à choisir l'époque.
+
+Par défaut : 100 époques, taux d'apprentissage `0.001`, batch de 4 images, 4 workers, images de 512 × 512 et clé de checkpoint `teacher`. Options utiles : `--epochs`, `--lr`, `--batch_size_per_gpu`, `--num_workers`, `--img_size`, `--val_freq`, `--seed`, `--pretrained_weights`, `--checkpoint_key`, `--split_file` et `--metadata_file`. Les chemins relatifs sont résolus depuis `OpenUS`. Le lanceur emploie le même interpréteur Python pour les scripts d'entraînement et de test. Les options `--no-save_predictions`, `--no-save_masks` et `--no-save_overlays` désactivent les exports de test correspondants ; les TXT hors fold restent produits.
+
+## 4. Lire les résultats
+
+Dans `output/custom_seg_cv5_2classes_v2` :
+
+| Chemin | Contenu |
+| --- | --- |
+| `splits/` | Cinq splits et leur manifeste avec paramètres et empreintes des entrées. |
+| `fold_N/attempt_M/` | Checkpoint retenu, métriques, journaux et prédictions du fold. |
+| `fold_N/attempt_M/eval/predicted_masks_teacher/` | Un TXT de prédiction hors fold par image de validation. |
+| `summary.json`, `summary.csv` | Métriques de validation et de test par fold ; le JSON contient leur moyenne non pondérée et l'écart-type d'échantillon. |
+| `oof_validation_metrics.csv` | Métriques par image de validation hors fold. |
+| `results_OpenUS_2classes.pkl` | Résultats par fold dans un format compatible avec l'analyse UNet. |
+
+Les scores sont calculés sur les masques remis à la résolution originale. Les différences de surface sont en cm² ; si une échelle manque, la valeur correspondante est indisponible, sans supprimer les autres métriques. `summary.json` indique explicitement l'ordre des classes. Les TXT hors fold codent les contours externes par classe avec des coordonnées normalisées ; ils ne représentent pas les trous internes.
+
+`--resume` vérifie le manifeste, ignore les folds terminés et reprend l'évaluation si l'entraînement est achevé. Un entraînement interrompu recommence dans une nouvelle tentative `attempt_M` ; les anciens fichiers restent dans leur dossier. Une erreur dans un fold arrête le lanceur.
+
+## Variante à trois classes
+
+Pour Cavite, Gonade et Intestin, employer `annotations.json` et **un autre dossier de sortie** :
+
+```bash
+python run_cross_validation.py \
+  --coco_json ../../data/COCO/labels/cavite/annotations.json \
+  --output_dir output/custom_seg_cv5_3classes --dry-run
+
+python run_cross_validation.py \
+  --coco_json ../../data/COCO/labels/cavite/annotations.json \
+  --output_dir output/custom_seg_cv5_3classes
+```
+
+Le nombre de canaux du décodeur est déduit des catégories COCO : les checkpoints à deux et trois classes ne sont pas interchangeables. Le fichier d'analyse produit pour cette variante s'appelle `results_OpenUS_3classes.pkl`.
