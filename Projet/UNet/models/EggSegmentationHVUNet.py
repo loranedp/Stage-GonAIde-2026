@@ -1,13 +1,9 @@
 """U-Net pour la segmentation et la séparation d'œufs rapprochés.
 
-Le modèle suit le principe décrit dans l'article fourni : il prédit un masque
+Le modèle suit le principe décrit dans l'article : il prédit un masque
 binaire des œufs ainsi que deux cartes de déplacement vers le centre de
 chaque instance (horizontalement et verticalement). Les cartes H/V peuvent
-ensuite être utilisées par :func:`postprocess_egg_instances` pour séparer les
-œufs qui se touchent.
-
-La tête est volontairement limitée à la segmentation : aucune classification
-du stade de maturation n'est réalisée.
+ensuite être utilisées pour séparer les œufs qui se touchent.
 """
 
 from __future__ import annotations
@@ -67,10 +63,6 @@ class EggSegmentationHVUNet(nn.Module):
 
 def _as_instance_mask(instance: Any, height: int, width: int) -> np.ndarray:
     """Convertit une instance en masque booléen.
-
-    ``instance`` peut être un masque 2D, un polygone ``[(x, y), ...]`` ou une
-    liste plate COCO ``[x1, y1, x2, y2, ...]``. Les polygones sont rasterisés
-    avec OpenCV uniquement au moment de la préparation des cibles.
     """
     import cv2
 

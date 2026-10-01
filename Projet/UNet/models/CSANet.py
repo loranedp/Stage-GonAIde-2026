@@ -1,12 +1,7 @@
 """CSA-Net pour la segmentation de sequences de coupes 2.5D.
 
 L'article original predit uniquement la coupe centrale d'un triplet
-``(precedente, centrale, suivante)``. Cette adaptation applique le meme calcul a
-chaque coupe d'une sequence et conserve donc l'interface historique du projet :
-
-    (B, T, C, H, W) -> (B, T, num_classes, H, W)
-
-Aux extremites, la coupe centrale remplace le voisin manquant.
+``(precedente, centrale, suivante)``. La différence ici est que aux extremites, la coupe centrale remplace le voisin manquant.
 """
 
 import copy
@@ -21,7 +16,6 @@ import torch.nn.functional as F
 
 
 def _np_to_tensor(array, convolution=False):
-    """Convertit les poids JAX (HWIO) au format PyTorch (OIHW)."""
     if convolution:
         array = array.transpose(3, 2, 0, 1)
     return torch.from_numpy(array)
@@ -109,8 +103,6 @@ class PreActBottleneck(nn.Module):
 
 
 class ResNetV2(nn.Module):
-    """Partie ResNet-50 hybride officielle, jusqu'au bottleneck H/16."""
-
     def __init__(self, in_channels=3):
         super().__init__()
         self.root = nn.Sequential(
@@ -278,8 +270,6 @@ class DecoderBlock(nn.Module):
 
 
 class CSANet(nn.Module):
-    """CSA-Net fidele a l'article, etendue pour predire les ``T`` coupes."""
-
     def __init__(
         self,
         num_classes,
