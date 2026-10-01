@@ -10,14 +10,15 @@ DATA_DIR = ROOT_DIR / "data"
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+# --- Checkpoints de l'application ---
+CHECKPOINTS_DIR = APP_DIR / "checkpoints"
+
 # --- Modèle cavité : ensemble U-Net 2 classes (Cavité, Gonade) ---
 FOLD_MODEL_PATHS = [
-    ROOT_DIR / "UNet" / "saves" / f"unet_finetuned_fold_{fold}_UNet_2classes.pth"
+    CHECKPOINTS_DIR / f"unet_finetuned_fold_{fold}_UNet_2classes.pth"
     for fold in range(1, 6)
 ]
-EGG_YOLO_MODEL_PATH = (
-    ROOT_DIR / "YOLO26" / "runs" / "segment" / "train_oeufs_instance_all" / "weights" / "best.pt"
-)
+EGG_YOLO_MODEL_PATH = CHECKPOINTS_DIR / "best.pt"
 YOLO_CONFIDENCE = 0.25
 IMAGE_SIZE = (512, 512)  # (W, H) taille d'entrée du modèle, après crop
 CROP_PARAMS = [85, 33, 510, 380]  # x, y, w, h appliqué avant resize (RoboflowUNetDataset)
