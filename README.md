@@ -35,7 +35,7 @@ python3 Projet/utils/pretraitement.py
 ## Lancer l'application
 streamlit run Projet/App/app.py
 
-L'application est alors accessible à l'adresse http://localhost:8501.
+L'application est alors accessible à l'adresse http://localhost:8501
 
 Note : si les données entrées sont après 2025, il faut également re-télécharger le fichier csv mis à jours
 
@@ -44,5 +44,6 @@ Les résultats du calcul des volumes et de la fécondité pour les poissons pré
 
 ## En cas d'ajout de nouvelles données annotées
 - Telecharger depuis Roboflow les données au format "YOLO26" et "COCO segmentation"
-- Mettre dans le dossier "data" avec la même architecture que présentement (les images et les labels)
-- Lancer le pretraitement des nouvelles données : python3 utils/pretraitement.py
+- Mettre dans le dossier "data" avec les données non prétraitée sur OpenCloud
+- Remplacer toutes les images dans data (anciennes et nouvelles)
+- Lancer le pretraitement des données : python3 utils/pretraitement.py
