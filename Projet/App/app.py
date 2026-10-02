@@ -10,10 +10,10 @@ from PIL import Image
 import config
 import data_utils
 import metadata_utils
-from metrics_utils import compute_iou_per_class
 import model_utils
 import result_workflow
 from utils import calcul_volume_fct
+from utils.segmentation_metrics import compute_iou_per_class
 from canvas_adapter import st_stable_canvas
 from mask_editor_utils import apply_pending_stroke, extract_stroke_mask
 from rendering_utils import draw_instance_contours
@@ -333,7 +333,7 @@ with tab_prediction:
             f"Œufs : {egg_upload_count}"
         )
 
-    if st.button("Sauvegarde des résultats", key="automatic_results_save"):
+    if st.button("Sauvegarde directement des résultats en csv", key="automatic_results_save"):
         uploads_by_type = st.session_state.uploaded_batches
         if not any(uploads_by_type.values()):
             st.warning("Veuillez uploader au moins une image avant la sauvegarde.")
@@ -396,12 +396,12 @@ with tab_prediction:
 
     st.header("Résultats par poisson")
     if st.button("Prédiction", key="manual_prediction"):
-        current_uploads = st.session_state.uploaded_batches[upload_type]
-        if not current_uploads:
+        uploads_by_type = st.session_state.uploaded_batches
+        if not any(uploads_by_type.values()):
             st.warning("Veuillez uploader au moins une image avant de lancer la prédiction.")
         else:
             with st.spinner("Prédiction en cours..."):
-                batch = result_workflow.predict_uploads({upload_type: current_uploads})
+                batch = result_workflow.predict_uploads(uploads_by_type)
                 apply_prediction_batch(batch)
             render_prediction_issues(batch)
             if batch.predictions:
