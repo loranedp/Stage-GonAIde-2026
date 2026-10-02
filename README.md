@@ -30,7 +30,20 @@ Les données et les poids des modèles sont disponibles sur next cloud : https:/
 - YOLO : mettre le dossier 'saves' dans 'Projet/YOLO26/' pour récupérer les poids du modèle YOLO.
 
 ## Lancer le pre-traitement des données
-python3 Projet/utils/pretraitement.py
+
+Installer préalablement **Tesseract OCR** :
+
+```bash
+sudo apt update
+sudo apt install tesseract-ocr tesseract-ocr-eng
+```
+Puis lancer le pretraitement :
+```bash
+python Projet/utils/pretraitement.py
+```
+
+Utiliser les images et annotations originales : le prétraitement ne doit pas
+être relancé sur des images déjà recadrées.
 
 ## Lancer l'application
 streamlit run Projet/App/app.py

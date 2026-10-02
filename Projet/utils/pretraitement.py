@@ -26,6 +26,33 @@ from utils.segmentation_visualization import overlay_colored_mask
 from utils.yolo_metrics import load_yolo_polygon_masks
 
 
+# Vérifie le moteur OCR avant toute modification des données.
+# pytesseract est un wrapper Python ; Tesseract doit être installé séparément.
+tesseract_cmd = os.environ.get("TESSERACT_CMD") or shutil.which("tesseract")
+if not tesseract_cmd and os.name == "nt":
+    for install_dir in ("ProgramFiles", "ProgramFiles(x86)"):
+        candidate = Path(os.environ.get(install_dir, "C:/Program Files")) / "Tesseract-OCR" / "tesseract.exe"
+        if candidate.is_file():
+            tesseract_cmd = str(candidate)
+            break
+if not tesseract_cmd:
+    raise RuntimeError(
+        "Tesseract OCR est introuvable. Sous Debian/Ubuntu : "
+        "sudo apt install tesseract-ocr tesseract-ocr-eng. Sous Windows : "
+        "https://github.com/UB-Mannheim/tesseract/wiki. Puis relancez le script. "
+        "Pour une installation personnalisée, définissez TESSERACT_CMD "
+        "avec le chemin complet de l'exécutable Tesseract."
+    )
+pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+pytesseract.get_tesseract_version()
+if "eng" not in pytesseract.get_languages(config=""):
+    raise RuntimeError(
+        "Les données OCR anglaises (eng) sont absentes. Sous Debian/Ubuntu : "
+        "sudo apt install tesseract-ocr-eng. Sous Windows, installez la langue "
+        "English avec Tesseract."
+    )
+
+
 # Le script attend des images originales. Un mélange avec des images déjà
 # recadrées détruirait les labels YOLO des œufs lors d'un second passage.
 for image_type in ("cavite", "oeufs"):
@@ -136,7 +163,7 @@ def rename(path, format):
             # Si déjà renommé avant l'annotation
             if len(split_name) == 5:
                 new_file_name = "_".join(split_name[0:4])
-                new_file_name = f"{new_file_name.replace("-",".")}.{format}"
+                new_file_name = f"{new_file_name.replace('-', '.')}.{format}"
 
             os.rename(path + file_name, path + new_file_name)
 
@@ -274,7 +301,7 @@ def rename_json(json_path, output_json_path):
                 # Si déjà renommé avant l'annotation
                 if len(split_name) == 5:
                     new_file_name = "_".join(split_name[0:4])
-                    new_file_name = f"{new_file_name.replace("-",".")}.jpg"
+                    new_file_name = f"{new_file_name.replace('-', '.')}.jpg"
                     image['file_name'] = new_file_name
 
         with open(output_json_path, 'w', encoding='utf-8') as f:
