@@ -40,7 +40,7 @@ Les données et les poids des modèles sont disponibles sur next cloud : https:/
 
 ## Lancer le pre-traitement des données
 
-Installer préalablement **Tesseract OCR** :
+Installer préalablement **Tesseract OCR** si nécessaire :
 
 ```bash
 sudo apt update
