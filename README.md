@@ -1,10 +1,11 @@
 # Stage-GonAIde-2026
 GonAIde : Application de l'IA à des images d'échographies de gonades pour estimer la fécondité chez la truite commune
 
-# Consignes pour lancer le projet :
+# Consignes pour lancer le projet
 
-## Cloner le dépot github :
-git clone le dépôt dans un dossier au choix : git clone https://github.com/loranedp/Stage-GonAIde-2026.git
+## Cloner le dépot github
+git clone https://github.com/loranedp/Stage-GonAIde-2026.git
+
 cd Stage-GonAIde-2026/
 
 ## Installer uv
@@ -31,16 +32,17 @@ Les données et les poids des modèles sont disponibles sur next cloud : https:/
 ## Lancer le pre-traitement des données
 python3 Projet/utils/pretraitement.py
 
-## Lancement de l'application
+## Lancer l'application
 streamlit run Projet/App/app.py
-
-## En cas d'ajout de nouvelles données :
-(2 cas : avant et après 2025)
-- Telecharger depuis Roboflow les données au format "YOLO26" et "COCO segmentation"
-- Mettre dans le dossier "data" avec la même architecture que présentement (les images et les labels)
-- Lancer le pretraitement des nouvelles données : utils/python3 pretraitement.py
 
 L'application est alors accessible à l'adresse http://localhost:8501.
 
+Note : si les données entrées sont après 2025, il faut également re-télécharger le fichier csv mis à jours
+
 ## Résultats
 Les résultats du calcul des volumes et de la fécondité pour les poissons prédits dans l'interface sont disponibles dans 'Projet/Résultats/volumes_poissons.csv'.
+
+## En cas d'ajout de nouvelles données annotées
+- Telecharger depuis Roboflow les données au format "YOLO26" et "COCO segmentation"
+- Mettre dans le dossier "data" avec la même architecture que présentement (les images et les labels)
+- Lancer le pretraitement des nouvelles données : python3 utils/pretraitement.py
