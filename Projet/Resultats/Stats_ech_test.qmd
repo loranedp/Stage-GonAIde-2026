@@ -3,6 +3,7 @@ title: "Résultats sur l'échantillon de test"
 format: 
     html :
         page-layout: full
+        embed-resources: true
 jupyter: python3
 execute:
   echo: false

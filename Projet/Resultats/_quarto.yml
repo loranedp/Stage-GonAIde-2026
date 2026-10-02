@@ -1,0 +1,6 @@
+project:
+  type: default
+  render:
+    - Stats_ech_eval.qmd
+    - Stats_ech_test.qmd
+  output-dir: rapports
