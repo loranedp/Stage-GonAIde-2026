@@ -7,6 +7,7 @@ from PIL import Image
 
 EGG_OUTLINE_COLOR = (0, 0, 0)
 EGG_OUTLINE_THICKNESS = 1
+EGG_OUTLINE_OPACITY = 0.35
 
 
 def draw_instance_contours(
@@ -14,6 +15,7 @@ def draw_instance_contours(
     instances: np.ndarray,
     color: tuple[int, int, int] = EGG_OUTLINE_COLOR,
     thickness: int = EGG_OUTLINE_THICKNESS,
+    opacity: float = EGG_OUTLINE_OPACITY,
 ) -> Image.Image:
     """Trace le contour de chaque instance non nulle sur une copie RGB de ``image``."""
     instance_array = np.asarray(instances)
@@ -27,6 +29,10 @@ def draw_instance_contours(
         )
     if thickness < 1:
         raise ValueError("L'épaisseur du contour doit être strictement positive.")
+    if not 0 <= opacity <= 1:
+        raise ValueError("L'opacité du contour doit être comprise entre 0 et 1.")
+
+    outlined = rendered.copy()
 
     for instance_id in np.unique(instance_array):
         if instance_id <= 0:
@@ -38,7 +44,7 @@ def draw_instance_contours(
             instance_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
         )
         cv2.drawContours(
-            rendered,
+            outlined,
             contours,
             contourIdx=-1,
             color=color,
@@ -46,4 +52,4 @@ def draw_instance_contours(
             lineType=cv2.LINE_8,
         )
 
-    return Image.fromarray(rendered)
+    return Image.fromarray(cv2.addWeighted(rendered, 1 - opacity, outlined, opacity, 0))

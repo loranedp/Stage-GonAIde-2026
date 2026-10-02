@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 st.set_page_config(page_title="Segmentation gonades", layout="wide")
 
-BASE_FONT_SIZE_PX = 18
+BASE_FONT_SIZE_PX = 20
 st.markdown(
     f"<style>html {{ font-size: {BASE_FONT_SIZE_PX}px; }}</style>",
     unsafe_allow_html=True,
@@ -36,12 +36,12 @@ CLASS_COLORS = {
 CLASS_ALPHAS = {
     "Cavite": 0.25,
     "Gonade": 0.55,
-    "Oeuf": 0.50,
+    "Oeuf": 0.25,
 }
 EDIT_CLASS_ALPHAS = {
     "Cavite": 0.15,
     "Gonade": 0.45,
-    "Oeuf": 0.40,
+    "Oeuf": 0.25,
 }
 IMAGE_DISPLAY_WIDTH = 500
 EDIT_IMAGE_DISPLAY_WIDTH = 900
@@ -279,6 +279,7 @@ def render_mask_editor(prediction_key: str, pred: dict) -> None:
                 pred["masks"] = {name: mask.copy() for name, mask in edited_masks.items()}
                 if image_type == "oeufs":
                     pred["instances"] = model_utils.split_egg_mask(pred["masks"]["Oeuf"])
+                    pred.pop("egg_areas_px", None)
                 st.session_state.statuses[prediction_key] = config.DEFAULT_STATUS
                 st.session_state.corrected.add(prediction_key)
                 del st.session_state.editing[prediction_key]
@@ -517,7 +518,11 @@ with tab_prediction:
                             color=CAPTION_COLOR_CORRECTED if is_corrected else None,
                         )
                     if instances is not None:
-                        distinct_egg_count = calcul_volume_fct.count_egg_instances(instances)
+                        distinct_egg_count = (
+                            len(pred["egg_areas_px"])
+                            if "egg_areas_px" in pred
+                            else calcul_volume_fct.count_egg_instances(instances)
+                        )
                         st.caption(
                             f"Nombre d'œufs distincts retrouvés : {distinct_egg_count}"
                         )
@@ -645,6 +650,7 @@ with tab_prediction:
                                         pred["confidences"] = result["confidences"]
                                         if image_type == "oeufs":
                                             pred["instances"] = result["instances"]
+                                            pred["egg_areas_px"] = result["egg_areas_px"]
                                         st.session_state.corrected.discard(prediction_key)
                                         st.session_state.statuses[prediction_key] = (
                                             data_utils.get_disk_status(
@@ -688,13 +694,17 @@ with tab_prediction:
                 st.session_state.volume_result = result
 
     volume_result = st.session_state.volume_result
+    if volume_result is not None and "egg_median" not in volume_result:
+        st.session_state.volume_result = None
+        volume_result = None
+        st.info("Le calcul des œufs a changé. Relancez le calcul des volumes et de la fécondité.")
     if volume_result is not None:
         rows = volume_result["rows"]
         anomalies = volume_result["anomalies"]
         volume_total = volume_result["volume_total"]
         volume_total_cavite = volume_result["volume_total_cavite"]
         egg_rows = volume_result["egg_rows"]
-        egg_mean = volume_result["egg_mean"]
+        egg_median = volume_result["egg_median"]
         fecundity = volume_result["fecundity"]
 
         st.subheader("Volume des gonades et de la cavité")
@@ -737,24 +747,22 @@ with tab_prediction:
         else:
             st.info("Aucune image cavité bonne/ok n'est disponible pour ce poisson.")
 
-        st.subheader("Volume moyen des œufs")
+        st.subheader("Volume médian des œufs")
         if egg_rows:
             egg_display_rows = [
                 {
                     "Id_image": row["id_image"],
-                    "Nombre d'œufs utilisés pour la moyenne": row[
-                        "nombre_oeufs_utilises_pour_moyenne"
-                    ],
-                    "Surface_moyenne_oeufs_mm2": round(
-                        row["surface_moyenne_oeufs_mm2"], 4
+                    "Nombre d'œufs identifiés": row["nombre_oeufs_distincts"],
+                    "Volume médian des œufs (mm³)": (
+                        round(row["volume_median_oeufs_mm3"], 4)
+                        if row["volume_median_oeufs_mm3"] is not None else None
                     ),
-                    "Volume_moyen_oeufs_mm3": round(row["volume_moyen_oeufs_mm3"], 4),
                 }
                 for row in egg_rows
             ]
             st.dataframe(pd.DataFrame(egg_display_rows), use_container_width=True)
-            if egg_mean is not None and egg_mean > 0:
-                st.metric("Volume moyen d'un œuf", f"{egg_mean:.4f} mm³")
+            if egg_median is not None and egg_median > 0:
+                st.metric("Volume médian d'un œuf (toutes images)", f"{egg_median:.4f} mm³")
             else:
                 st.warning("Aucune instance d'œuf exploitable n'a été détectée.")
         else:
@@ -763,9 +771,17 @@ with tab_prediction:
         st.subheader("Fécondité")
         if fecundity is not None:
             st.metric("Fécondité estimée", f"{int(round(fecundity))} œufs")
+            st.markdown(
+                f'<p style="font-size:{BASE_FONT_SIZE_PX}px;">'
+                "Intervalle interquartile : "
+                f"{int(round(volume_result['fecundity_low']))} à "
+                f"{int(round(volume_result['fecundity_high']))} œufs "
+                "(calculé avec Q3 et Q1 des volumes d'œufs).</p>",
+                unsafe_allow_html=True,
+            )
         else:
             st.info(
-                "Le volume de la gonade et un volume moyen d'œuf strictement positif "
+                "Le volume de la gonade et au moins un volume d'œuf strictement positif "
                 "sont nécessaires pour estimer la fécondité."
             )
 

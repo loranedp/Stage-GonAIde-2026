@@ -141,13 +141,16 @@ def predict_eggs(
     )
 
     instances_crop = np.zeros((h, w), dtype=np.int32)
+    egg_areas_px = []
     confidences = []
     if results and results[0].masks is not None:
         instance_masks = results[0].masks.data.detach().cpu().numpy() > 0.5
         boxes = results[0].boxes
         if boxes is not None:
             confidences = boxes.conf.detach().cpu().numpy().astype(float).tolist()
-        for instance_id, instance_mask in enumerate(instance_masks, start=1):
+        paste_w = max(0, min(w, original_size[0] - x))
+        paste_h = max(0, min(h, original_size[1] - y))
+        for instance_mask in instance_masks:
             if instance_mask.shape != instances_crop.shape:
                 instance_mask = np.asarray(
                     Image.fromarray(instance_mask.astype(np.uint8)).resize(
@@ -155,7 +158,12 @@ def predict_eggs(
                     ),
                     dtype=bool,
                 )
-            instances_crop[instance_mask] = instance_id
+            visible_mask = instance_mask[:paste_h, :paste_w]
+            area_px = int(np.count_nonzero(visible_mask))
+            if area_px == 0:
+                continue
+            egg_areas_px.append(area_px)
+            instances_crop[:paste_h, :paste_w][visible_mask] = len(egg_areas_px)
     semantic_crop = instances_crop > 0
 
     full_semantic = Image.new("L", original_size, 0)
@@ -170,6 +178,7 @@ def predict_eggs(
     return {
         "masks": {"Oeuf": np.asarray(full_semantic) > 0},
         "instances": full_instances,
+        "egg_areas_px": egg_areas_px,
         "confidences": {"Oeuf": confidence},
     }
 

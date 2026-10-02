@@ -25,7 +25,10 @@ RESULT_CSV_COLUMNS = [
     "Volume_gonades",
     "Volume_cavite",
     "Volume_moyen_oeufs_mm3",
+    "Volume_median_oeufs_mm3",
     "Fecondite_estimee",
+    "Fecondite_IQR_borne_basse",
+    "Fecondite_IQR_borne_haute",
 ]
 LEGACY_RESULT_COLUMNS = {
     "Volume_gonades": "Volume_total_gonades_cm3",
@@ -148,6 +151,8 @@ def predict_uploads(
             }
             if instances is not None:
                 prediction["instances"] = instances
+            if corrected_data is None and image_type == "oeufs":
+                prediction["egg_areas_px"] = result["egg_areas_px"]
             batch.predictions[prediction_key] = prediction
             batch.statuses[prediction_key] = status
             if is_corrected:
@@ -255,15 +260,18 @@ def calculate_fish_result(
             {
                 "id_image": pred["id_image"],
                 "instances": instances,
+                "areas_px": pred.get("egg_areas_px"),
                 "echelle": echelle,
                 "image_height": pred["image"].height,
             }
         )
 
-    egg_result = calcul_volume_fct.calculate_mean_egg_volume(egg_inputs)
+    egg_result = calcul_volume_fct.calculate_egg_volume_summary(egg_inputs)
     egg_rows = egg_result["images"]
-    egg_mean = egg_result["volume_moyen_oeufs_mm3"]
-    fecundity = calculate_fecundity(volume_total, egg_mean)
+    egg_median = egg_result["volume_median_oeufs_mm3"]
+    fecundity = calculate_fecundity(volume_total, egg_median)
+    fecundity_low = calculate_fecundity(volume_total, egg_result["volume_q3_oeufs_mm3"])
+    fecundity_high = calculate_fecundity(volume_total, egg_result["volume_q1_oeufs_mm3"])
 
     return {
         "selected_fish": fish_id,
@@ -272,8 +280,12 @@ def calculate_fish_result(
         "volume_total": volume_total,
         "volume_total_cavite": volume_total_cavite,
         "egg_rows": egg_rows,
-        "egg_mean": egg_mean,
+        "egg_median": egg_median,
+        "egg_q1": egg_result["volume_q1_oeufs_mm3"],
+        "egg_q3": egg_result["volume_q3_oeufs_mm3"],
         "fecundity": fecundity,
+        "fecundity_low": fecundity_low,
+        "fecundity_high": fecundity_high,
         "has_cavity_images": bool(cavity_items),
         "has_egg_images": bool(egg_items),
         "has_eligible_images": bool(fish_items),
@@ -290,13 +302,13 @@ def _rounded_number(value, digits: int = 4):
     return round(number, digits) if np.isfinite(number) else None
 
 
-def calculate_fecundity(volume_total_cm3, egg_mean_mm3):
+def calculate_fecundity(volume_total_cm3, egg_volume_mm3):
     """Calcule la fécondité après conversion du volume de gonade en mm³."""
 
-    if volume_total_cm3 is None or egg_mean_mm3 is None:
+    if volume_total_cm3 is None or egg_volume_mm3 is None:
         return None
     gonad_volume = float(volume_total_cm3)
-    egg_volume = float(egg_mean_mm3)
+    egg_volume = float(egg_volume_mm3)
     if not np.isfinite(gonad_volume) or not np.isfinite(egg_volume) or egg_volume <= 0:
         return None
     return (gonad_volume * 1000) / egg_volume
@@ -305,20 +317,21 @@ def calculate_fecundity(volume_total_cm3, egg_mean_mm3):
 def result_summary_row(result: Mapping) -> dict:
     """Convertit un résultat détaillé en une ligne synthétique pour le CSV."""
 
-    fecundity_value = result.get("fecundity")
-    fecundity = (
-        float(fecundity_value)
-        if fecundity_value is not None and not pd.isna(fecundity_value)
-        else None
-    )
-    if fecundity is not None and not np.isfinite(fecundity):
-        fecundity = None
+    def rounded_count(key):
+        value = result.get(key)
+        if value is None or pd.isna(value) or not np.isfinite(float(value)):
+            return None
+        return int(round(float(value)))
+
     return {
         "Id_poisson": str(result["selected_fish"]),
         "Volume_gonades": _rounded_number(result.get("volume_total")),
         "Volume_cavite": _rounded_number(result.get("volume_total_cavite")),
-        "Volume_moyen_oeufs_mm3": _rounded_number(result.get("egg_mean")),
-        "Fecondite_estimee": int(round(fecundity)) if fecundity is not None else None,
+        "Volume_moyen_oeufs_mm3": _rounded_number(result.get("legacy_egg_mean")),
+        "Volume_median_oeufs_mm3": _rounded_number(result.get("egg_median")),
+        "Fecondite_estimee": rounded_count("fecundity"),
+        "Fecondite_IQR_borne_basse": rounded_count("fecundity_low"),
+        "Fecondite_IQR_borne_haute": rounded_count("fecundity_high"),
     }
 
 
@@ -329,9 +342,8 @@ def has_exportable_result(result: Mapping) -> bool:
 
 def _summary_dataframe(rows) -> pd.DataFrame:
     dataframe = pd.DataFrame(rows, columns=RESULT_CSV_COLUMNS)
-    dataframe["Fecondite_estimee"] = pd.array(
-        dataframe["Fecondite_estimee"], dtype="Int64"
-    )
+    for column in ("Fecondite_estimee", "Fecondite_IQR_borne_basse", "Fecondite_IQR_borne_haute"):
+        dataframe[column] = pd.array(dataframe[column], dtype="Int64")
     return dataframe
 
 
@@ -341,8 +353,12 @@ def migrate_results_dataframe(dataframe: pd.DataFrame) -> pd.DataFrame:
     if "Id_poisson" not in dataframe.columns:
         raise ValueError("Le CSV de résultats ne contient pas la colonne Id_poisson.")
     egg_volume_is_cm3 = False
-    if set(RESULT_CSV_COLUMNS).issubset(dataframe.columns):
-        source_columns = {column: column for column in RESULT_CSV_COLUMNS[1:]}
+    old_summary_columns = {
+        "Id_poisson", "Volume_gonades", "Volume_cavite",
+        "Volume_moyen_oeufs_mm3", "Fecondite_estimee",
+    }
+    if old_summary_columns.issubset(dataframe.columns):
+        source_columns = {column: column for column in old_summary_columns if column != "Id_poisson"}
     elif {
         "Id_poisson",
         "Volume_gonades",
@@ -370,10 +386,16 @@ def migrate_results_dataframe(dataframe: pd.DataFrame) -> pd.DataFrame:
             "Volume_gonades": "volume_total",
             "Volume_cavite": "volume_total_cavite",
             "Volume_moyen_oeufs_mm3": "egg_mean",
+            "Volume_median_oeufs_mm3": "egg_median",
             "Fecondite_estimee": "fecundity",
+            "Fecondite_IQR_borne_basse": "fecundity_low",
+            "Fecondite_IQR_borne_haute": "fecundity_high",
         }
         for target_column, result_key in result_keys.items():
-            values = group[source_columns[target_column]].dropna()
+            source_column = source_columns.get(target_column, target_column)
+            if source_column not in group.columns:
+                continue
+            values = group[source_column].dropna()
             value = values.iloc[0] if not values.empty else None
             if (
                 target_column == "Volume_moyen_oeufs_mm3"
@@ -381,7 +403,7 @@ def migrate_results_dataframe(dataframe: pd.DataFrame) -> pd.DataFrame:
                 and egg_volume_is_cm3
             ):
                 value = float(value) * 1000
-            result[result_key] = value
+            result["legacy_egg_mean" if result_key == "egg_mean" else result_key] = value
         if has_exportable_result(result):
             rows.append(result_summary_row(result))
 
@@ -403,7 +425,10 @@ def save_fish_results(results: Sequence[dict], csv_path: Path) -> int:
         existing_df = pd.read_csv(csv_path, encoding="utf-8", dtype={"Id_poisson": str})
         existing_df = migrate_results_dataframe(existing_df)
         existing_df = existing_df[~existing_df["Id_poisson"].isin(fish_ids)]
-        combined_df = pd.concat([existing_df, new_rows_df], ignore_index=True)
+        combined_df = pd.DataFrame(
+            [*existing_df.to_dict("records"), *new_rows_df.to_dict("records")],
+            columns=RESULT_CSV_COLUMNS,
+        )
     else:
         combined_df = new_rows_df
     combined_df = _summary_dataframe(combined_df.to_dict("records"))
