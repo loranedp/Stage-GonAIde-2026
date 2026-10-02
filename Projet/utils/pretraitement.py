@@ -12,11 +12,18 @@ import glob
 from pytesseract import Output
 import cv2
 import shutil
+import sys
 from pathlib import Path
 from PIL import Image
 import numpy as np
-from stats_fct import overlay_colored_mask
-from yolo_metrics import load_yolo_polygon_masks
+
+# Les chemins des données sont relatifs à utils, quel que soit le dossier de lancement.
+SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR.parent))
+os.chdir(SCRIPT_DIR)
+
+from utils.segmentation_visualization import overlay_colored_mask
+from utils.yolo_metrics import load_yolo_polygon_masks
 
 
 # ================== 2. Gestion des metadata ==================
