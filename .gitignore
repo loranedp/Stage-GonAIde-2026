@@ -4,17 +4,13 @@ ultrasam_venv
 OpenUs_venv
 Projet/data
 .vscode
-.codex
-.agents
-.claude
 __pycache__
 __init__.py
 checkpoint
 checkpoints
 
 Projet/UNet/__pycache__
-Projet/UNet/saves
-Projet/UNet/*.pth
+Projet/UNet/saves/*.pth
 R50+ViT-B_16.npz
 
 Projet/App/__pycache__
@@ -25,11 +21,6 @@ Projet/YOLO26/folds
 Projet/YOLO26/runs
 
 Projet/utils/__pycache__
-
-Projet/OpenUS
-Projet/Ex1
-Projet/SAM
-Projet/UltraSam
 
 # OpenUS-multiclass
 output/
