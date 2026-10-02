@@ -68,6 +68,25 @@ def metrics_from_counts(intersection, union, predicted_area, true_area):
     }
 
 
+def compute_iou_per_class(pred_masks, gt_masks, class_names):
+    """Calcule l'IoU de chaque classe pour les masques de l'application."""
+    intersections = []
+    unions = []
+    predicted_areas = []
+    true_areas = []
+    for class_name in class_names:
+        pred_mask = pred_masks[class_name]
+        gt_mask = gt_masks[class_name]
+        intersections.append(np.logical_and(pred_mask, gt_mask).sum())
+        unions.append(np.logical_or(pred_mask, gt_mask).sum())
+        predicted_areas.append(pred_mask.sum())
+        true_areas.append(gt_mask.sum())
+    ious = metrics_from_counts(
+        intersections, unions, predicted_areas, true_areas
+    )["iou"]
+    return dict(zip(class_names, map(float, ious)))
+
+
 def metrics_by_class(
     true,
     preds,
@@ -214,6 +233,7 @@ def metrics_by_class(
 __all__ = [
     "_median_areas_px",
     "_median_instance_area_px",
+    "compute_iou_per_class",
     "metrics_by_class",
     "metrics_from_counts",
 ]

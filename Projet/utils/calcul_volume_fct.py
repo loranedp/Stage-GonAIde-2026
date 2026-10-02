@@ -286,22 +286,45 @@ def calculate_egg_volume_from_instances(instance_labels, echelle, image_height):
     }
 
 
-def calculate_mean_egg_volume(images):
-    """Agrège le volume moyen d'œuf sur plusieurs échographies.
+def calculate_egg_volume_summary(images):
+    """Résume les volumes individuels, par image et sur tous les œufs du poisson.
 
-    Chaque élément contient ``id_image``, ``instances``, ``echelle`` et
-    ``image_height``. Les images sans instance donnent un volume nul dans le
-    détail mais ne permettent pas à elles seules de produire une fécondité.
+    ``areas_px`` contient les aires des masques YOLO séparés. Pour une image
+    corrigée, les aires sont reconstituées depuis ``instances``.
     """
     rows = []
+    all_volumes = []
     for item in images:
-        values = calculate_egg_volume_from_instances(
-            item["instances"], item["echelle"], item["image_height"]
-        )
-        rows.append({"id_image": item["id_image"], **values})
-    volumes = [row["volume_moyen_oeufs_mm3"] for row in rows]
-    mean_volume = float(np.mean(volumes)) if volumes else None
-    return {"images": rows, "volume_moyen_oeufs_mm3": mean_volume}
+        areas = item.get("areas_px")
+        if areas is None:
+            labels = np.asarray(item["instances"])
+            if labels.ndim != 2:
+                raise ValueError("La carte d'instances d'œufs doit être bidimensionnelle.")
+            areas = [int(np.count_nonzero(labels == label_id))
+                     for label_id in np.unique(labels) if label_id > 0]
+        areas = [float(area) for area in areas if np.isfinite(area) and area > 0]
+        volumes = []
+        if areas:
+            scale = float(item["echelle"])
+            height = float(item["image_height"])
+            if not np.isfinite(scale) or scale <= 0 or not np.isfinite(height) or height <= 0:
+                raise ValueError(f"Échelle ou hauteur invalide pour l'image {item['id_image']}.")
+            surfaces_mm2 = np.asarray(areas) * ((scale * 10) / height) ** 2
+            radii_mm = np.sqrt(surfaces_mm2 / np.pi)
+            volumes = (4 / 3 * np.pi * radii_mm**3).tolist()
+            all_volumes.extend(volumes)
+        rows.append({
+            "id_image": item["id_image"],
+            "nombre_oeufs_distincts": len(areas),
+            "volume_median_oeufs_mm3": float(np.median(volumes)) if volumes else None,
+        })
+
+    return {
+        "images": rows,
+        "volume_median_oeufs_mm3": float(np.median(all_volumes)) if all_volumes else None,
+        "volume_q1_oeufs_mm3": float(np.percentile(all_volumes, 25)) if all_volumes else None,
+        "volume_q3_oeufs_mm3": float(np.percentile(all_volumes, 75)) if all_volumes else None,
+    }
 
 
 # ---- Calcul du volume : images longitudinales -----
