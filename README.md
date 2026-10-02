@@ -4,21 +4,30 @@ GonAIde : Application de l'IA à des images d'échographies de gonades pour esti
 # Consignes pour lancer le projet
 
 ## Cloner le dépot github
+```bash
 git clone https://github.com/loranedp/Stage-GonAIde-2026.git
-
 cd Stage-GonAIde-2026/
+```
 
 ## Installer uv
+```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
+```
 
 ## Créer un environnement virtuel (python 3.14)
+```bash
 uv venv mon_venv --python 3.14
+```
 
 ## Installer les dépendances
+```bash
 uv pip install --python mon_venv/bin/python -r requirements.txt
+```
 
 ## Activer l'environnement
+```bash
 source mon_venv/bin/activate
+```
 
 ## Téléchargement des données et des poids
 Les données et les poids des modèles sont disponibles sur next cloud : https://nextcloud.inrae.fr/s/6o4xxWFft2fap59?dir=/Github
@@ -42,11 +51,12 @@ Puis lancer le pretraitement :
 python Projet/utils/pretraitement.py
 ```
 
-Utiliser les images et annotations originales : le prétraitement ne doit pas
-être relancé sur des images déjà recadrées.
+Utiliser les images et annotations originales : le prétraitement ne doit pas être relancé sur des images déjà recadrées.
 
 ## Lancer l'application
+```bash
 streamlit run Projet/App/app.py
+```
 
 L'application est alors accessible à l'adresse http://localhost:8501
 
