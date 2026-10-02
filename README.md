@@ -42,6 +42,9 @@ Note : si les données entrées sont après 2025, il faut également re-téléch
 ## Résultats
 Les résultats du calcul des volumes et de la fécondité pour les poissons prédits dans l'interface sont disponibles dans 'Projet/Résultats/volumes_poissons.csv'.
 
+Les résultats sur l'échantillon de validation et de tests sont également disponibles en .html dans 'Projet/Résultats/rapports'.
+
+
 ## En cas d'ajout de nouvelles données annotées
 - Telecharger depuis Roboflow les données au format "YOLO26" et "COCO segmentation"
 - Mettre dans le dossier "data" avec les données non prétraitée sur OpenCloud
