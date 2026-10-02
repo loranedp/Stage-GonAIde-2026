@@ -3,6 +3,7 @@ import torch
 import torchvision.transforms.functional as TF
 import numpy as np
 from PIL import Image
+from pathlib import Path
 
 
 
@@ -12,8 +13,13 @@ def CME(file_name, image_tensor, df, one_hot_df):
     
     
     # récupération de la ligne
-    idx = np.where(df.new_name_file == file_name.replace(".jpg","").split("/")[4])
-    one_hot = torch.tensor(one_hot_df.iloc[idx].values, dtype=torch.float32)
+    image_name = Path(file_name).stem
+    matches = np.flatnonzero(df.new_name_file == image_name)
+    if len(matches) != 1:
+        raise ValueError(
+            f"Métadonnées CME attendues pour {image_name}: {len(matches)} ligne(s) trouvée(s)"
+        )
+    one_hot = torch.tensor(one_hot_df.iloc[matches[0]].to_numpy(dtype=np.float32))
 
     # ---- 2. Expansion spatiale ----
     metadata_channels = one_hot.view(nb_categories, 1, 1).expand(nb_categories, image_height, image_width)

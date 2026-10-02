@@ -39,11 +39,10 @@ def tensor_to_numpy_image(tensor):
     else:
         image = np.asarray(tensor)
     if image.ndim == 3:
-        if image.shape[0] <= 4 and image.shape[-1] > 4:
-            image = image[:3]
-            if image.shape[0] == 3:
-                image = np.transpose(image, (1, 2, 0))
-        elif image.shape[-1] <= 4:
+        if image.shape[0] <= 16 and image.shape[1] > 16 and image.shape[2] > 16:
+            # Les éventuels canaux CME suivent les trois canaux RGB.
+            image = np.transpose(image[:3], (1, 2, 0))
+        elif image.shape[-1] <= 16:
             image = image[..., :3]
     if image.size and image.max() > 1.0:
         image = image / 255.0
