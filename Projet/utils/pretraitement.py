@@ -26,6 +26,21 @@ from utils.segmentation_visualization import overlay_colored_mask
 from utils.yolo_metrics import load_yolo_polygon_masks
 
 
+# Le script attend des images originales. Un mélange avec des images déjà
+# recadrées détruirait les labels YOLO des œufs lors d'un second passage.
+for image_type in ("cavite", "oeufs"):
+    image_dir = SCRIPT_DIR.parent / "data" / "COCO" / "images" / image_type
+    for image_path in image_dir.glob("*.jpg"):
+        with Image.open(image_path) as image:
+            if image.size == (510, 380):
+                raise RuntimeError(
+                    f"Image déjà prétraitée : {image_path}. "
+                    "Ne relancez pas ce script sur Projet/data. "
+                    "Utilisez une copie isolée contenant toutes les images et "
+                    "annotations originales, anciennes et nouvelles."
+                )
+
+
 # ================== 2. Gestion des metadata ==================
 # Importation du fichier avec les metadatas
 df = pd.read_excel('Correspondance_Capture-Echographe.xlsx', sheet_name = 2, usecols=[0,1,4,5,6])
