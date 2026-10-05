@@ -141,7 +141,7 @@ def generate_hv_targets(
 
 
 class EggSegmentationHVLoss(nn.Module):
-    """Loss BCE/Dice pour le masque et Smooth-L1 pour les cartes H/V."""
+    """Loss BCE/Dice pour le masque et MSE pour les cartes H/V."""
 
     def __init__(
         self,
@@ -179,7 +179,7 @@ class EggSegmentationHVLoss(nn.Module):
         # Les valeurs H/V hors masque sont artificiellement nulles et ne
         # doivent pas dominer la régression lorsque les œufs sont petits.
         valid = target_mask.expand_as(target_hv)
-        hv_error = F.smooth_l1_loss(hv_logits * valid, target_hv * valid)
+        hv_error = F.mse_loss(hv_logits * valid, target_hv * valid)
         return self.mask_weight * mask_loss + self.hv_weight * hv_error
 
 
