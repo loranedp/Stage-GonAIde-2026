@@ -865,6 +865,137 @@ ax.legend(
 plt.show()
 ```
 
+## Annotations — poissons avec au moins 3 œufs par échographie
+
+Seuls les poissons ayant au moins trois œufs annotés dans chacune de leurs
+échographies d'œufs sont retenus.
+
+```{python}
+# Partir de toutes les échographies d'œufs pour inclure celles sans œuf mesuré.
+echos_filtre_3_oeufs = (
+    df_echos_oeufs[["cap_id", "image_id"]]
+    .rename(columns={"cap_id": "id poisson"})
+    .copy()
+)
+echos_filtre_3_oeufs["id poisson"] = echos_filtre_3_oeufs["id poisson"].astype(str)
+echos_filtre_3_oeufs = echos_filtre_3_oeufs.drop_duplicates()
+comptages_3_oeufs = (
+    df_oeufs_individuels_true.groupby(["id poisson", "image_id"])
+    .size()
+    .reset_index(name="nombre_oeufs")
+)
+echos_filtre_3_oeufs = echos_filtre_3_oeufs.merge(
+    comptages_3_oeufs, on=["id poisson", "image_id"], how="left"
+)
+echos_filtre_3_oeufs["nombre_oeufs"] = (
+    echos_filtre_3_oeufs["nombre_oeufs"].fillna(0)
+)
+minimum_oeufs_par_poisson = (
+    echos_filtre_3_oeufs.groupby("id poisson")["nombre_oeufs"].min()
+)
+poissons_3_oeufs = minimum_oeufs_par_poisson[
+    minimum_oeufs_par_poisson >= 3
+].index
+df_oeufs_true_3_oeufs = df_oeufs_individuels_true.loc[
+    df_oeufs_individuels_true["id poisson"].isin(poissons_3_oeufs)
+].copy()
+ordre_images_3_oeufs = sorted(df_oeufs_true_3_oeufs["image_id"].unique())
+ordre_poissons_3_oeufs = sorted(df_oeufs_true_3_oeufs["id poisson"].unique())
+
+print(
+    f"Poissons retenus : {len(ordre_poissons_3_oeufs)} ; "
+    f"échographies : {len(ordre_images_3_oeufs)} ; "
+    f"œufs annotés : {len(df_oeufs_true_3_oeufs)}"
+)
+if df_oeufs_true_3_oeufs.empty:
+    print("Aucun poisson ne satisfait le seuil de 3 œufs par échographie.")
+else:
+    fig, ax = plt.subplots(figsize=(17, 7))
+    sns.boxplot(
+        data=df_oeufs_true_3_oeufs,
+        x="image_id", y="volume_oeuf_mm3",
+        hue="id poisson", order=ordre_images_3_oeufs,
+        hue_order=ordre_poissons_3_oeufs,
+        palette=palette_poissons_true, dodge=False, ax=ax,
+    )
+    ax.set(
+        title="Volume des œufs — au moins 3 œufs dans chaque échographie",
+        xlabel="Image ID",
+        ylabel="Volume individuel d'un œuf (mm³)",
+    )
+    effectifs_par_image = (
+        df_oeufs_true_3_oeufs.groupby("image_id")["volume_oeuf_mm3"].count()
+    )
+    ax.set_xticks(
+        np.arange(len(ordre_images_3_oeufs)),
+        labels=[
+            f"{image_id} (n={effectifs_par_image.loc[image_id]})"
+            for image_id in ordre_images_3_oeufs
+        ],
+    )
+    ax.tick_params(axis="x", labelrotation=90, labelsize=8)
+    ax.grid(axis="y", alpha=0.2)
+    fig.subplots_adjust(right=0.78, bottom=0.22)
+    ax.legend(
+        title="ID poisson", bbox_to_anchor=(1.01, 1), loc="upper left",
+        ncol=2, fontsize=8, title_fontsize=9,
+    )
+    plt.show()
+```
+
+## Annotations — volume des œufs par poisson (au moins 6 œufs)
+
+Tous les œufs annotés des différentes échographies d'un même poisson sont
+regroupés.
+
+```{python}
+effectifs_oeufs_par_poisson = (
+    df_oeufs_individuels_true.groupby("id poisson")["volume_oeuf_mm3"].count()
+)
+ordre_poissons_6_oeufs = sorted(
+    effectifs_oeufs_par_poisson[effectifs_oeufs_par_poisson >= 6].index
+)
+df_oeufs_true_6_oeufs = df_oeufs_individuels_true.loc[
+    df_oeufs_individuels_true["id poisson"].isin(ordre_poissons_6_oeufs)
+].copy()
+
+print(
+    f"Poissons retenus : {len(ordre_poissons_6_oeufs)} ; "
+    f"œufs annotés : {effectifs_oeufs_par_poisson.loc[ordre_poissons_6_oeufs].sum()}"
+)
+if df_oeufs_true_6_oeufs.empty:
+    print("Aucun poisson ne satisfait le seuil de 6 œufs au total.")
+else:
+    fig, ax = plt.subplots(figsize=(17, 7))
+    sns.boxplot(
+        data=df_oeufs_true_6_oeufs,
+        x="id poisson", y="volume_oeuf_mm3",
+        hue="id poisson", order=ordre_poissons_6_oeufs,
+        hue_order=ordre_poissons_6_oeufs,
+        palette=palette_poissons_true, dodge=False, ax=ax,
+    )
+    ax.set(
+        title="Volume des œufs par poisson — au moins 6 œufs au total",
+        xlabel="ID poisson",
+        ylabel="Volume individuel d'un œuf (mm³)",
+    )
+    ax.set_xticks(
+        np.arange(len(ordre_poissons_6_oeufs)),
+        labels=[
+            f"{id_poisson} (n={effectifs_oeufs_par_poisson.loc[id_poisson]})"
+            for id_poisson in ordre_poissons_6_oeufs
+        ],
+    )
+    ax.tick_params(axis="x", labelrotation=90, labelsize=8)
+    ax.grid(axis="y", alpha=0.2)
+    fig.subplots_adjust(right=0.78, bottom=0.22)
+    ax.legend(
+        title="ID poisson", bbox_to_anchor=(1.01, 1), loc="upper left",
+        ncol=2, fontsize=8, title_fontsize=9,
+    )
+    plt.show()
+```
+
 ## Prédictions
 ```{python}
 fig, ax = plt.subplots(figsize=(17, 7))
@@ -1137,4 +1268,44 @@ nuage_points(
     ylabel="Fecondité annotée",
     couleur='teal'
     )
+```
+
+### Calcul de la relation d'Acolas
+
+```{python}
+acolas_long = 4.0867 * df_final_NA_true.long_poisson - 522.26
+nuage_points(
+    x=df_final_NA_true.long_poisson, # long_poisson ou poids_poisson
+    y=acolas_long,
+    titre="", 
+    xlabel="Longueur du poisson", 
+    ylabel="Fecondité d'Acolas",
+    couleur='teal'
+    )
+```
+
+```{python}
+acolas_long = 4.0867 * df_final_NA_true.long_poisson - 522.26
+fig, ax = plt.subplots(figsize=(6, 4))
+nuage_points(
+    x=df_final_NA_true.long_poisson, # long_poisson ou poids_poisson
+    y=df_final_NA_true.fecondite_true,
+    titre="Relation fécondité / longueur du poisson", 
+    xlabel="Longueur du poisson", 
+    ylabel="Fecondité",
+    couleur='teal',
+    ax=ax,
+    )
+ax.collections[0].set_label("Fécondité annotée")
+ordre_longueurs = df_final_NA_true.long_poisson.sort_values().index
+ax.plot(
+    df_final_NA_true.loc[ordre_longueurs, "long_poisson"],
+    acolas_long.loc[ordre_longueurs],
+    color="red",
+    linestyle="--",
+    label="Fécondité d'Acolas",
+)
+ax.legend()
+plt.tight_layout()
+plt.show()
 ```
