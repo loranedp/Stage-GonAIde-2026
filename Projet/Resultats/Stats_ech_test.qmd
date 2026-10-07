@@ -10,7 +10,7 @@ execute:
 ---
 
 ```{python}
-# -------- 1. Importation des pakages nécessaires --------
+# -------- 1. Importation des packages nécessaires --------
 from pathlib import Path
 import json
 import pandas as pd
@@ -248,7 +248,7 @@ print(f"Nombre d'échographies longitudinales : {len(df_oeufs)}")
 :::: {.columns}
 
 ::: {.column width="50%"}
-#### Vrai annotations
+#### Vraies annotations
 
 ```{python}
 print(f"Nombre d'échographies transversales non vides : {(df_cavite["surface_gonade_true"] != 0).sum()}")
@@ -444,7 +444,7 @@ print(f"Corrélation (pour position echo >= 2) : {df_fin.surface_cavite_pred.cor
 ```
 
 
-### Diférence entre les volumes des gonades prédits et annotés
+### Différence entre les volumes des gonades prédits et annotés
 
 ```{python}
 df_diff_volumes_gonades, fig, ax = plot_differences_par_poisson(

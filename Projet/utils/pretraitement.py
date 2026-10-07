@@ -130,7 +130,7 @@ print(f"Nombre d'images COCO importées des oeufs : {len(os.listdir('../data/COC
 print(f"Nombre d'images YOLO importées de la cavite : {len(os.listdir('../data/YOLO/images/cavite/'))}")
 print(f"Nombre d'images YOLO importées des oeufs : {len(os.listdir('../data/YOLO/images/oeufs/'))}")
 
-# -------- 4.2 Renomage des images et des masques YOLO --------
+# -------- 4.2 Renommage des images et des masques YOLO --------
 def rename(path, format):
     for file_name in os.listdir(path):
         if Path(file_name).suffix.lower() != f".{format.lower()}":
@@ -261,7 +261,7 @@ print(f"Nombre de poissons importés : {len(poissons_importes)}")
 print("---------------------------------")
 
 
-# -------- 4.3 Renomage des masques COCO --------
+# -------- 4.3 Renommage des masques COCO --------
 def rename_json(json_path, output_json_path):
     if os.path.exists(json_path) :
         # Ouvrir le fichier JSON
@@ -581,7 +581,7 @@ delete_classes_YOLO(input_dir = "../data/YOLO/labels/oeufs/", output_dir = "../d
 
 
 # ================== 6. Enrichissement du fichier metadata ==================
-# -------- 5.1 Création de nouvelles colonne pour obtenir la position de l'échographie --------
+# -------- 5.1 Création de nouvelles colonnes pour obtenir la position de l'échographie --------
 df['position'] = df[df['type_image'] != "œufs"]['type_image'].str.replace('+', '', regex=False).str[2:].astype(float)
 df["position_ratio"] = df.position / df.long_gonade
 
@@ -667,7 +667,7 @@ for id in id_unique:
     # Récupère la ligne correspondant au poisson
     row = df_cap[df_cap.cap_id == id]
 
-    # Complète df avec le poids, la taile et l'age du poisson
+    # Complète df avec le poids, la taille et l'âge du poisson
     df.loc[df.cap_id == id, "poids_poisson"] = float(str(row["cap_poids"].values[0]).replace(",", "."))
     df.loc[df.cap_id == id, "long_poisson"] = float(row["cap_lf"].values[0])
     df.loc[df.cap_id == id, "age_poisson"] = row["age_referent"].values[0]

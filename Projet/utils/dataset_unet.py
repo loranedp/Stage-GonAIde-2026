@@ -121,7 +121,7 @@ class RoboflowUNetDataset(torch.utils.data.Dataset):
 
         ignore_torch = torch.as_tensor(ignore_np.astype(np.float32)).unsqueeze(0)
 
-        # CME : Ajout de canaux RBG
+        # CME : Ajout de canaux RGB
         if self.is_cme:
             image_torch = CME(sample['image_path'], image_torch, self.df, self.one_hot_df)
 

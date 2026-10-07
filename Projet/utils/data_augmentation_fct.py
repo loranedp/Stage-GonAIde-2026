@@ -69,7 +69,7 @@ def data_augmentation(image, mask, model="classique"):
     return image, mask
 
 
-# Fonction pour la Data augmentation d'une séquence de coupes (dépendance inter-coupes) pour appliquer les mêmes transformation à toutes les coupes.
+# Fonction pour la Data augmentation d'une séquence de coupes (dépendance inter-coupes) pour appliquer les mêmes transformations à toutes les coupes.
 def data_augmentation_sequence(images, masks):
     """Applique la même transformation à toutes les coupes d'une séquence."""
     # --- 1. Tirage unique des paramètres géométriques de la séquence ---

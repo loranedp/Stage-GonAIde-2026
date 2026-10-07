@@ -77,7 +77,7 @@ def fill_holes(preds_tensor):
             if c == 2:  # Intestin
                 kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (8, 8))
                 
-            # Supression des petites excroissances
+            # Suppression des petites excroissances
             new_mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel) # Ouverture morphologique
             # Remplissage des petites encoches sur le contour
             new_mask = cv2.morphologyEx(new_mask, cv2.MORPH_CLOSE, kernel) # Fermeture morphologique

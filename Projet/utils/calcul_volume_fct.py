@@ -87,7 +87,7 @@ def calculate_volumes(df, id, path, *, mask_size=None):
 
     df = df[df["type_image"] != "œufs"] # Filtrer les échos sans type "oeufs"
 
-    # ---- On parcours chaque échographie du poisson ----
+    # ---- On parcourt chaque échographie du poisson ----
     for index, row in df.iterrows():
         file_path = row["new_name_file"]
 
@@ -346,7 +346,7 @@ def calculate_eggs_volumes(df, id, path, *, mask_size=None):
 
     df = df[df["type_image"] == "œufs"] # Filtrer les écho de type "oeufs"
 
-    # ---- On parcours chaque échographie du poisson ----
+    # ---- On parcourt chaque échographie du poisson ----
     for index, row in df.iterrows():
         file_path = row["new_name_file"]
 

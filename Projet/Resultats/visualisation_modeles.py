@@ -150,7 +150,7 @@ def overlay_egg_instances(image_tensor, instance_mask, alpha=0.4,
 def prediction_sources(task_name):
     """Retourne les dossiers de prédictions à comparer pour une tâche.
 
-    Les sorties UNet sont organisées comme ``eval/<modele>/<tache>`` tandis
+    Les sorties U-Net sont organisées comme ``eval/<modele>/<tache>`` tandis
     que les sorties YOLO sont organisées comme ``eval/<type>/<tache>``.
     """
     sources = []
@@ -285,7 +285,7 @@ def run(task_names, dpi=150):
         ):
             axes_flat[index].imshow(display_image)
             axes_flat[index].set_title(
-                model_name, fontsize=16,
+                model_name.replace("UNet", "U-Net"), fontsize=16,
                 fontweight='bold', pad=8
             )
             axes_flat[index].axis('off')

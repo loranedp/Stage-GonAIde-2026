@@ -10,7 +10,7 @@ execute:
 ---
 
 ```{python}
-# -------- 1. Importation des pakages nécessaires --------
+# -------- 1. Importation des packages nécessaires --------
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -244,7 +244,7 @@ print(f"Nombre d'échographies longitudinales : {len(df_oeufs)}")
 :::: {.columns}
 
 ::: {.column width="50%"}
-#### Vrai annotations
+#### Vraies annotations
 
 ```{python}
 print(f"Nombre d'échographies transversales non vides : {(df_cavite["surface_gonade_true"] != 0).sum()}")
