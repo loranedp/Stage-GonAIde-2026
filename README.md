@@ -70,6 +70,7 @@ Les résultats sur l'échantillon de validation et de tests sont également disp
 
 ## En cas d'ajout de nouvelles données annotées
 - Telecharger depuis Roboflow les données au format "YOLO26" et "COCO segmentation"
+- Telecharger le fichier csv et le sauvegarder sous Projet/utils/correspondance_echo_final.xlsx
 - Mettre dans le dossier "data" avec les données non prétraitée sur OpenCloud
 - Remplacer toutes les images dans data (anciennes et nouvelles)
 - Lancer le pretraitement des données : python3 utils/pretraitement.py

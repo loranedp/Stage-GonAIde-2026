@@ -44,6 +44,7 @@ joblib==1.5.3
 joypy==0.2.6
 jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
+jupyter==1.1.1
 jupyter_client==8.9.1
 jupyter_core==5.9.1
 kiwisolver==1.5.0
@@ -90,6 +91,7 @@ python-dateutil==2.9.0.post0
 pytz==2026.2
 PyYAML==6.0.3
 pyzmq==27.1.0
+quarto-cli==1.10.18
 referencing==0.37.0
 regex==2026.7.19
 reportlab==5.0.0
