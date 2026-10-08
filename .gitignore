@@ -5,7 +5,6 @@ OpenUs_venv
 Projet/data
 .vscode
 __pycache__
-__init__.py
 checkpoint
 checkpoints
 

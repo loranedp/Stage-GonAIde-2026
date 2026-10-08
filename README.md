@@ -60,7 +60,7 @@ streamlit run Projet/App/app.py
 
 L'application est alors accessible à l'adresse http://localhost:8501
 
-Note : si les données entrées sont après 2025, il faut également re-télécharger le fichier csv mis à jours
+Note : si les données entrées sont après 2025, il faut également re-télécharger le fichier csv mis à jours et renommer les images. Un script R pour renommer les images est disponible sur Nextcloud.
 
 ## Résultats
 Les résultats du calcul des volumes et de la fécondité pour les poissons prédits dans l'interface sont disponibles dans 'Projet/Résultats/volumes_poissons.csv'.
