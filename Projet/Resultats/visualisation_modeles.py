@@ -16,7 +16,7 @@ from dataclasses import dataclass
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
-from utils.stats_fct import overlay_colored_mask, overlay_mask
+from utils.segmentation_visualization import overlay_colored_mask, overlay_mask
 
 
 # ============================ 2. Définition des chemins et paramètres ============================
@@ -31,6 +31,12 @@ OUTPUT_ROOT = PROJECT_ROOT / 'Resultats' / 'visualisation'
 TASKS = {
     'oeufs': {'num_classes': 1, 'image_dir': 'oeufs'},
     '2classes': {'num_classes': 2, 'image_dir': 'cavite'},
+}
+
+MODEL_DISPLAY_NAMES = {
+    'CSANet': 'CSA-Net',
+    'AttentionUNet++': 'ResAttentionUNet++',
+    'EggSegmentationHVUNet': 'SegHVUNet',
 }
 
 # ============================ 3. Visualisation des résultats ============================
@@ -274,7 +280,7 @@ def run(task_names, dpi=150):
         if true_display is not None:
             axes_flat[0].imshow(true_display)
             axes_flat[0].set_title(
-                'Annotation', fontsize=16,
+                'Annotation', fontsize=20,
                 fontweight='bold', pad=8
             )
             axes_flat[0].axis('off')
@@ -285,7 +291,9 @@ def run(task_names, dpi=150):
         ):
             axes_flat[index].imshow(display_image)
             axes_flat[index].set_title(
-                model_name.replace("UNet", "U-Net"), fontsize=16,
+                MODEL_DISPLAY_NAMES.get(
+                    model_name, model_name.replace("UNet", "U-Net")
+                ), fontsize=20,
                 fontweight='bold', pad=8
             )
             axes_flat[index].axis('off')

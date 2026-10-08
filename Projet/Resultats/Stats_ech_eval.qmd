@@ -290,7 +290,14 @@ df_final
 ## Vérification des surfaces des gonades et de la cavité - Annotations
 
 ```{python}
-plot_evolution_curves(df_other, var1 = "augmentation_surface_gonade_true", var2 = "augmentation_surface_cavite_true")
+plot_evolution_curves(
+    df_other,
+    var1="augmentation_surface_gonade_true",
+    var2="augmentation_surface_cavite_true",
+    text_fontsize=16,
+    tick_fontsize=14,
+    legend_fontsize=12,
+)
 ```
 
 ## Vérification des surfaces des gonades et de la cavité - Prédictions
@@ -528,6 +535,8 @@ df_diff_volumes_gonades, fig, ax = plot_differences_par_poisson(
     colonne_predite="volume_gonade_pred",
     colonne_annote="volume_gonade_true",
     ylabel="Volume prédit − volume annoté (cm³)",
+    text_fontsize=16,
+    tick_fontsize=12,
 )
 ```
 
@@ -553,6 +562,8 @@ df_diff_volumes_medians_oeufs, fig, ax = plot_differences_par_poisson(
     colonne_predite="volume_median_oeufs_mm3_pred",
     colonne_annote="volume_median_oeufs_mm3_true",
     ylabel="Volume prédit − volume annoté (mm³)",
+    text_fontsize=16,
+    tick_fontsize=12,
 )
 ```
 
@@ -979,6 +990,9 @@ else:
         xlabel="ID poisson",
         ylabel="Volume individuel d'un œuf (mm³)",
     )
+    ax.title.set_fontsize(16)
+    ax.xaxis.label.set_fontsize(16)
+    ax.yaxis.label.set_fontsize(16)
     ax.set_xticks(
         np.arange(len(ordre_poissons_6_oeufs)),
         labels=[
@@ -986,12 +1000,13 @@ else:
             for id_poisson in ordre_poissons_6_oeufs
         ],
     )
-    ax.tick_params(axis="x", labelrotation=90, labelsize=8)
+    ax.tick_params(axis="x", labelrotation=90, labelsize=12)
+    ax.tick_params(axis="y", labelsize=14)
     ax.grid(axis="y", alpha=0.2)
-    fig.subplots_adjust(right=0.78, bottom=0.22)
+    fig.subplots_adjust(right=0.78, bottom=0.30)
     ax.legend(
         title="ID poisson", bbox_to_anchor=(1.01, 1), loc="upper left",
-        ncol=2, fontsize=8, title_fontsize=9,
+        ncol=2, fontsize=12, title_fontsize=16,
     )
     plt.show()
 ```

@@ -451,7 +451,9 @@ df_diff_volumes_gonades, fig, ax = plot_differences_par_poisson(
     df_final,
     colonne_predite="volume_gonade_pred",
     colonne_annote="volume_gonade_true",
-    ylabel="Volume prédit − volume annoté (mm³)"
+    ylabel="Volume prédit − volume annoté",
+    text_fontsize=16,
+    tick_fontsize=12,
 )
 ```
 
@@ -467,7 +469,9 @@ nuage_points(
     xlabel="Volume annoté (en cm³)",
     ylabel="Volume prédit (en cm³)",
     couleur="teal",
-    diagonale=True
+    diagonale=True,
+    text_fontsize=16,
+    tick_fontsize=14,
 )
 print(df_final[["volume_gonade_true", "volume_gonade_pred"]])
 ```
@@ -647,7 +651,9 @@ df_diff_volumes_medians_oeufs, fig, ax = plot_differences_par_poisson(
     df_final,
     colonne_predite="volume_median_oeufs_mm3_pred",
     colonne_annote="volume_median_oeufs_mm3_true",
-    ylabel="Volume prédit − volume annoté (mm³)"
+    ylabel="Volume prédit − volume annoté (mm³)",
+    text_fontsize=16,
+    tick_fontsize=12,
 )
 ```
 
@@ -662,7 +668,9 @@ nuage_points(
     xlabel="Volume annoté (en cm³)",
     ylabel="Volume prédit (en cm³)",
     couleur="teal",
-    diagonale=True
+    diagonale=True,
+    text_fontsize=16,
+    tick_fontsize=14,
 )
 ```
 
