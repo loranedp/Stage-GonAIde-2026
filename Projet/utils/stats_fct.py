@@ -25,6 +25,8 @@ def plot_differences_par_poisson(
     ylabel="Valeur prédite − valeur annotée",
     figsize_par_poisson=0.4,
     hauteur=5,
+    text_fontsize=None,
+    tick_fontsize=8,
 ):
     """Trace les différences prédites − annotées, triées par poisson.
 
@@ -45,13 +47,17 @@ def plot_differences_par_poisson(
     ax.bar(x, donnees["difference"], color=couleurs)
     ax.axhline(0, color="black", linewidth=1)
     ax.set_xticks(x)
-    ax.set_xticklabels(donnees[colonne_id].astype(str), rotation=90, fontsize=8)
+    ax.set_xticklabels(donnees[colonne_id].astype(str), rotation=90, fontsize=tick_fontsize)
     ax.set(title="", xlabel="ID poisson", ylabel=ylabel)
+    if text_fontsize is not None:
+        ax.xaxis.label.set_fontsize(text_fontsize)
+        ax.yaxis.label.set_fontsize(text_fontsize)
+        ax.tick_params(axis='y', labelsize=text_fontsize)
     ax.grid(axis="y", alpha=0.2)
     ax.legend(handles=[
         Patch(facecolor="#4C78A8", label="Sous-estimation"),
         Patch(facecolor="#E45756", label="Surestimation"),
-    ])
+    ], fontsize=text_fontsize)
     fig.tight_layout()
     plt.show()
     return donnees, fig, ax
@@ -196,7 +202,9 @@ def nuage_points(
     ylabel="Axe Y",
     couleur="blue",
     ax=None,
-    diagonale=None
+    diagonale=None,
+    text_fontsize=12,
+    tick_fontsize=None,
 ):
     # Crée une figure seulement si aucun axe n'est fourni
     if ax is None:
@@ -234,9 +242,11 @@ def nuage_points(
     if diagonale:
         ax.axline((0, 0), slope=1, color="red", linestyle="--")
 
-    ax.set_title(titre, fontsize=14, pad=15)
-    ax.set_xlabel(xlabel, fontsize=12)
-    ax.set_ylabel(ylabel, fontsize=12)
+    ax.set_title(titre, fontsize=max(14, text_fontsize), pad=15)
+    ax.set_xlabel(xlabel, fontsize=text_fontsize)
+    ax.set_ylabel(ylabel, fontsize=text_fontsize)
+    if tick_fontsize is not None:
+        ax.tick_params(axis='both', labelsize=tick_fontsize)
 
     ax.grid(True, linestyle="--", alpha=0.5)
 
@@ -320,14 +330,15 @@ def linear_regression(x, y):
 
 
 
-def plot_evolution_curves(df, var1="augmentation_surface_gonade", var2="augmentation_surface_cavite"):
+def plot_evolution_curves(df, var1="augmentation_surface_gonade", var2="augmentation_surface_cavite",
+                          text_fontsize=None, tick_fontsize=None, legend_fontsize=None):
     """Trace les évolutions et adapte la hauteur au nombre de poissons."""
     poisson_ids = df["id poisson"].dropna().unique()
     colors = plt.cm.tab20(np.linspace(0, 1, 20))
 
     # Garder une hauteur de tracé lisible tout en donnant une ligne à chaque
     # poisson dans la légende. La légende est ainsi incluse dans la figure.
-    hauteur = max(5, 1.5 + 0.28 * len(poisson_ids))
+    hauteur = max(5, 1.5 + 0.28 * (legend_fontsize / 10 if legend_fontsize else 1) * len(poisson_ids))
 
     for colonne, marqueur, titre in (
         (var1, "o", "Augmentation de la surface des gonades selon la position de l'échographie"),
@@ -343,11 +354,14 @@ def plot_evolution_curves(df, var1="augmentation_surface_gonade", var2="augmenta
                 color=colors[i % 20],
                 label=f"Poisson {poisson_id}",
             )
-        ax.set_title(titre)
-        ax.set_xlabel("Position de l'échographie")
-        ax.set_ylabel("Augmentation de la surface (en %)")
+        ax.set_title(titre, fontsize=text_fontsize)
+        ax.set_xlabel("Position de l'échographie", fontsize=text_fontsize)
+        ax.set_ylabel("Augmentation de la surface (en %)", fontsize=text_fontsize)
+        if tick_fontsize is not None:
+            ax.tick_params(axis='both', labelsize=tick_fontsize)
         ax.grid(True)
-        ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), borderaxespad=0)
+        ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), borderaxespad=0,
+                  fontsize=legend_fontsize)
         plt.show()
 
 
